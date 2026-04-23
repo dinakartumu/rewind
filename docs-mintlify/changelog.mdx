@@ -5,34 +5,55 @@ description: API updates and new features.
 
 <Update label="April 23, 2026" tags={["Improvements"]}>
 
-## MCP server v0.4.3 -- full article content for deep reading
+## MCP server v0.4.3 -- reading-search polish across three cycles
 
-`GET /v1/reading/articles/{id}` now returns a `content` field containing the full plain-text article body (HTML-stripped from the stored Instapaper `get_text` capture). Previously Claude only saw the title, metadata, and the first ~3000 chars of excerpt — anything past that was a blind spot, especially on paywalled sources where the source URL itself was unreadable by the model. With `content` exposed, fetching `@rewind://article/{id}` gives Claude the entire piece for "summarize this," "what did it say about X," or "compare these three articles" kinds of questions. Typical article is 5-30 KB; the field is `null` for the 9 articles that never had their content enriched successfully.
+Three iteration passes on top of the v0.4.0 semantic-recall shipment, driven by real-session testing. Bundled into a single release.
 
-## MCP server v0.4.2 -- Instapaper deep-links + anti-hallucination + drift prevention
+### Full article content for deep reading
 
-Three targeted improvements based on real-session testing of v0.4.1.
+`GET /v1/reading/articles/{id}` now returns a `content` field with the full plain-text body (HTML-stripped from the stored Instapaper `get_text` capture). Before, Claude only saw the first ~3000 chars of excerpt — anything past that was a blind spot, especially on paywalled sources where the source URL itself is unreadable by the model. With `content` exposed, fetching `@rewind://article/{id}` gives Claude the entire piece for "summarize this," "what did it say about X," or "compare these three articles" kinds of questions. Typical article is 5-30 KB; the field is `null` for the 9 articles that never had their content enriched successfully.
 
-- **Instapaper deep-links on every reading article.** The reading API response now carries two extra URL fields:
-  - `instapaper_url` — `https://www.instapaper.com/read/{bookmark_id}`, the paywall-free archive copy with your highlights
-  - `instapaper_app_url` — `instapaper://read/{bookmark_id}`, iOS deep-link to the Instapaper app
-  Flows through `/v1/reading/recent`, `/v1/reading/articles/{id}`, `/v1/reading/articles/{id}/related`, `/v1/reading/highlights/*`, and `/v1/search` reading hits. MCP tools emit all three link variants (source, Instapaper web, Instapaper app) as distinct `resource_link` blocks. Ask Claude "give me the Instapaper link for that" and it can pull the Instapaper URL straight from the tool response.
-- **Anti-hallucination server instructions.** Testing surfaced Claude fabricating biographical details ("X was a writer on SNL") to bridge a vague query to a retrieved article when the excerpt didn't support the claim. New `SERVER_INSTRUCTIONS` enforce: only assert facts present in the excerpt, offer candidates when the top match doesn't clearly fit, quote short phrases to show sourcing, and fetch `@rewind://article/{id}` for the excerpt when in doubt. The `find-article` prompt gets a matching anti-hallucination block.
-- **Explicit tool routing nudge.** `SERVER_INSTRUCTIONS` now explicitly tells the model to prefer Rewind tools over conversation search / web search when the user references their own history. Caught the routing case where Claude was reaching for its built-in conversation search instead of the Rewind MCP on "find that article I saved".
-- **Drift prevention (infrastructure).** New `manifest-snapshot.test.ts` snapshots every registered tool / prompt / resource / URI template — adds or renames show up as a reviewable diff. New `scripts/check-docs.mjs` fails CI when a registered identifier is absent from the Mintlify docs. Tightened `server.test.ts:774` from `toBeGreaterThanOrEqual(29)` to `toBe(39)` — the inequality assertion was the reason `get_health` shipped undocumented in a prior release.
+### Instapaper deep-links on every reading article
 
-## MCP server v0.4.1 -- click-through links + cleaner output
+- `instapaper_url` — `https://www.instapaper.com/read/{bookmark_id}`, the paywall-free archive copy with your highlights
+- `instapaper_app_url` — `instapaper://read/{bookmark_id}`, iOS deep-link to the Instapaper app
 
-Polish pass on the v0.4.0 reading-search shipment. No new capabilities; existing tools read better in chat and link out to the actual source.
+Flows through `/v1/reading/recent`, `/v1/reading/articles/{id}`, `/v1/reading/articles/{id}/related`, `/v1/reading/highlights/*`, and `/v1/search` reading hits. MCP tools emit all three link variants (source, Instapaper web, Instapaper app) as distinct `resource_link` blocks. Ask Claude "give me the Instapaper link for that" and it can pull the Instapaper URL straight from the tool response.
 
-- **External URLs on search results.** `search`, `semantic_search`, and `find_similar_articles` now emit the article's real URL (nytimes.com, etc.) as a `text/html` resource_link alongside the internal `rewind://` drill-in. Models and clients can present clickable links to the source, not just opaque IDs.
-- **Inline domain + author.** Search result text lines now read `The Secret Weapon of S.N.L. by Jason Zinoman (nytimes.com)` instead of the FTS-internal `[reading/article]` prefix.
-- **No more `[ID: 42]` noise.** Stripped the internal-id bracketed prefix from user-visible text across all list tools (`get_recent_reads`, `get_recent_runs`, `get_recent_watches`, `browse_movies`, `get_top_*`, `get_personal_records`, collecting browse tools). IDs still live in `structuredContent.items[i]` for model chaining — they just no longer clutter the prose.
-- **Per-item drill-in links.** `browse_movies` and `get_personal_records` now emit `rewind://movie/{id}` and `rewind://activity/{id}` links per row.
+### Anti-hallucination server instructions
+
+Testing surfaced Claude fabricating biographical details ("X was a writer on SNL") to bridge a vague query to a retrieved article when the excerpt didn't support the claim. New `SERVER_INSTRUCTIONS` enforce:
+
+- Only assert facts present in the excerpt, description, or structured fields
+- Offer 2-3 candidates when the top match doesn't clearly fit, and ask which the user meant
+- Quote short phrases from the excerpt when citing a fact so the user can see sourcing
+- Fetch `@rewind://article/{id}` and read the excerpt before answering when in doubt
+
+The `find-article` prompt carries a matching anti-hallucination block.
+
+### Explicit tool routing nudge
+
+`SERVER_INSTRUCTIONS` now explicitly tells the model to prefer Rewind tools over conversation search / web search when the user references their own history ("that article I saved", "what was I listening to", etc.). Caught the case where Claude was reaching for its built-in conversation search instead of Rewind on "find that article I saved."
+
+### Click-through + output polish
+
+- `search`, `semantic_search`, and `find_similar_articles` emit the article's real URL (nytimes.com, etc.) as a `text/html` resource_link alongside the internal `rewind://` drill-in
+- Result text lines now read "The Secret Weapon of S.N.L. by Jason Zinoman (nytimes.com)" instead of the FTS-internal `[reading/article]` prefix
+- Stripped the `[ID: 42]` bracketed prefix from user-visible text across every list tool (`get_recent_reads`, `get_recent_runs`, `get_recent_watches`, `browse_movies`, `get_top_*`, `get_personal_records`, collecting browse tools). IDs still live in `structuredContent.items[i]` for model chaining
+- `browse_movies` and `get_personal_records` now emit per-row drill-in links (`rewind://movie/{id}`, `rewind://activity/{id}`)
+
+### Drift prevention (infrastructure)
+
+- New `manifest-snapshot.test.ts` snapshots every registered tool / prompt / resource / URI template — adds or renames surface as a reviewable diff in PR review (mirrors the existing `openapi-snapshot.test.ts` pattern)
+- New `scripts/check-docs.mjs` fails CI when a registered identifier is absent from the Mintlify docs
+- Tightened `server.test.ts` tool-count assertion from `toBeGreaterThanOrEqual(29)` to `toBe(39)` exact — the inequality is why `get_health` shipped undocumented in a prior release
 
 ## API
 
-- **`/v1/search`** responses include `url` and `author` fields for reading-article hits (null for other domains). Semantic path fills them via the existing JOIN; FTS path does a single follow-up lookup in `reading_items`.
+- **`/v1/search`** responses include `url`, `author`, `instapaper_url`, `instapaper_app_url` for reading-article hits (null on other domains). Semantic path fills them via the existing JOIN; FTS path does a single follow-up lookup in `reading_items`.
+- **`/v1/reading/articles/{id}`** gains `content` (full plain-text body), `instapaper_url`, and `instapaper_app_url`.
+- **`/v1/reading/highlights/*`** — the nested `article` object carries `instapaper_url` and `instapaper_app_url`.
+- **`/v1/reading/articles/{id}/related`** each result includes `instapaper_url` and `instapaper_app_url`.
 
 </Update>
 
