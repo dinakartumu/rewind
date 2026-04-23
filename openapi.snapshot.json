@@ -685,7 +685,7 @@
           "Listening"
         ],
         "summary": "Recent scrobbles",
-        "description": "Returns the most recent scrobbles. Supports date filtering via date, from, and to params.",
+        "description": "Returns the most recent scrobbles. Supports date filtering via date, from, and to params and page-based pagination.",
         "parameters": [
           {
             "schema": {
@@ -697,6 +697,17 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -4355,17 +4366,27 @@
           "Running"
         ],
         "summary": "Latest runs",
-        "description": "Returns the last N activities (default 5, max 20). Supports date filtering via date, from, and to params.",
+        "description": "Returns the last N activities (default 10, max 50). Supports date filtering via date, from, and to params and page-based pagination.",
         "parameters": [
           {
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -6597,11 +6618,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -10750,11 +10781,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -12557,11 +12598,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -13763,6 +13814,17 @@
           },
           {
             "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "string",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "description": "Single day (YYYY-MM-DD). Overrides from/to.",
@@ -14612,6 +14674,12 @@
                         "null"
                       ]
                     },
+                    "excerpt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "highlights": {
                       "type": "array",
                       "items": {
@@ -14682,6 +14750,7 @@
                     "saved_at",
                     "started_at",
                     "finished_at",
+                    "excerpt",
                     "highlights"
                   ]
                 },
@@ -14708,6 +14777,7 @@
                   "saved_at": "2026-03-18T14:30:00.000Z",
                   "started_at": "2026-03-19T08:00:00.000Z",
                   "finished_at": "2026-03-19T08:15:00.000Z",
+                  "excerpt": null,
                   "highlights": [
                     {
                       "id": 1,
@@ -15306,6 +15376,156 @@
                     "author": "Maxwell Zeff",
                     "domain": "wired.com",
                     "url": "https://www.wired.com/story/why-the-internet-isnt-working"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reading/highlights/{id}": {
+      "get": {
+        "operationId": "getReadingHighlight",
+        "tags": [
+          "Reading"
+        ],
+        "summary": "Highlight detail",
+        "description": "Returns a single highlight by internal Rewind id, with nested parent-article context.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "42"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Highlight detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "position": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "chapter": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "page": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "article": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "number"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "author": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "domain": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "author",
+                        "domain",
+                        "url"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "note",
+                    "position",
+                    "chapter",
+                    "page",
+                    "created_at",
+                    "article"
+                  ]
+                },
+                "example": {
+                  "id": 42,
+                  "text": "The question is not whether AI will transform society, but how quickly institutions can adapt.",
+                  "note": "Key thesis",
+                  "position": 1,
+                  "chapter": null,
+                  "page": null,
+                  "created_at": "2026-03-19T08:10:00.000Z",
+                  "article": {
+                    "id": 42,
+                    "title": "The Age of AI",
+                    "author": "Derek Thompson",
+                    "domain": "theatlantic.com",
+                    "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai"
                   }
                 }
               }
@@ -16609,7 +16829,7 @@
           "Search"
         ],
         "summary": "Cross-domain search",
-        "description": "Full-text search across all data domains (listening, running, watching, collecting).",
+        "description": "Full-text search across all data domains (listening, running, watching, collecting, reading).",
         "parameters": [
           {
             "schema": {
@@ -16628,7 +16848,8 @@
                 "listening",
                 "running",
                 "watching",
-                "collecting"
+                "collecting",
+                "reading"
               ],
               "description": "Filter results to a specific domain"
             },
@@ -16694,6 +16915,34 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "image": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "cdn_url": {
+                                "type": "string"
+                              },
+                              "thumbhash": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "dominant_color": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "cdn_url",
+                              "thumbhash",
+                              "dominant_color"
+                            ]
                           }
                         },
                         "required": [
@@ -16702,7 +16951,8 @@
                           "entity_id",
                           "title",
                           "subtitle",
-                          "image_key"
+                          "image_key",
+                          "image"
                         ]
                       }
                     },
@@ -16723,7 +16973,8 @@
                       "entity_id": "189",
                       "title": "Nirvana",
                       "subtitle": null,
-                      "image_key": null
+                      "image_key": null,
+                      "image": null
                     }
                   ],
                   "pagination": {
@@ -17081,6 +17332,243 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reindex-search": {
+      "post": {
+        "operationId": "reindexSearch",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Rebuild the FTS search_index",
+        "description": "Truncates and repopulates the search_index FTS table from source tables. Pass `domains` in the body to limit scope; default rebuilds all five domains.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "reading",
+                        "watching",
+                        "listening",
+                        "running",
+                        "collecting"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reindex complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domains": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "indexed": {
+                            "type": "number"
+                          },
+                          "took_ms": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "indexed",
+                          "took_ms"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "domains"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reenrich-reading": {
+      "post": {
+        "operationId": "reenrichReading",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Retry enrichment for failed reading items",
+        "description": "Iterates reading_items where enrichment_status = \"failed\" and re-runs enrichArticle on each. Instapaper often has full body text even when the original URL fetch 403s, so this typically rescues articles that stalled on legacy OG-fetch errors.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Re-enrichment complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "retried": {
+                      "type": "number"
+                    },
+                    "succeeded": {
+                      "type": "number"
+                    },
+                    "still_failed": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "retried",
+                    "succeeded",
+                    "still_failed",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/backfill-body-excerpt": {
+      "post": {
+        "operationId": "backfillBodyExcerpt",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Populate reading_items.body_excerpt from existing content column",
+        "description": "Iterates reading_items WHERE body_excerpt IS NULL AND content IS NOT NULL and applies htmlToText to derive the excerpt. Idempotent: re-running touches nothing already populated.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "scanned",
+                    "updated",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {

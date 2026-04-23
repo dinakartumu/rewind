@@ -291,12 +291,17 @@ export async function enrichArticle(
 
 /**
  * Upsert highlights for a bookmark from a pre-fetched list.
+ * Returns the DB rows (including generated ids) so the caller can index
+ * newly-inserted highlights into the search index.
  */
 async function upsertHighlights(
   db: Database,
   itemId: number,
   highlights: InstapaperHighlight[]
-): Promise<number> {
+): Promise<{
+  count: number;
+  rows: { id: number; text: string; note: string | null }[];
+}> {
   let count = 0;
   const returnedSourceIds: string[] = [];
 
@@ -335,7 +340,18 @@ async function upsertHighlights(
       .where(eq(readingHighlights.itemId, itemId));
   }
 
-  return count;
+  // Read back the final set for this item so the caller can index the
+  // current snapshot in FTS. Including note so body contains both.
+  const rows = await db
+    .select({
+      id: readingHighlights.id,
+      text: readingHighlights.text,
+      note: readingHighlights.note,
+    })
+    .from(readingHighlights)
+    .where(eq(readingHighlights.itemId, itemId));
+
+  return { count, rows };
 }
 
 /**
@@ -347,12 +363,15 @@ async function syncHighlights(
   client: InstapaperClient,
   itemId: number,
   bookmarkId: number
-): Promise<number> {
+): Promise<{
+  count: number;
+  rows: { id: number; text: string; note: string | null }[];
+}> {
   let highlights;
   try {
     highlights = await client.listHighlights(bookmarkId);
   } catch {
-    return 0;
+    return { count: 0, rows: [] };
   }
   return upsertHighlights(db, itemId, highlights);
 }
@@ -523,10 +542,26 @@ export async function syncReading(
 
         // Sync highlights — use inline highlights if available, otherwise fetch individually
         const inlineHighlights = highlightsByBookmark.get(bookmark.bookmark_id);
-        const hCount = inlineHighlights
+        const hResult = inlineHighlights
           ? await upsertHighlights(db, id, inlineHighlights)
           : await syncHighlights(db, client, id, bookmark.bookmark_id);
-        highlightsSynced += hCount;
+        highlightsSynced += hResult.count;
+
+        // Index each highlight in FTS so `search` can hit them independently
+        // from the parent article. Title = first 80 chars, subtitle = parent,
+        // body = full text (+ note if any) for longer matches.
+        for (const h of hResult.rows) {
+          const title = h.text.length > 80 ? h.text.slice(0, 80) + '…' : h.text;
+          const body = h.note ? `${h.text} ${h.note}` : h.text;
+          searchItems.push({
+            domain: 'reading',
+            entityType: 'highlight',
+            entityId: String(h.id),
+            title,
+            subtitle: bookmark.title,
+            body: body.length > title.length ? body : undefined,
+          });
+        }
       }
     }
 

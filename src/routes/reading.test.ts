@@ -403,6 +403,42 @@ describe('reading routes', () => {
     });
   });
 
+  // ─── GET /v1/reading/highlights/{id} ────────────────────────────────
+
+  describe('GET /v1/reading/highlights/{id}', () => {
+    it('returns a single highlight with article context', async () => {
+      const articleId = await seedArticle({
+        source_id: 'hl-detail-1',
+        title: 'Detail Article',
+        url: 'https://ex.com/detail',
+      });
+      const highlightId = await seedHighlight(articleId, {
+        source_id: 'hl-detail-h1',
+        text: 'Detail text',
+        note: 'Detail note',
+      });
+
+      const res = await authFetch(`/v1/reading/highlights/${highlightId}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.id).toBe(highlightId);
+      expect(body.text).toBe('Detail text');
+      expect(body.note).toBe('Detail note');
+      expect(body.article.id).toBe(articleId);
+      expect(body.article.title).toBe('Detail Article');
+    });
+
+    it('returns 404 for missing highlight', async () => {
+      const res = await authFetch('/v1/reading/highlights/99999');
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 for invalid id', async () => {
+      const res = await authFetch('/v1/reading/highlights/abc');
+      expect(res.status).toBe(400);
+    });
+  });
+
   // ─── GET /v1/reading/stats ──────────────────────────────────────────
 
   describe('GET /v1/reading/stats', () => {

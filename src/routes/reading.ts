@@ -593,6 +593,49 @@ const highlightRandomRoute = createRoute({
   },
 });
 
+// 7b. GET /highlights/{id}
+const highlightDetailRoute = createRoute({
+  method: 'get',
+  path: '/highlights/{id}',
+  operationId: 'getReadingHighlight',
+  tags: ['Reading'],
+  summary: 'Highlight detail',
+  description:
+    'Returns a single highlight by internal Rewind id, with nested parent-article context.',
+  request: {
+    params: z.object({
+      id: z.string().openapi({ example: '42' }),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'Highlight detail',
+      content: {
+        'application/json': {
+          schema: HighlightWithArticleSchema,
+          example: {
+            id: 42,
+            text: 'The question is not whether AI will transform society, but how quickly institutions can adapt.',
+            note: 'Key thesis',
+            position: 1,
+            chapter: null,
+            page: null,
+            created_at: '2026-03-19T08:10:00.000Z',
+            article: {
+              id: 42,
+              title: 'The Age of AI',
+              author: 'Derek Thompson',
+              domain: 'theatlantic.com',
+              url: 'https://www.theatlantic.com/technology/archive/2025/the-age-of-ai',
+            },
+          },
+        },
+      },
+    },
+    ...errorResponses(401, 404),
+  },
+});
+
 // 8. GET /stats
 const statsRoute = createRoute({
   method: 'get',
@@ -1136,6 +1179,53 @@ reading.openapi(highlightRandomRoute, async (c) => {
     .limit(1);
 
   if (!row) return notFound(c, 'No highlights found') as any;
+
+  return c.json({
+    id: row.id,
+    text: row.text,
+    note: row.note,
+    position: row.position,
+    chapter: row.chapter,
+    page: row.page,
+    created_at: row.createdAt,
+    article: {
+      id: row.articleId,
+      title: row.articleTitle,
+      author: row.articleAuthor,
+      domain: row.articleDomain,
+      url: row.articleUrl,
+    },
+  });
+});
+
+// 7b. GET /highlights/{id}
+reading.openapi(highlightDetailRoute, async (c) => {
+  setCache(c, 'medium');
+  const db = createDb(c.env.DB);
+  const id = parseInt(c.req.param('id'));
+  if (isNaN(id)) return badRequest(c, 'Invalid highlight ID') as any;
+
+  const [row] = await db
+    .select({
+      id: readingHighlights.id,
+      text: readingHighlights.text,
+      note: readingHighlights.note,
+      position: readingHighlights.position,
+      chapter: readingHighlights.chapter,
+      page: readingHighlights.page,
+      createdAt: readingHighlights.createdAt,
+      articleId: readingItems.id,
+      articleTitle: readingItems.title,
+      articleAuthor: readingItems.author,
+      articleDomain: readingItems.domain,
+      articleUrl: readingItems.url,
+    })
+    .from(readingHighlights)
+    .innerJoin(readingItems, eq(readingHighlights.itemId, readingItems.id))
+    .where(and(eq(readingHighlights.id, id), eq(readingHighlights.userId, 1)))
+    .limit(1);
+
+  if (!row) return notFound(c, 'Highlight not found') as any;
 
   return c.json({
     id: row.id,

@@ -48,15 +48,15 @@ Original plan was per-domain image_key plumbing. During implementation we found 
 - [x] **1.6.4** `search` tool emits imageBlocks (top-5) when result.image is non-null, uses `LIST_IMAGE_PX` (150px) transform
 - [x] **1.6.5** `SearchResult` type extended with `image: {cdn_url, thumbhash, dominant_color} | null`
 
-**1.7 -- Deploy + smoke test** -- PARTIAL; BLOCKED by 1.8
+**1.7 -- Deploy + smoke test** -- MOSTLY COMPLETE
 
-- [x] **1.7.1** Migration file ready; no drizzle-kit generate needed (raw SQL FTS migration)
+- [x] **1.7.1** Migration file ready
 - [x] **1.7.2** `npm test` green: API 576/576, MCP 98/98
 - [x] **1.7.3** Deployed API to prod (commit 8ed0284, version 930e59cc). Migration 0026 applied successfully to remote D1.
 - [x] **1.7.4a** Reindex endpoint hit. reading: 1110, watching: 710, listening: 45591 -- all indexed. running + collecting failed late with D1 tail errors after listening's 190s burst; re-running those two individually after a minute resolves (see 1.7.7).
-- [x] **1.7.4b** `search?q=SNL` hits the NYT article (entity_id 6) and three other SNL-related articles. Acronym-normalization path works end-to-end.
-- [ ] **1.7.4c** `search?q=SNL+writer` returns the NYT article. **Blocked by 1.8**: the article's `description` is null because enrichment failed (HTTP 403 on nytimes.com OG fetch), so there is no "writer" token anywhere on that indexed row to match.
-- [ ] **1.7.5** MCP smoke test in Claude Desktop
+- [x] **1.7.4b** `search?q=SNL` hits the NYT article (entity_id 6) and three other SNL-related articles.
+- [x] **1.7.4c** `search?q=SNL+writer` returns the NYT article (ranked #3 after other SNL-adjacent pieces — once Phase 2 backfill combined with Phase 1.8 reenrichment landed, the body excerpt made the match work end-to-end). Full article excerpt -- including "Jim Downey" -- is returned by the `excerpt` field on `/v1/reading/articles/6`.
+- [ ] **1.7.5** MCP smoke test in Claude Desktop (verify search tool returns the article + that fetching `rewind://article/6` surfaces the excerpt)
 - [ ] **1.7.6** Bump mcp-server to 0.4.0, rebuild, `npm publish`
 - [ ] **1.7.7** Re-run reindex for running + collecting domains individually to backfill what tail-errored
 

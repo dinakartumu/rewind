@@ -10,7 +10,7 @@ import { errorResponses } from '../lib/schemas/common.js';
 import { createDb } from '../db/client.js';
 import { eq, sql } from 'drizzle-orm';
 import { upsertSearchIndexBatch, type SearchIndexItem } from './search.js';
-import { readingItems } from '../db/schema/reading.js';
+import { readingItems, readingHighlights } from '../db/schema/reading.js';
 import { movies } from '../db/schema/watching.js';
 import {
   lastfmArtists,
@@ -328,7 +328,7 @@ async function buildReading(
     .from(readingItems)
     .where(eq(readingItems.userId, 1));
 
-  return rows.map((r) => ({
+  const items: SearchIndexItem[] = rows.map((r) => ({
     domain: 'reading',
     entityType: 'article',
     entityId: String(r.id),
@@ -336,6 +336,36 @@ async function buildReading(
     subtitle: r.description ?? undefined,
     body: r.bodyExcerpt ?? undefined,
   }));
+
+  // Highlights: one FTS row per saved highlight. Title = first 80 chars of
+  // the highlight text, subtitle = parent article title, body = the full
+  // highlight text + optional note so long highlights still match on body.
+  const highlightRows = await db
+    .select({
+      id: readingHighlights.id,
+      text: readingHighlights.text,
+      note: readingHighlights.note,
+      parentTitle: readingItems.title,
+    })
+    .from(readingHighlights)
+    .innerJoin(readingItems, eq(readingHighlights.itemId, readingItems.id))
+    .where(eq(readingHighlights.userId, 1));
+
+  for (const h of highlightRows) {
+    const text = h.text ?? '';
+    const title = text.length > 80 ? text.slice(0, 80) + '…' : text;
+    const body = h.note ? `${text} ${h.note}` : text;
+    items.push({
+      domain: 'reading',
+      entityType: 'highlight',
+      entityId: String(h.id),
+      title,
+      subtitle: h.parentTitle,
+      body: body.length > title.length ? body : undefined,
+    });
+  }
+
+  return items;
 }
 
 async function buildWatching(
