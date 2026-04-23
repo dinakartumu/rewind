@@ -185,7 +185,12 @@ webhooks.openapi(plexWebhookRoute, async (c) => {
   const db = createDb(c.env.DB);
   const tmdbClient = new TmdbClient(c.env.TMDB_API_KEY);
 
-  const result = await handlePlexWebhook(db, payload, tmdbClient);
+  const result = await handlePlexWebhook(
+    db,
+    payload,
+    tmdbClient,
+    c.env.PLEX_OWNER_ACCOUNT_TITLE
+  );
 
   // Process image in the background so artwork is available immediately
   if (result.entity) {

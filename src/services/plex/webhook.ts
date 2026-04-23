@@ -132,12 +132,14 @@ async function isEventProcessed(
 async function recordWebhookEvent(
   db: Database,
   eventId: string,
-  eventType: string
+  eventType: string,
+  accountTitle: string | null
 ): Promise<void> {
   await db.insert(webhookEvents).values({
     eventSource: 'plex',
     eventId,
     eventType,
+    accountTitle,
   });
 }
 
@@ -440,16 +442,20 @@ export interface PlexWebhookResult {
 export async function handlePlexWebhook(
   db: Database,
   payload: PlexWebhookPayload,
-  tmdbClient: TmdbClient
+  tmdbClient: TmdbClient,
+  ownerAccountTitle: string
 ): Promise<PlexWebhookResult> {
-  // Only process events from the server owner
-  if (!payload.owner) {
+  // Only process events from the configured server owner account.
+  // Plex's `owner` boolean is unreliable: some client platforms (e.g. Tizen)
+  // report non-owner plays with owner=true, so we also gate on Account.title.
+  const accountTitle = payload.Account?.title;
+  if (!payload.owner || !accountTitle || accountTitle !== ownerAccountTitle) {
     console.log(
-      `[INFO] Ignoring Plex webhook from non-owner: ${payload.Account?.title ?? 'unknown'}`
+      `[INFO] Ignoring Plex webhook from non-owner: ${accountTitle ?? 'unknown'} (owner=${payload.owner})`
     );
     return {
       success: true,
-      message: `Ignored: non-owner user ${payload.Account?.title ?? 'unknown'}`,
+      message: `Ignored: non-owner user ${accountTitle ?? 'unknown'}`,
     };
   }
 
@@ -485,7 +491,12 @@ export async function handlePlexWebhook(
 
   if (result.success) {
     // Record the event as processed
-    await recordWebhookEvent(db, eventId, `media.scrobble.${mediaType}`);
+    await recordWebhookEvent(
+      db,
+      eventId,
+      `media.scrobble.${mediaType}`,
+      accountTitle
+    );
 
     // Recompute watch stats (cron sync does this, webhook previously did not)
     await computeWatchStats(db);

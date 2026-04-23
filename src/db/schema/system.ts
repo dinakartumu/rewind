@@ -126,6 +126,7 @@ export const webhookEvents = sqliteTable(
     eventSource: text('event_source').notNull(),
     eventId: text('event_id').notNull(),
     eventType: text('event_type'),
+    accountTitle: text('account_title'),
     processedAt: text('processed_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
