@@ -9,6 +9,7 @@ import { getImageAttachment, getImageAttachmentBatch } from '../lib/images.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import { errorResponses, PaginationMeta } from '../lib/schemas/common.js';
 import { vectorIdForArticle } from '../services/embeddings/reading.js';
+import { htmlToText } from '../lib/html-to-text.js';
 
 const reading = createOpenAPIApp();
 
@@ -70,6 +71,7 @@ const HighlightSchema = z.object({
 
 const ArticleDetailSchema = ArticleSchema.extend({
   excerpt: z.string().nullable(),
+  content: z.string().nullable(),
   highlights: z.array(HighlightSchema),
 });
 
@@ -405,6 +407,7 @@ const articleDetailRoute = createRoute({
             started_at: '2026-03-19T08:00:00.000Z',
             finished_at: '2026-03-19T08:15:00.000Z',
             excerpt: null,
+            content: null,
             highlights: [
               {
                 id: 1,
@@ -1121,9 +1124,15 @@ reading.openapi(articleDetailRoute, async (c) => {
 
   const image = await getImageAttachment(db, 'reading', 'articles', String(id));
 
+  // Full plain-text body, stripped from the stored HTML. Null when the
+  // article never had its content enriched (paywalled source with an
+  // auth error, deleted Instapaper bookmark, etc.).
+  const content = article.content ? htmlToText(article.content) : null;
+
   return c.json({
     ...formatArticle(article, image),
     excerpt: article.bodyExcerpt ?? null,
+    content,
     highlights: highlights.map((h) => ({
       id: h.id,
       text: h.text,

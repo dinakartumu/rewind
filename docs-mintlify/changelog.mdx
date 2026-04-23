@@ -5,6 +5,10 @@ description: API updates and new features.
 
 <Update label="April 23, 2026" tags={["Improvements"]}>
 
+## MCP server v0.4.3 -- full article content for deep reading
+
+`GET /v1/reading/articles/{id}` now returns a `content` field containing the full plain-text article body (HTML-stripped from the stored Instapaper `get_text` capture). Previously Claude only saw the title, metadata, and the first ~3000 chars of excerpt — anything past that was a blind spot, especially on paywalled sources where the source URL itself was unreadable by the model. With `content` exposed, fetching `@rewind://article/{id}` gives Claude the entire piece for "summarize this," "what did it say about X," or "compare these three articles" kinds of questions. Typical article is 5-30 KB; the field is `null` for the 9 articles that never had their content enriched successfully.
+
 ## MCP server v0.4.2 -- Instapaper deep-links + anti-hallucination + drift prevention
 
 Three targeted improvements based on real-session testing of v0.4.1.
