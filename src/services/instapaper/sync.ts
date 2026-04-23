@@ -227,7 +227,7 @@ async function upsertBookmark(
 /**
  * Enrich a new article with OG metadata and word count.
  */
-async function enrichArticle(
+export async function enrichArticle(
   db: Database,
   client: InstapaperClient,
   itemId: number,
@@ -248,15 +248,17 @@ async function enrichArticle(
   }
 
   // Fetch article text for word count
+  let getTextError: string | null = null;
   try {
     const html = await client.getText(bookmarkId);
     const { wordCount, estimatedReadMin } = computeWordCount(html);
     updates.content = html;
     updates.wordCount = wordCount;
     updates.estimatedReadMin = estimatedReadMin;
-  } catch {
+  } catch (err) {
+    getTextError = err instanceof Error ? err.message : String(err);
     console.log(
-      `[SYNC] Failed to get text for bookmark ${bookmarkId}, skipping word count`
+      `[SYNC] Failed to get text for bookmark ${bookmarkId}: ${getTextError}`
     );
   }
 
@@ -269,12 +271,16 @@ async function enrichArticle(
       .set(updates)
       .where(eq(readingItems.id, itemId));
   } else if (url) {
-    // OG fetch returned nothing — mark as failed
+    // Both OG fetch and getText came back empty/errored — mark as failed with
+    // the real reason so re-enrichment and debugging have something to go on.
+    const reason = getTextError
+      ? `getText: ${getTextError}`
+      : 'No OG metadata found';
     await db
       .update(readingItems)
       .set({
         enrichmentStatus: 'failed',
-        enrichmentError: 'No OG metadata found',
+        enrichmentError: reason,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(readingItems.id, itemId));

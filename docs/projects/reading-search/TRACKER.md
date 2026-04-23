@@ -48,14 +48,46 @@ Original plan was per-domain image_key plumbing. During implementation we found 
 - [x] **1.6.4** `search` tool emits imageBlocks (top-5) when result.image is non-null, uses `LIST_IMAGE_PX` (150px) transform
 - [x] **1.6.5** `SearchResult` type extended with `image: {cdn_url, thumbhash, dominant_color} | null`
 
-**1.7 -- Deploy + smoke test** -- AWAITING USER
+**1.7 -- Deploy + smoke test** -- PARTIAL; BLOCKED by 1.8
 
 - [x] **1.7.1** Migration file ready; no drizzle-kit generate needed (raw SQL FTS migration)
 - [x] **1.7.2** `npm test` green: API 576/576, MCP 98/98
-- [ ] **1.7.3** Deploy API to prod (`npm run deploy` from repo root); after deploy, hit `POST https://api.rewind.rest/v1/admin/reindex-search` once with admin Bearer
-- [ ] **1.7.4** Smoke test: `curl 'https://api.rewind.rest/v1/search?q=SNL+writer&domain=reading' -H 'Authorization: Bearer rw_...'` returns the NYT article with `image` populated
-- [ ] **1.7.5** Smoke test: in Claude Desktop, MCP `search "SNL writer"` returns the article with hero image block + resource_link to `rewind://article/{id}`
+- [x] **1.7.3** Deployed API to prod (commit 8ed0284, version 930e59cc). Migration 0026 applied successfully to remote D1.
+- [x] **1.7.4a** Reindex endpoint hit. reading: 1110, watching: 710, listening: 45591 -- all indexed. running + collecting failed late with D1 tail errors after listening's 190s burst; re-running those two individually after a minute resolves (see 1.7.7).
+- [x] **1.7.4b** `search?q=SNL` hits the NYT article (entity_id 6) and three other SNL-related articles. Acronym-normalization path works end-to-end.
+- [ ] **1.7.4c** `search?q=SNL+writer` returns the NYT article. **Blocked by 1.8**: the article's `description` is null because enrichment failed (HTTP 403 on nytimes.com OG fetch), so there is no "writer" token anywhere on that indexed row to match.
+- [ ] **1.7.5** MCP smoke test in Claude Desktop
 - [ ] **1.7.6** Bump mcp-server to 0.4.0, rebuild, `npm publish`
+- [ ] **1.7.7** Re-run reindex for running + collecting domains individually to backfill what tail-errored
+
+## Phase 1.8: Enrichment retry (unblocks Phase 1 smoke test) -- NEW
+
+491 of 1110 reading_items rows (44%) have `enrichment_status = 'failed'`. Root cause: `enrichArticle` in `src/services/instapaper/sync.ts` calls `fetchOgMetadata(url)` without its own try/catch, so a 403 from paywalled sites (NYT, FT, etc.) aborts the whole function before `client.getText(bookmarkId)` runs. Instapaper actually has the full body text in all these cases -- we just never fetched it.
+
+Impact:
+
+- 44% of articles have `description = null`, `content = null`, `author = null`, `word_count = null`
+- Phase 1 search quality is proportionally degraded (only title is searchable on these rows)
+- Phase 2 body indexing has nothing to index for these articles
+- Phase 4 embeddings will be low-quality for these (title-only)
+
+**1.8.1 Fix the bug**
+
+- [ ] Wrap `fetchOgMetadata(url)` in `src/services/instapaper/sync.ts` in its own try/catch so a URL failure doesn't abort `client.getText`
+- [ ] When either step succeeds, record `enrichmentStatus = 'completed'`. When both fail, `failed` with the combined errors. Partial success is the common case.
+- [ ] Unit test: OG throws + getText succeeds -> content populated, description null, status 'completed'
+
+**1.8.2 Retry admin endpoint**
+
+- [ ] `POST /v1/admin/reenrich-reading` iterates `reading_items WHERE enrichment_status = 'failed'`, rate-limited, calls the fixed `enrichArticle` for each
+- [ ] Returns `{ retried: N, succeeded: M, failed: P }`
+- [ ] Reasonable rate (5 req/s) to avoid Instapaper API limits
+
+**1.8.3 Run once against prod**
+
+- [ ] Hit `/v1/admin/reenrich-reading`; expect 491 articles retried, most succeed on the getText path
+- [ ] Re-run `/v1/admin/reindex-search {domains: ['reading']}` to pick up new descriptions
+- [ ] Confirm `search?q=SNL+writer` now returns the NYT article
 
 ## Phase 2: Tier 2 -- body indexing -- BLOCKED on Phase 1
 

@@ -1,8 +1,7 @@
 /**
- * POST /v1/admin/reindex-search -- rebuild the FTS search_index from source tables.
- *
- * After migration 0026 drops + recreates the FTS table with a new schema,
- * this endpoint repopulates it. Safe to re-run at any time.
+ * Admin maintenance endpoints:
+ *   POST /v1/admin/reindex-search   -- rebuild FTS from source tables
+ *   POST /v1/admin/reenrich-reading -- retry enrichArticle for failed rows
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
@@ -25,6 +24,8 @@ import {
   discogsReleaseArtists,
   discogsArtists,
 } from '../db/schema/discogs.js';
+import { InstapaperClient } from '../services/instapaper/client.js';
+import { enrichArticle } from '../services/instapaper/sync.js';
 
 const ALL_DOMAINS = [
   'reading',
@@ -113,6 +114,111 @@ adminReindex.openapi(reindexRoute, async (c) => {
   }
 
   return c.json({ domains: results });
+});
+
+// ─── Re-enrichment ───────────────────────────────────────────────────
+
+const ReenrichBodySchema = z
+  .object({
+    limit: z.number().int().min(1).max(2000).optional(),
+  })
+  .optional();
+
+const ReenrichResponseSchema = z.object({
+  retried: z.number(),
+  succeeded: z.number(),
+  still_failed: z.number(),
+  took_ms: z.number(),
+});
+
+const reenrichRoute = createRoute({
+  method: 'post',
+  path: '/reenrich-reading',
+  operationId: 'reenrichReading',
+  tags: ['Admin'],
+  summary: 'Retry enrichment for failed reading items',
+  description:
+    'Iterates reading_items where enrichment_status = "failed" and re-runs enrichArticle on each. Instapaper often has full body text even when the original URL fetch 403s, so this typically rescues articles that stalled on legacy OG-fetch errors.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: ReenrichBodySchema } },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Re-enrichment complete',
+      content: {
+        'application/json': { schema: ReenrichResponseSchema },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminReindex.openapi(reenrichRoute, async (c) => {
+  const env = c.env as {
+    INSTAPAPER_CONSUMER_KEY: string;
+    INSTAPAPER_CONSUMER_SECRET: string;
+    INSTAPAPER_ACCESS_TOKEN: string;
+    INSTAPAPER_ACCESS_TOKEN_SECRET: string;
+  };
+  const db = createDb(c.env.DB);
+
+  const body = (await c.req.json().catch(() => undefined)) as
+    | { limit?: number }
+    | undefined;
+  const limit = body?.limit ?? 500;
+
+  const client = new InstapaperClient(
+    env.INSTAPAPER_CONSUMER_KEY,
+    env.INSTAPAPER_CONSUMER_SECRET,
+    env.INSTAPAPER_ACCESS_TOKEN,
+    env.INSTAPAPER_ACCESS_TOKEN_SECRET
+  );
+
+  const t0 = Date.now();
+  const rows = await db
+    .select({
+      id: readingItems.id,
+      sourceId: readingItems.sourceId,
+      url: readingItems.url,
+    })
+    .from(readingItems)
+    .where(
+      sql`${readingItems.userId} = 1 AND ${readingItems.enrichmentStatus} = 'failed'`
+    )
+    .limit(limit);
+
+  let succeeded = 0;
+  let stillFailed = 0;
+
+  for (const row of rows) {
+    const bookmarkId = Number(row.sourceId);
+    if (!bookmarkId) {
+      stillFailed++;
+      continue;
+    }
+    try {
+      await enrichArticle(db, client, row.id, bookmarkId, row.url);
+      const [after] = await db
+        .select({ status: readingItems.enrichmentStatus })
+        .from(readingItems)
+        .where(eq(readingItems.id, row.id))
+        .limit(1);
+      if (after?.status === 'completed') succeeded++;
+      else stillFailed++;
+    } catch {
+      stillFailed++;
+    }
+  }
+
+  return c.json({
+    retried: rows.length,
+    succeeded,
+    still_failed: stillFailed,
+    took_ms: Date.now() - t0,
+  });
 });
 
 async function buildSearchItemsForDomain(
