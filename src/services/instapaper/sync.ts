@@ -19,6 +19,7 @@ import {
 } from './transforms.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
+import { htmlToText } from '../../lib/html-to-text.js';
 
 interface SyncResult {
   itemsSynced: number;
@@ -253,6 +254,7 @@ export async function enrichArticle(
     const html = await client.getText(bookmarkId);
     const { wordCount, estimatedReadMin } = computeWordCount(html);
     updates.content = html;
+    updates.bodyExcerpt = htmlToText(html, { maxChars: 3000 });
     updates.wordCount = wordCount;
     updates.estimatedReadMin = estimatedReadMin;
   } catch (err) {

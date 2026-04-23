@@ -27,6 +27,7 @@ export const readingItems = sqliteTable(
     domain: text('domain'),
     siteName: text('site_name'),
     content: text('content'),
+    bodyExcerpt: text('body_excerpt'),
     wordCount: integer('word_count'),
     estimatedReadMin: integer('estimated_read_min'),
     publishedAt: text('published_at'),

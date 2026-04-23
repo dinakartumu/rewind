@@ -26,6 +26,7 @@ import {
 } from '../db/schema/discogs.js';
 import { InstapaperClient } from '../services/instapaper/client.js';
 import { enrichArticle } from '../services/instapaper/sync.js';
+import { htmlToText } from '../lib/html-to-text.js';
 
 const ALL_DOMAINS = [
   'reading',
@@ -221,6 +222,81 @@ adminReindex.openapi(reenrichRoute, async (c) => {
   });
 });
 
+// ─── Body-excerpt backfill ───────────────────────────────────────────
+
+const BackfillBodyBodySchema = z
+  .object({
+    limit: z.number().int().min(1).max(5000).optional(),
+  })
+  .optional();
+
+const BackfillBodyResponseSchema = z.object({
+  scanned: z.number(),
+  updated: z.number(),
+  took_ms: z.number(),
+});
+
+const backfillBodyRoute = createRoute({
+  method: 'post',
+  path: '/backfill-body-excerpt',
+  operationId: 'backfillBodyExcerpt',
+  tags: ['Admin'],
+  summary: 'Populate reading_items.body_excerpt from existing content column',
+  description:
+    'Iterates reading_items WHERE body_excerpt IS NULL AND content IS NOT NULL and applies htmlToText to derive the excerpt. Idempotent: re-running touches nothing already populated.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: BackfillBodyBodySchema } },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Backfill complete',
+      content: {
+        'application/json': { schema: BackfillBodyResponseSchema },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminReindex.openapi(backfillBodyRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  const body = (await c.req.json().catch(() => undefined)) as
+    | { limit?: number }
+    | undefined;
+  const limit = body?.limit ?? 2000;
+
+  const t0 = Date.now();
+  const rows = await db
+    .select({ id: readingItems.id, content: readingItems.content })
+    .from(readingItems)
+    .where(
+      sql`${readingItems.userId} = 1
+          AND ${readingItems.bodyExcerpt} IS NULL
+          AND ${readingItems.content} IS NOT NULL`
+    )
+    .limit(limit);
+
+  let updated = 0;
+  for (const row of rows) {
+    const excerpt = htmlToText(row.content, { maxChars: 3000 });
+    if (!excerpt) continue;
+    await db
+      .update(readingItems)
+      .set({ bodyExcerpt: excerpt, updatedAt: new Date().toISOString() })
+      .where(eq(readingItems.id, row.id));
+    updated++;
+  }
+
+  return c.json({
+    scanned: rows.length,
+    updated,
+    took_ms: Date.now() - t0,
+  });
+});
+
 async function buildSearchItemsForDomain(
   db: ReturnType<typeof createDb>,
   domain: Domain
@@ -247,6 +323,7 @@ async function buildReading(
       id: readingItems.id,
       title: readingItems.title,
       description: readingItems.description,
+      bodyExcerpt: readingItems.bodyExcerpt,
     })
     .from(readingItems)
     .where(eq(readingItems.userId, 1));
@@ -257,6 +334,7 @@ async function buildReading(
     entityId: String(r.id),
     title: r.title,
     subtitle: r.description ?? undefined,
+    body: r.bodyExcerpt ?? undefined,
   }));
 }
 
