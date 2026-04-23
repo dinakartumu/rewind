@@ -322,7 +322,8 @@ const WantlistQuerySchema = z.object({
 });
 
 const LimitQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(20).optional().default(5),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+  page: z.coerce.number().int().min(1).optional().default(1),
 });
 
 const ArtistLimitQuerySchema = z.object({
@@ -1548,9 +1549,11 @@ collecting.openapi(collectionStatsRoute, async (c) => {
 collecting.openapi(collectionRecentRoute, async (c) => {
   try {
     const limit = Math.min(
-      20,
-      Math.max(1, parseInt(c.req.query('limit') || '5', 10))
+      50,
+      Math.max(1, parseInt(c.req.query('limit') || '10', 10))
     );
+    const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
+    const offset = (page - 1) * limit;
 
     const db = createDb(c.env.DB);
 
@@ -1583,7 +1586,8 @@ collecting.openapi(collectionRecentRoute, async (c) => {
       )
       .where(and(eq(discogsCollection.userId, 1), dateCondition))
       .orderBy(desc(discogsCollection.dateAdded))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
     const releaseIds = rows.map((r) => String(r.discogsId));
     const imageMap = await getImageAttachmentBatch(
@@ -2422,9 +2426,11 @@ collecting.openapi(mediaStatsRoute, async (c) => {
 collecting.openapi(mediaRecentRoute, async (c) => {
   try {
     const limit = Math.min(
-      20,
-      Math.max(1, parseInt(c.req.query('limit') || '5', 10))
+      50,
+      Math.max(1, parseInt(c.req.query('limit') || '10', 10))
     );
+    const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
+    const offset = (page - 1) * limit;
     const db = createDb(c.env.DB);
 
     const dateCondition = buildDateCondition(traktCollection.collectedAt, {
@@ -2453,7 +2459,8 @@ collecting.openapi(mediaRecentRoute, async (c) => {
       .innerJoin(movies, eq(traktCollection.movieId, movies.id))
       .where(and(eq(traktCollection.userId, 1), dateCondition))
       .orderBy(desc(traktCollection.collectedAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
     const movieIds = rows.map((r) => String(r.movieId));
     const imageMap = await getImageAttachmentBatch(

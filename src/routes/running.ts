@@ -500,11 +500,12 @@ const recentRoute = createRoute({
   tags: ['Running'],
   summary: 'Latest runs',
   description:
-    'Returns the last N activities (default 5, max 20). Supports date filtering via date, from, and to params.',
+    'Returns the last N activities (default 10, max 50). Supports date filtering via date, from, and to params and page-based pagination.',
   request: {
     query: z
       .object({
-        limit: z.coerce.number().int().min(1).max(20).optional().default(5),
+        limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+        page: z.coerce.number().int().min(1).optional().default(1),
       })
       .merge(DateFilterQuery),
   },
@@ -550,7 +551,9 @@ const recentRoute = createRoute({
 running.openapi(recentRoute, async (c) => {
   setCache(c, 'realtime');
   const db = createDb(c.env.DB);
-  const limit = Math.min(parseInt(c.req.query('limit') ?? '5', 10), 20);
+  const limit = Math.min(parseInt(c.req.query('limit') ?? '10', 10), 50);
+  const page = Math.max(parseInt(c.req.query('page') ?? '1', 10), 1);
+  const offset = (page - 1) * limit;
 
   const dateCondition = buildDateCondition(stravaActivities.startDate, {
     date: c.req.query('date'),
@@ -563,7 +566,8 @@ running.openapi(recentRoute, async (c) => {
     .from(stravaActivities)
     .where(and(eq(stravaActivities.isDeleted, 0), dateCondition))
     .orderBy(desc(stravaActivities.startDate))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   return c.json({
     data: activities.map(formatActivityResponse),

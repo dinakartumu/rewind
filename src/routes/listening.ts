@@ -347,7 +347,7 @@ const recentRoute = createRoute({
   tags: ['Listening'],
   summary: 'Recent scrobbles',
   description:
-    'Returns the most recent scrobbles. Supports date filtering via date, from, and to params.',
+    'Returns the most recent scrobbles. Supports date filtering via date, from, and to params and page-based pagination.',
   request: {
     query: z
       .object({
@@ -359,6 +359,13 @@ const recentRoute = createRoute({
           .optional()
           .default(10)
           .openapi({ example: 10 }),
+        page: z.coerce
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .default(1)
+          .openapi({ example: 1 }),
       })
       .merge(DateFilterQuery),
   },
@@ -1569,6 +1576,9 @@ listening.openapi(recentRoute, async (c) => {
 
   const limitParam = parseInt(c.req.query('limit') ?? '10');
   const limit = Math.min(Math.max(1, limitParam), 50);
+  const pageParam = parseInt(c.req.query('page') ?? '1');
+  const page = Math.max(1, pageParam);
+  const offset = (page - 1) * limit;
 
   const dateCondition = buildDateCondition(lastfmScrobbles.scrobbledAt, {
     date: c.req.query('date'),
@@ -1595,7 +1605,8 @@ listening.openapi(recentRoute, async (c) => {
     .leftJoin(lastfmAlbums, eq(lastfmTracks.albumId, lastfmAlbums.id))
     .where(and(eq(lastfmTracks.isFiltered, 0), dateCondition))
     .orderBy(desc(lastfmScrobbles.scrobbledAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   const albumIds = [
     ...new Set(

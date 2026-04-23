@@ -275,7 +275,8 @@ const recentRoute = createRoute({
   request: {
     query: z
       .object({
-        limit: z.coerce.number().int().min(1).max(20).optional().default(5),
+        limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+        page: z.coerce.number().int().min(1).optional().default(1),
       })
       .merge(DateFilterQuery),
   },
@@ -1181,7 +1182,9 @@ const adminBackfillImagesRoute = createRoute({
 watching.openapi(recentRoute, async (c) => {
   setCache(c, 'realtime');
   const db = createDb(c.env.DB);
-  const limit = Math.min(parseInt(c.req.query('limit') || '5'), 20);
+  const limit = Math.min(parseInt(c.req.query('limit') || '10'), 50);
+  const page = Math.max(parseInt(c.req.query('page') || '1'), 1);
+  const offset = (page - 1) * limit;
 
   const dateCondition = buildDateCondition(watchHistory.watchedAt, {
     date: c.req.query('date'),
@@ -1214,7 +1217,8 @@ watching.openapi(recentRoute, async (c) => {
     .innerJoin(movies, eq(watchHistory.movieId, movies.id))
     .where(dateCondition)
     .orderBy(desc(watchHistory.watchedAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   const movieIds = recentWatches.map((w) => String(w.movieId));
   const imageMap = await getImageAttachmentBatch(
