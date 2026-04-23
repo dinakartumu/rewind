@@ -44,6 +44,28 @@ export class RewindClient {
 
     return res.json() as Promise<T>;
   }
+
+  /**
+   * Fetch binary content directly from a full URL (typically the public image CDN).
+   * No Authorization header -- the CDN is public and cross-origin auth forwarding
+   * was unreliable when routed through the API's redirect endpoint.
+   */
+  async getBinaryFromUrl(
+    url: string
+  ): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    log(`GET ${url} (binary)`);
+
+    const res = await fetch(url, { redirect: 'follow' });
+
+    if (!res.ok) {
+      throw new Error(`Binary fetch failed: ${res.status} ${res.statusText}`);
+    }
+
+    const mimeType =
+      res.headers.get('content-type') ?? 'application/octet-stream';
+    const buffer = await res.arrayBuffer();
+    return { bytes: new Uint8Array(buffer), mimeType };
+  }
 }
 
 export class RewindApiError extends Error {

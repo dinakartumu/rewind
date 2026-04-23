@@ -109,6 +109,25 @@ const defaultHandler: ExportedHandler<Env> = {
   ): Promise<Response> {
     const url = new URL(request.url);
 
+    // CORS preflight -- respond before auth parsing so OPTIONS never reaches
+    // /authorize's `parseAuthRequest(request)` path (which throws on
+    // preflights without query params). Without this, claude.ai aborts the
+    // OAuth flow with "Couldn't reach the MCP server".
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': request.headers.get('Origin') ?? '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers':
+            request.headers.get('Access-Control-Request-Headers') ??
+            'Authorization, Content-Type',
+          'Access-Control-Max-Age': '86400',
+          Vary: 'Origin',
+        },
+      });
+    }
+
     // Health check
     if (url.pathname === '/' || url.pathname === '/health') {
       return Response.json({ status: 'ok', service: 'rewind-mcp-server' });
@@ -152,17 +171,23 @@ const defaultHandler: ExportedHandler<Env> = {
     if (url.pathname === '/callback') {
       const code = url.searchParams.get('code');
       const githubState = url.searchParams.get('state');
+      console.error(
+        `[callback] code=${code ? 'present' : 'MISSING'} state=${githubState ? 'present' : 'MISSING'}`
+      );
 
       if (!code || !githubState) {
+        console.error('[callback] rejecting: missing code or state');
         return Response.json(
           { error: 'Missing code or state from GitHub' },
           { status: 400 }
         );
       }
 
-      // Retrieve the stored OAuth request info
       const storedState = await env.OAUTH_KV.get(`github_state:${githubState}`);
       if (!storedState) {
+        console.error(
+          `[callback] rejecting: no stored state for github_state:${githubState}`
+        );
         return Response.json(
           { error: 'Invalid or expired state. Please try connecting again.' },
           { status: 400 }
@@ -173,7 +198,6 @@ const defaultHandler: ExportedHandler<Env> = {
 
       const { oauthReqInfo } = JSON.parse(storedState);
 
-      // Exchange GitHub code for user info
       let gitHubUser;
       try {
         gitHubUser = await exchangeGitHubCode(
@@ -181,7 +205,13 @@ const defaultHandler: ExportedHandler<Env> = {
           env.GITHUB_CLIENT_ID,
           env.GITHUB_CLIENT_SECRET
         );
+        console.error(
+          `[callback] github exchange ok: id=${gitHubUser.id} login=${gitHubUser.login}`
+        );
       } catch (error) {
+        console.error(
+          `[callback] github exchange FAILED: ${error instanceof Error ? error.message : String(error)}`
+        );
         return Response.json(
           {
             error: `GitHub authentication failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -190,36 +220,46 @@ const defaultHandler: ExportedHandler<Env> = {
         );
       }
 
-      // Check if this GitHub user is in the allowlist
-      const allowlist = JSON.parse(env.USER_ALLOWLIST || '{}') as Record<
-        string,
-        number
-      >;
+      const allowlistRaw = env.USER_ALLOWLIST || '{}';
+      const allowlist = JSON.parse(allowlistRaw) as Record<string, number>;
       const rewindUserId = allowlist[String(gitHubUser.id)];
+      console.error(
+        `[callback] allowlist check: github_id=${gitHubUser.id} rewind_user_id=${rewindUserId ?? 'NOT_ALLOWED'} allowlist_keys=${Object.keys(allowlist).join(',')}`
+      );
 
       if (rewindUserId === undefined) {
         return Response.json(
           {
-            error: `GitHub user @${gitHubUser.login} is not authorized. Contact the Rewind admin to request access.`,
+            error: `GitHub user @${gitHubUser.login} (id ${gitHubUser.id}) is not authorized. Contact the Rewind admin to request access.`,
           },
           { status: 403 }
         );
       }
 
-      // Complete the OAuth grant and redirect back to the MCP client with the auth code
-      const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-        request: oauthReqInfo,
-        userId: String(rewindUserId),
-        metadata: { label: gitHubUser.login },
-        scope: oauthReqInfo.scope,
-        props: {
-          rewindUserId,
-          rewindApiKey: env.REWIND_API_KEY,
-          gitHubLogin: gitHubUser.login,
-        } as GrantProps,
-      });
-
-      return Response.redirect(redirectTo, 302);
+      try {
+        const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+          request: oauthReqInfo,
+          userId: String(rewindUserId),
+          metadata: { label: gitHubUser.login },
+          scope: oauthReqInfo.scope,
+          props: {
+            rewindUserId,
+            rewindApiKey: env.REWIND_API_KEY,
+            gitHubLogin: gitHubUser.login,
+          } as GrantProps,
+        });
+        console.error(
+          `[callback] completeAuthorization redirectTo=${redirectTo}`
+        );
+        return Response.redirect(redirectTo, 302);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[callback] completeAuthorization FAILED: ${msg}`);
+        return Response.json(
+          { error: `completeAuthorization failed: ${msg}` },
+          { status: 500 }
+        );
+      }
     }
 
     return Response.json(

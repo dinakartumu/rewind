@@ -129,4 +129,238 @@ export function registerResources(
       };
     }
   );
+
+  // Movie entity
+  server.resource(
+    'movie',
+    new ResourceTemplate('rewind://movie/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single movie by internal Rewind id: metadata, watch history, ratings, and Letterboxd review URLs.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/watching/movies/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Show entity
+  server.resource(
+    'show',
+    new ResourceTemplate('rewind://show/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single TV show by internal Rewind id: metadata, seasons, and watched-episode counts.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/watching/shows/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Album entity
+  server.resource(
+    'album',
+    new ResourceTemplate('rewind://album/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single album by internal Rewind id: artist, play count, track listing, cover art metadata, and Apple Music URL.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/listening/albums/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Artist entity
+  server.resource(
+    'artist',
+    new ResourceTemplate('rewind://artist/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single artist by internal Rewind id: play count, genre, top albums, top tracks, image metadata, and Apple Music URL.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/listening/artists/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Vinyl record entity
+  server.resource(
+    'vinyl',
+    new ResourceTemplate('rewind://vinyl/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single vinyl record (or other Discogs collection item) by internal Rewind id: title, artists, formats, genres, cover art, Discogs URL, community stats.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/collecting/vinyl/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Physical media entity
+  server.resource(
+    'physical-media',
+    new ResourceTemplate('rewind://physical-media/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single physical media item (Blu-ray / 4K UHD / HD DVD) by internal Rewind id: title, year, format, resolution, HDR, audio, watch history.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/collecting/media/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Article entity
+  server.resource(
+    'article',
+    new ResourceTemplate('rewind://article/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a saved Instapaper article by internal Rewind id: title, author, domain, word count, read progress, tags, source URL, and embedded highlights.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/reading/articles/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Activity entity
+  server.resource(
+    'activity',
+    new ResourceTemplate('rewind://activity/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single running activity by internal Rewind id: distance, pace, elevation, HR, cadence, calories, location, and Strava URL.',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/running/activities/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
+  // Highlight entity
+  server.resource(
+    'highlight',
+    new ResourceTemplate('rewind://highlight/{id}', { list: undefined }),
+    {
+      description:
+        'Full detail for a single Instapaper highlight by internal Rewind id: highlighted text, optional note, and nested parent-article context (title, author, domain, source URL).',
+    },
+    async (uri, params) => {
+      const id = params.id as string;
+      const data = await client.get<Record<string, unknown>>(
+        `/reading/highlights/${id}`
+      );
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
 }

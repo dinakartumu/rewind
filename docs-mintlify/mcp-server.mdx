@@ -88,37 +88,42 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
 
 ### Listening
 
-| Tool                    | Description                                                  |
-| ----------------------- | ------------------------------------------------------------ |
-| `get_now_playing`       | Currently playing track                                      |
-| `get_recent_listens`    | Recent scrobbles with date filtering                         |
-| `get_listening_stats`   | Total scrobbles, unique artists/albums/tracks, daily average |
-| `get_top_artists`       | Top artists by period (7d, 1m, 3m, 6m, 12m, all-time)        |
-| `get_top_albums`        | Top albums by period                                         |
-| `get_top_tracks`        | Top tracks by period                                         |
-| `get_listening_streaks` | Current and longest consecutive listening streaks            |
-| `get_artist_details`    | Artist info, play count, top albums and tracks               |
-| `get_album_details`     | Album info, play count, track listing                        |
+| Tool                    | Description                                                         |
+| ----------------------- | ------------------------------------------------------------------- |
+| `get_now_playing`       | Currently playing track (with album cover + Apple Music link)       |
+| `get_recent_listens`    | Recent scrobbles with date filtering + pagination                   |
+| `get_listening_stats`   | Total scrobbles, unique artists/albums/tracks, daily average        |
+| `get_top_artists`       | Top artists by period (7d, 1m, 3m, 6m, 12m, all-time) + top-N images |
+| `get_top_albums`        | Top albums by period + top-N covers                                 |
+| `get_top_tracks`        | Top tracks by period                                                |
+| `get_listening_streaks` | Current and longest consecutive listening streaks                   |
+| `get_artist_details`    | Artist info, play count, top albums and tracks, artist image        |
+| `get_album_details`     | Album info, play count, track listing, cover art                    |
+| `get_listening_genres`  | Genre breakdown over time (week / month / year grouping)            |
 
 ### Running
 
 | Tool                   | Description                                                     |
 | ---------------------- | --------------------------------------------------------------- |
 | `get_running_stats`    | Total runs, distance, elevation, pace, Eddington number         |
-| `get_recent_runs`      | Recent activities with distance, pace, duration, location       |
+| `get_recent_runs`      | Recent activities with distance, pace, duration, location + pagination |
 | `get_personal_records` | Fastest times at mile, 5K, 10K, half marathon, marathon         |
 | `get_running_streaks`  | Current and longest consecutive running streaks                 |
 | `get_activity_details` | Full details for a single run (heart rate, elevation, calories) |
 | `get_activity_splits`  | Per-mile splits with pace, elevation, and heart rate            |
+| `get_running_years`    | Per-year summary: total runs, distance, elevation, pace, race count |
 
 ### Watching
 
-| Tool                 | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `get_recent_watches` | Recently watched movies and TV shows                    |
-| `get_movie_details`  | Director, genres, rating, summary, watch history        |
-| `browse_movies`      | Browse by genre, decade, director, or year with sorting |
-| `get_watching_stats` | Total movies, watch time, top genre/director, TV stats  |
+| Tool                      | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| `get_recent_watches`      | Recently watched movies + posters + Letterboxd review links; renders as an interactive poster grid in MCP Apps clients |
+| `get_movie_details`       | Director, genres, rating, summary, watch history, poster   |
+| `browse_movies`           | Browse by genre, decade, director, or year with sorting    |
+| `get_watching_stats`      | Total movies, watch time, top genre/director, TV stats     |
+| `get_watching_genres`     | Genre breakdown across all watched movies                  |
+| `get_watching_decades`    | Decade breakdown across all watched movies                 |
+| `get_watching_directors`  | Top directors by watched-movie count                       |
 
 ### Collecting
 
@@ -156,15 +161,49 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
 - "Search my data for 'Radiohead'"
 - "What happened on this day in previous years?"
 
+## Rich Responses
+
+Tool responses follow the MCP 2025-06-18 content model and include more than plain text:
+
+- **Images.** Detail tools (`get_movie_details`, `get_album_details`, `get_artist_details`) and list tools (`get_recent_watches`, `get_recent_listens`, `get_top_albums`, `get_vinyl_collection`, etc.) return cover art / posters / artist imagery as `image` content blocks (top-N on lists, default N=5). Pass `include_images: false` to skip them when keeping responses compact matters.
+- **Resource links.** External platform URLs come back as `resource_link` content blocks -- Letterboxd reviews, Strava activities, Discogs releases, Apple Music pages, original article URLs, Last.fm pages.
+- **Structured content.** Every tool also returns `structuredContent` with a JSON shape that mirrors the underlying API response, so the model can reason over exact numbers without re-parsing prose.
+
+## Entity Resources
+
+The server exposes `@`-mentionable resources for fetching full detail on any entity:
+
+| Entity         | URI                               | Source endpoint                |
+| -------------- | --------------------------------- | ------------------------------ |
+| Movie          | `rewind://movie/{id}`             | `/v1/watching/movies/{id}`     |
+| Show           | `rewind://show/{id}`              | `/v1/watching/shows/{id}`      |
+| Album          | `rewind://album/{id}`             | `/v1/listening/albums/{id}`    |
+| Artist         | `rewind://artist/{id}`            | `/v1/listening/artists/{id}`   |
+| Vinyl          | `rewind://vinyl/{id}`             | `/v1/collecting/vinyl/{id}`    |
+| Physical media | `rewind://physical-media/{id}`    | `/v1/collecting/media/{id}`    |
+| Article        | `rewind://article/{id}`           | `/v1/reading/articles/{id}`    |
+| Activity       | `rewind://activity/{id}`          | `/v1/running/activities/{id}`  |
+| Sync status    | `rewind://sync/status`            | `/v1/health/sync`              |
+| Year in review | `rewind://{domain}/year/{year}`   | `/v1/{domain}/year/{year}`     |
+
+In Claude Code you can reference any of these with `@rewind:<uri>` to pull the full record into the conversation. `search` returns `resource_link`s pointing at these URIs so clients can drill from a match straight into the full record.
+
+## Interactive UI (MCP Apps)
+
+`get_recent_watches` advertises a [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) UI resource. On clients that render MCP Apps (Claude Desktop, Claude web, VS Code GitHub Copilot, Goose) the tool returns an interactive poster grid inline in the conversation: thumbhash placeholders, theme-aware cards, clickable Letterboxd reviews, hover states. On clients that do not yet render MCP Apps -- including Claude iOS -- the text + image + resource_link + structuredContent response is unchanged, so no caller regresses.
+
 ## Prompt Templates
 
 The server includes built-in prompt templates for common multi-step queries:
 
-| Prompt            | Description                                              |
-| ----------------- | -------------------------------------------------------- |
-| `weekly-summary`  | Summarize activity across all domains for the past week  |
-| `year-in-review`  | Generate a comprehensive year-in-review for a given year |
-| `compare-periods` | Compare activity between two time periods for a domain   |
+| Prompt                    | Description                                                        |
+| ------------------------- | ------------------------------------------------------------------ |
+| `weekly-summary`          | Summarize activity across all domains for the past week            |
+| `year-in-review`          | Generate a comprehensive year-in-review for a given year           |
+| `compare-periods`         | Compare activity between two time periods for a single domain      |
+| `letterboxd-review-draft` | Draft a Letterboxd-style review for a recently watched, unrated film |
+| `training-report`         | Coach-style running report for the last 7-14 days                  |
+| `film-diet`               | Portrait of your film-watching taste (genre mix, decades, directors) |
 
 ## Environment Variables
 

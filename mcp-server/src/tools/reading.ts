@@ -2,48 +2,103 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RewindClient } from '../client.js';
 import {
-  withErrorHandling,
+  withRichResponse,
+  text,
+  resourceLink,
+  imageBlock,
   formatDate,
   timeAgo,
   fmt,
   READ_ONLY_ANNOTATIONS,
   dateFilterParams,
+  includeImagesParam,
+  LIST_IMAGE_PX,
+  type ContentBlock,
 } from './helpers.js';
+
+const TOP_N = 5;
+
+function truncateAtWord(s: string, maxChars: number): string {
+  if (s.length <= maxChars) return s;
+  const slice = s.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice) + '…';
+}
+
+type Image = {
+  cdn_url?: string | null;
+  url?: string | null;
+  thumbhash?: string | null;
+  dominant_color?: string | null;
+  accent_color?: string | null;
+} | null;
+
+type Article = {
+  id: number;
+  title: string;
+  author: string | null;
+  url: string | null;
+  domain: string | null;
+  description: string | null;
+  estimated_read_min: number | null;
+  status: string;
+  progress: number;
+  image: Image;
+  saved_at: string;
+};
+
+type Highlight = {
+  text: string;
+  note: string | null;
+  created_at: string;
+  article: {
+    id?: number;
+    title: string;
+    author: string | null;
+    domain: string | null;
+    url?: string | null;
+  };
+};
 
 export function registerReadingTools(
   server: McpServer,
   client: RewindClient
 ): void {
-  // get_recent_reads
+  // get_recent_reads ───────────────────────────────────────────────
   server.tool(
     'get_recent_reads',
-    'Get recently saved articles from Instapaper. Returns article titles, authors, domains, reading time, and status.',
+    'Get recently saved articles from Instapaper. Returns title, author, domain, read time, status, top-N site images where available, and article URLs as resource links.',
     {
       limit: z
         .number()
         .min(1)
         .max(50)
         .default(10)
-        .describe('Number of recent articles to return'),
+        .describe('Number of recent articles to return (max 50)'),
+      page: z
+        .number()
+        .min(1)
+        .default(1)
+        .describe(
+          'Page number for pagination. Combine with limit to page through longer windows.'
+        ),
       ...dateFilterParams,
+      ...includeImagesParam,
     },
     READ_ONLY_ANNOTATIONS,
-    async ({ limit, date, from, to }) =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: Array<{
-            id: number;
-            title: string;
-            author: string | null;
-            domain: string | null;
-            estimated_read_min: number | null;
-            status: string;
-            progress: number;
-            saved_at: string;
-          }>;
-        }>('/reading/recent', { limit, date, from, to });
+    async ({ limit, page, date, from, to, include_images }) =>
+      withRichResponse(async () => {
+        const { data } = await client.get<{ data: Article[] }>(
+          '/reading/recent',
+          { limit, page, date, from, to }
+        );
 
-        if (!data.length) return 'No recent articles found.';
+        if (!data.length) {
+          return {
+            content: [text('No recent articles found.')],
+            structuredContent: { items: [] },
+          };
+        }
 
         const lines = ['Recent reads:'];
         for (const [i, a] of data.entries()) {
@@ -59,17 +114,41 @@ export function registerReadingTools(
                 ? ' [finished]'
                 : '';
           lines.push(
-            `${i + 1}. ${a.title}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
+            `${i + 1}. [ID: ${a.id}] ${a.title}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
           );
+          if (a.description) {
+            lines.push(`   ${truncateAtWord(a.description, 160)}`);
+          }
         }
-        return lines.join('\n');
+
+        const topN = data.slice(0, TOP_N);
+        const images = include_images
+          ? await Promise.all(
+              topN.map((a) => imageBlock(client, a.image, LIST_IMAGE_PX))
+            )
+          : [];
+        const links = topN
+          .map((a) =>
+            resourceLink(a.url, `Article -- ${a.title}`, {
+              mimeType: 'text/html',
+            })
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [
+          text(lines.join('\n')),
+          ...images.filter((b): b is NonNullable<typeof b> => b !== null),
+          ...links,
+        ];
+
+        return { content, structuredContent: { items: data } };
       })
   );
 
-  // get_reading_highlights
+  // get_reading_highlights ─────────────────────────────────────────
   server.tool(
     'get_reading_highlights',
-    'Get saved highlights from Instapaper articles. Returns the highlighted text, optional notes, and the source article.',
+    'Get saved highlights from Instapaper articles. Returns the highlighted text, notes, source article, and article URLs as resource links.',
     {
       limit: z
         .number()
@@ -81,29 +160,20 @@ export function registerReadingTools(
     },
     READ_ONLY_ANNOTATIONS,
     async ({ limit, page }) =>
-      withErrorHandling(async () => {
+      withRichResponse(async () => {
         const data = await client.get<{
-          data: Array<{
-            text: string;
-            note: string | null;
-            created_at: string;
-            article: {
-              title: string;
-              author: string | null;
-              domain: string | null;
-            };
-          }>;
-          pagination: {
-            page: number;
-            total: number;
-            total_pages: number;
-          };
+          data: Highlight[];
+          pagination: { page: number; total: number; total_pages: number };
         }>('/reading/highlights', { limit, page });
 
-        if (!data.data.length) return 'No highlights found.';
+        if (!data.data.length) {
+          return {
+            content: [text('No highlights found.')],
+            structuredContent: { items: [], pagination: data.pagination },
+          };
+        }
 
         const lines = [`Highlights (${fmt(data.pagination.total)} total):`];
-
         for (const h of data.data) {
           const source = h.article.author
             ? `${h.article.title} by ${h.article.author}`
@@ -114,28 +184,37 @@ export function registerReadingTools(
           lines.push(`  -- ${source} (${formatDate(h.created_at)})`);
         }
 
-        return lines.join('\n');
+        // Deduplicate article URLs before emitting as resource_links
+        const seen = new Set<string>();
+        const links = data.data
+          .map((h) => {
+            const url = h.article.url ?? null;
+            if (!url || seen.has(url)) return null;
+            seen.add(url);
+            return resourceLink(url, `Article -- ${h.article.title}`, {
+              mimeType: 'text/html',
+            });
+          })
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [text(lines.join('\n')), ...links];
+
+        return {
+          content,
+          structuredContent: { items: data.data, pagination: data.pagination },
+        };
       })
   );
 
-  // get_random_highlight
+  // get_random_highlight ───────────────────────────────────────────
   server.tool(
     'get_random_highlight',
     'Get a single random highlight from saved Instapaper articles. Great for daily inspiration or reflection.',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
-        const data = await client.get<{
-          text: string;
-          note: string | null;
-          created_at: string;
-          article: {
-            title: string;
-            author: string | null;
-            domain: string | null;
-          };
-        }>('/reading/highlights/random');
+      withRichResponse(async () => {
+        const data = await client.get<Highlight>('/reading/highlights/random');
 
         const source = data.article.author
           ? `${data.article.title} by ${data.article.author}`
@@ -145,18 +224,29 @@ export function registerReadingTools(
         if (data.note) lines.push(`Note: ${data.note}`);
         lines.push(`-- ${source}`);
 
-        return lines.join('\n');
+        const link = resourceLink(
+          data.article.url ?? null,
+          `Article -- ${data.article.title}`,
+          { mimeType: 'text/html' }
+        );
+
+        const content: ContentBlock[] = [
+          text(lines.join('\n')),
+          ...(link ? [link] : []),
+        ];
+
+        return { content, structuredContent: data };
       })
   );
 
-  // get_reading_stats
+  // get_reading_stats ──────────────────────────────────────────────
   server.tool(
     'get_reading_stats',
     'Get overall reading statistics from Instapaper including total articles, finished count, currently reading, highlights, and word count.',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
+      withRichResponse(async () => {
         const data = await client.get<{
           total_articles: number;
           finished_count: number;
@@ -166,7 +256,7 @@ export function registerReadingTools(
           avg_estimated_read_min: number;
         }>('/reading/stats');
 
-        return [
+        const summary = [
           'Reading Stats:',
           `- Total articles: ${fmt(data.total_articles)}`,
           `- Finished: ${fmt(data.finished_count)}`,
@@ -175,6 +265,79 @@ export function registerReadingTools(
           `- Total words read: ${fmt(data.total_word_count)}`,
           `- Average read time: ${Math.round(data.avg_estimated_read_min)} min`,
         ].join('\n');
+
+        return { content: [text(summary)], structuredContent: data };
+      })
+  );
+
+  // find_similar_articles ───────────────────────────────────────────
+  server.tool(
+    'find_similar_articles',
+    'Find articles thematically similar to a given article by cosine similarity over Voyage AI embeddings. Use after an article has been surfaced (via search, get_recent_reads, or an @rewind://article/{id} mention) when the user asks "what else was I reading like that" or "show me related pieces". No Voyage API call is made — the article\'s stored vector is reused.',
+    {
+      article_id: z
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'Internal Rewind article id (from an earlier search/recent result)'
+        ),
+      limit: z
+        .number()
+        .min(1)
+        .max(25)
+        .default(5)
+        .describe('Number of related articles to return'),
+    },
+    READ_ONLY_ANNOTATIONS,
+    async ({ article_id, limit }) =>
+      withRichResponse(async () => {
+        type Related = {
+          id: number;
+          title: string;
+          author: string | null;
+          url: string | null;
+          domain: string | null;
+          description: string | null;
+          score: number;
+        };
+        const data = await client.get<{ data: Related[] }>(
+          `/reading/articles/${article_id}/related`,
+          { limit }
+        );
+
+        if (!data.data.length) {
+          return {
+            content: [
+              text(
+                `No related articles found for article ${article_id}. The article may not be embedded yet — try running /v1/admin/reembed-reading.`
+              ),
+            ],
+            structuredContent: { items: [] },
+          };
+        }
+
+        const lines = [`Articles similar to #${article_id}:`];
+        for (const [i, r] of data.data.entries()) {
+          const author = r.author ? ` by ${r.author}` : '';
+          const dom = r.domain ? ` (${r.domain})` : '';
+          lines.push(
+            `${i + 1}. ${r.title}${author}${dom} (score=${r.score.toFixed(2)})`
+          );
+        }
+
+        const links = data.data
+          .map((r) =>
+            resourceLink(`rewind://article/${r.id}`, r.title, {
+              mimeType: 'application/json',
+              description: r.description ?? undefined,
+            })
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [text(lines.join('\n')), ...links];
+
+        return { content, structuredContent: { items: data.data } };
       })
   );
 }

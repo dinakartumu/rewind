@@ -47,14 +47,45 @@ Requires a [Rewind API key](https://docs.rewind.rest/authentication). `REWIND_AP
 
 ## Tools
 
-| Domain           | Source           | Tools                                                                                              |
-| ---------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
-| **Listening**    | Last.fm          | Now playing, recent scrobbles, stats, top artists/albums/tracks, streaks, artist and album details |
-| **Running**      | Strava           | Stats, recent runs, personal records, streaks, activity details, per-mile splits                   |
-| **Watching**     | Plex, Letterboxd | Recent watches, movie details, browse by genre/decade/director, stats                              |
-| **Collecting**   | Discogs, Trakt   | Vinyl collection, physical media (Blu-ray/4K UHD/HD DVD), collection and media stats               |
-| **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats                                               |
-| **Cross-domain** | All              | Full-text search, unified feed, on-this-day                                                        |
+| Domain           | Source           | Tools                                                                                                                         |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Listening**    | Last.fm          | Now playing, recent scrobbles, stats, top artists/albums/tracks, streaks, artist and album details, genre breakdown over time |
+| **Running**      | Strava           | Stats, recent runs, personal records, streaks, activity details, per-mile splits, per-year summaries                          |
+| **Watching**     | Plex, Letterboxd | Recent watches, movie details, browse by genre/decade/director, stats, genre/decade/director breakdowns                       |
+| **Collecting**   | Discogs, Trakt   | Vinyl collection, physical media (Blu-ray/4K UHD/HD DVD), collection and media stats                                          |
+| **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats                                                                          |
+| **Cross-domain** | All              | Full-text search, unified feed, on-this-day                                                                                   |
+
+## Rich responses
+
+Tool responses follow the MCP 2025-06-18 content model and include more than plain text:
+
+- **Images.** Detail tools (`get_movie_details`, `get_album_details`, `get_artist_details`) and list tools (`get_recent_watches`, `get_recent_listens`, `get_top_albums`, `get_vinyl_collection`, etc.) return cover art / posters / artist imagery as `image` content blocks (top-N on lists, default N=5). Pass `include_images: false` to skip them when keeping responses compact matters.
+- **Resource links.** External platform URLs come back as `resource_link` content blocks rather than being baked into prose -- Letterboxd reviews, Strava activities, Discogs releases, Apple Music pages, original article URLs, Last.fm pages.
+- **Structured content.** Every tool also returns `structuredContent` with a JSON shape that mirrors the underlying API response, so the model can reason over exact numbers without re-parsing prose.
+
+## Entity resources
+
+The server exposes `@`-mentionable resources for fetching full detail on any entity:
+
+| Entity         | URI                             | Source endpoint               |
+| -------------- | ------------------------------- | ----------------------------- |
+| Movie          | `rewind://movie/{id}`           | `/v1/watching/movies/{id}`    |
+| Show           | `rewind://show/{id}`            | `/v1/watching/shows/{id}`     |
+| Album          | `rewind://album/{id}`           | `/v1/listening/albums/{id}`   |
+| Artist         | `rewind://artist/{id}`          | `/v1/listening/artists/{id}`  |
+| Vinyl          | `rewind://vinyl/{id}`           | `/v1/collecting/vinyl/{id}`   |
+| Physical media | `rewind://physical-media/{id}`  | `/v1/collecting/media/{id}`   |
+| Article        | `rewind://article/{id}`         | `/v1/reading/articles/{id}`   |
+| Activity       | `rewind://activity/{id}`        | `/v1/running/activities/{id}` |
+| Sync status    | `rewind://sync/status`          | `/v1/health/sync`             |
+| Year in review | `rewind://{domain}/year/{year}` | `/v1/{domain}/year/{year}`    |
+
+`search` returns `resource_link`s pointing at these URIs so clients can drill from a match straight into the full record.
+
+## Interactive UI (MCP Apps)
+
+`get_recent_watches` advertises a [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) UI resource. On clients that render MCP Apps (Claude Desktop, Claude web, VS Code GitHub Copilot, Goose) the tool returns an interactive poster grid inline in the conversation: thumbhash placeholders, theme-aware cards, clickable Letterboxd reviews, hover states. On clients that do not render MCP Apps the existing text + image + resource_link + structuredContent response is unchanged, so no caller regresses.
 
 ## Example Queries
 
@@ -64,6 +95,17 @@ Requires a [Rewind API key](https://docs.rewind.rest/authentication). `REWIND_AP
 - "What Beastie Boys records are missing from my vinyl collection?"
 - "How many articles did I read last year and stack-rank the top 10 sources"
 - "Can you give me a quick summary of everything I did last week?"
+
+## Prompts
+
+The server exposes slash-command prompts that orchestrate multiple tools for common asks:
+
+- `weekly-summary` -- rolls up activity across all domains for the past 7 days
+- `year-in-review` -- comprehensive yearly recap
+- `compare-periods` -- parametric comparison between two time windows in a single domain
+- `letterboxd-review-draft` -- drafts a Letterboxd-style review for your most recent unrated film
+- `training-report` -- coach-style running report for the last 7-14 days
+- `film-diet` -- portrait of your film-watching taste (genre mix, decades, directors)
 
 ## Authentication
 

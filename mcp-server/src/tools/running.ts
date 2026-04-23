@@ -2,39 +2,77 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RewindClient } from '../client.js';
 import {
-  withErrorHandling,
+  withRichResponse,
+  text,
+  resourceLink,
   formatDate,
   timeAgo,
   fmt,
   READ_ONLY_ANNOTATIONS,
+  dateFilterParams,
+  type ContentBlock,
 } from './helpers.js';
+
+type Activity = {
+  id: number;
+  strava_id?: number;
+  name: string;
+  date: string;
+  distance_mi: number;
+  duration: string;
+  pace: string;
+  elevation_ft: number;
+  city: string | null;
+  state: string | null;
+  is_race: boolean;
+  strava_url?: string | null;
+};
+
+type ActivityDetail = {
+  id?: number;
+  name: string;
+  date: string;
+  distance_mi: number;
+  duration: string;
+  pace: string;
+  elevation_ft: number;
+  heartrate_avg: number | null;
+  heartrate_max: number | null;
+  cadence: number | null;
+  calories: number | null;
+  suffer_score: number | null;
+  city: string | null;
+  state: string | null;
+  is_race: boolean;
+  workout_type: string;
+  strava_url: string | null;
+};
 
 export function registerRunningTools(
   server: McpServer,
   client: RewindClient
 ): void {
-  // get_running_stats
+  // get_running_stats ──────────────────────────────────────────────
   server.tool(
     'get_running_stats',
     'Get overall running statistics from Strava including total runs, distance, elevation, duration, average pace, and Eddington number.',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: {
-            total_runs: number;
-            total_distance_mi: number;
-            total_elevation_ft: number;
-            total_duration: string;
-            avg_pace: string | null;
-            years_active: number;
-            first_run: string | null;
-            eddington_number: number;
-          };
-        }>('/running/stats');
+      withRichResponse(async () => {
+        type Stats = {
+          total_runs: number;
+          total_distance_mi: number;
+          total_elevation_ft: number;
+          total_duration: string;
+          avg_pace: string | null;
+          years_active: number;
+          first_run: string | null;
+          eddington_number: number;
+        };
+        const { data } = await client.get<{ data: Stats }>('/running/stats');
 
-        return [
+        const summary = [
           'Running Stats:',
           `- Total runs: ${fmt(data.total_runs)}`,
           `- Total distance: ${fmt(Math.round(data.total_distance_mi))} mi`,
@@ -49,52 +87,45 @@ export function registerRunningTools(
         ]
           .filter((l) => l !== null)
           .join('\n');
+
+        return { content: [text(summary)], structuredContent: data };
       })
   );
 
-  // get_recent_runs
+  // get_recent_runs ────────────────────────────────────────────────
   server.tool(
     'get_recent_runs',
-    'Get recent running activities from Strava. Returns a list of runs with ID, distance, pace, duration, and location. Use the ID with get_activity_details or get_activity_splits for more info.',
+    'Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, and Strava activity resource links for top-N.',
     {
       limit: z
         .number()
         .min(1)
         .max(50)
         .default(10)
-        .describe('Number of recent runs to return'),
-      date: z
-        .string()
-        .optional()
-        .describe('Optional: filter to a specific date (YYYY-MM-DD)'),
-      from: z
-        .string()
-        .optional()
-        .describe('Optional: start of date range (ISO 8601)'),
-      to: z
-        .string()
-        .optional()
-        .describe('Optional: end of date range (ISO 8601)'),
+        .describe('Number of recent runs to return (max 50)'),
+      page: z
+        .number()
+        .min(1)
+        .default(1)
+        .describe(
+          'Page number for pagination. Combine with limit to page through longer windows.'
+        ),
+      ...dateFilterParams,
     },
     READ_ONLY_ANNOTATIONS,
-    async ({ limit, date, from, to }) =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: Array<{
-            id: number;
-            name: string;
-            date: string;
-            distance_mi: number;
-            duration: string;
-            pace: string;
-            elevation_ft: number;
-            city: string | null;
-            state: string | null;
-            is_race: boolean;
-          }>;
-        }>('/running/recent', { limit, date, from, to });
+    async ({ limit, page, date, from, to }) =>
+      withRichResponse(async () => {
+        const { data } = await client.get<{ data: Activity[] }>(
+          '/running/recent',
+          { limit, page, date, from, to }
+        );
 
-        if (!data.length) return 'No recent runs found.';
+        if (!data.length) {
+          return {
+            content: [text('No recent runs found.')],
+            structuredContent: { items: [] },
+          };
+        }
 
         const lines = ['Recent runs:'];
         for (const [i, r] of data.entries()) {
@@ -104,30 +135,46 @@ export function registerRunningTools(
             `${i + 1}. [ID: ${r.id}] ${r.name}${race} -- ${r.distance_mi.toFixed(1)} mi, ${r.pace}/mi, ${r.duration}${location} (${timeAgo(r.date)})`
           );
         }
-        return lines.join('\n');
+
+        const topN = data.slice(0, 5);
+        const links = topN
+          .map((r) =>
+            resourceLink(r.strava_url, `Strava -- ${r.name}`, {
+              mimeType: 'text/html',
+            })
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [text(lines.join('\n')), ...links];
+
+        return { content, structuredContent: { items: data } };
       })
   );
 
-  // get_personal_records
+  // get_personal_records ───────────────────────────────────────────
   server.tool(
     'get_personal_records',
     'Get personal running records (PRs) from Strava -- fastest times at standard distances like mile, 5K, 10K, half marathon, marathon.',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: Array<{
-            distance_label: string;
-            time: string;
-            pace: string;
-            date: string;
-            activity_name: string;
-            activity_id: number;
-          }>;
-        }>('/running/prs');
+      withRichResponse(async () => {
+        type PR = {
+          distance_label: string;
+          time: string;
+          pace: string;
+          date: string;
+          activity_name: string;
+          activity_id: number;
+        };
+        const { data } = await client.get<{ data: PR[] }>('/running/prs');
 
-        if (!data.length) return 'No personal records found.';
+        if (!data.length) {
+          return {
+            content: [text('No personal records found.')],
+            structuredContent: { items: [] },
+          };
+        }
 
         const lines = ['Personal Records:'];
         for (const pr of data) {
@@ -135,26 +182,31 @@ export function registerRunningTools(
             `- ${pr.distance_label}: ${pr.time} (${pr.pace}/mi) -- ${pr.activity_name} [ID: ${pr.activity_id}], ${formatDate(pr.date)}`
           );
         }
-        return lines.join('\n');
+
+        return {
+          content: [text(lines.join('\n'))],
+          structuredContent: { items: data },
+        };
       })
   );
 
-  // get_running_streaks
+  // get_running_streaks ────────────────────────────────────────────
   server.tool(
     'get_running_streaks',
     'Get running streak data from Strava -- current consecutive days with runs and the longest streak ever.',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: {
-            current: { days: number; start: string | null; end: string | null };
-            longest: { days: number; start: string | null; end: string | null };
-          };
-        }>('/running/streaks');
+      withRichResponse(async () => {
+        type Streaks = {
+          current: { days: number; start: string | null; end: string | null };
+          longest: { days: number; start: string | null; end: string | null };
+        };
+        const { data } = await client.get<{ data: Streaks }>(
+          '/running/streaks'
+        );
 
-        return [
+        const summary = [
           'Running Streaks:',
           '',
           `Current streak: ${data.current.days} days`,
@@ -169,13 +221,15 @@ export function registerRunningTools(
         ]
           .filter(Boolean)
           .join('\n');
+
+        return { content: [text(summary)], structuredContent: data };
       })
   );
 
-  // get_activity_details
+  // get_activity_details ───────────────────────────────────────────
   server.tool(
     'get_activity_details',
-    'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, and calories. Get the ID from get_recent_runs.',
+    'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, and a Strava resource link.',
     {
       id: z
         .number()
@@ -183,25 +237,10 @@ export function registerRunningTools(
     },
     READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
-      withErrorHandling(async () => {
-        const data = await client.get<{
-          name: string;
-          date: string;
-          distance_mi: number;
-          duration: string;
-          pace: string;
-          elevation_ft: number;
-          heartrate_avg: number | null;
-          heartrate_max: number | null;
-          cadence: number | null;
-          calories: number | null;
-          suffer_score: number | null;
-          city: string | null;
-          state: string | null;
-          is_race: boolean;
-          workout_type: string;
-          strava_url: string | null;
-        }>(`/running/activities/${id}`);
+      withRichResponse(async () => {
+        const data = await client.get<ActivityDetail>(
+          `/running/activities/${id}`
+        );
 
         const lines = [
           `${data.name}${data.is_race ? ' [RACE]' : ''}`,
@@ -224,13 +263,21 @@ export function registerRunningTools(
         if (data.cadence)
           lines.push(`Cadence: ${Math.round(data.cadence)} spm`);
         if (data.calories) lines.push(`Calories: ${fmt(data.calories)}`);
-        if (data.strava_url) lines.push(`Strava: ${data.strava_url}`);
 
-        return lines.join('\n');
+        const stravaLink = resourceLink(data.strava_url, 'Strava activity', {
+          mimeType: 'text/html',
+        });
+
+        const content: ContentBlock[] = [
+          text(lines.join('\n')),
+          ...(stravaLink ? [stravaLink] : []),
+        ];
+
+        return { content, structuredContent: data };
       })
   );
 
-  // get_activity_splits
+  // get_activity_splits ────────────────────────────────────────────
   server.tool(
     'get_activity_splits',
     'Get per-mile splits for a running activity. Shows pace, elevation, and heart rate for each mile. Get the activity ID from get_recent_runs.',
@@ -241,20 +288,26 @@ export function registerRunningTools(
     },
     READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: Array<{
-            split: number;
-            distance_mi: number;
-            moving_time_s: number;
-            elapsed_time_s: number;
-            elevation_ft: number;
-            pace: string;
-            heartrate: number | null;
-          }>;
-        }>(`/running/activities/${id}/splits`);
+      withRichResponse(async () => {
+        type Split = {
+          split: number;
+          distance_mi: number;
+          moving_time_s: number;
+          elapsed_time_s: number;
+          elevation_ft: number;
+          pace: string;
+          heartrate: number | null;
+        };
+        const { data } = await client.get<{ data: Split[] }>(
+          `/running/activities/${id}/splits`
+        );
 
-        if (!data.length) return 'No splits found for this activity.';
+        if (!data.length) {
+          return {
+            content: [text('No splits found for this activity.')],
+            structuredContent: { activity_id: id, items: [] as Split[] },
+          };
+        }
 
         const lines = [`Mile splits for activity ${id}:`];
         for (const s of data) {
@@ -266,7 +319,53 @@ export function registerRunningTools(
           lines.push(`  Mile ${s.split}: ${s.pace}${elev}${hr}`);
         }
 
-        return lines.join('\n');
+        return {
+          content: [text(lines.join('\n'))],
+          structuredContent: { activity_id: id, items: data },
+        };
+      })
+  );
+
+  // get_running_years ──────────────────────────────────────────────
+  server.tool(
+    'get_running_years',
+    'Get per-year summary of running activity: total runs, distance, elevation, duration, average pace, longest run, and race count for every year on record.',
+    {},
+    READ_ONLY_ANNOTATIONS,
+    async () =>
+      withRichResponse(async () => {
+        type YearSummary = {
+          year: number;
+          total_runs: number;
+          total_distance_mi: number;
+          total_elevation_ft: number;
+          total_duration_s: number;
+          avg_pace: string | null;
+          longest_run_mi: number | null;
+          race_count: number;
+        };
+        const { data } = await client.get<{ data: YearSummary[] }>(
+          '/running/stats/years'
+        );
+
+        if (!data.length) {
+          return {
+            content: [text('No yearly running data available.')],
+            structuredContent: { items: [] },
+          };
+        }
+
+        const lines = ['Running by year:'];
+        for (const y of data) {
+          lines.push(
+            `  ${y.year}: ${fmt(y.total_runs)} runs, ${fmt(Math.round(y.total_distance_mi))} mi, longest ${y.longest_run_mi ?? '-'} mi, races: ${y.race_count}`
+          );
+        }
+
+        return {
+          content: [text(lines.join('\n'))],
+          structuredContent: { items: data },
+        };
       })
   );
 }

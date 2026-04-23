@@ -2,20 +2,83 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RewindClient } from '../client.js';
 import {
-  withErrorHandling,
+  withRichResponse,
+  text,
+  resourceLink,
+  imageBlock,
   fmt,
   READ_ONLY_ANNOTATIONS,
   dateFilterParams,
+  includeImagesParam,
+  LIST_IMAGE_PX,
+  type ContentBlock,
 } from './helpers.js';
+
+const TOP_N = 5;
+
+type Image = {
+  cdn_url?: string | null;
+  url?: string | null;
+  thumbhash?: string | null;
+  dominant_color?: string | null;
+  accent_color?: string | null;
+} | null;
+
+type VinylItem = {
+  id: number;
+  discogs_id: number;
+  title: string;
+  artists: string[];
+  year: number | null;
+  format: string;
+  format_detail: string;
+  label: string;
+  genres: string[];
+  styles: string[];
+  image: Image;
+  date_added: string | null;
+  rating: number | null;
+  discogs_url: string | null;
+};
+
+type MediaItem = {
+  id: number;
+  title: string;
+  year: number | null;
+  tmdb_id: number | null;
+  imdb_id: string | null;
+  image: Image;
+  runtime: number | null;
+  tmdb_rating: number | null;
+  media_type: string;
+  resolution: string | null;
+  hdr: string | null;
+  audio: string | null;
+  audio_channels: string | null;
+  collected_at: string | null;
+};
+
+type Pagination = {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+};
+
+const FORMAT_LABEL: Record<string, string> = {
+  bluray: 'Blu-ray',
+  uhd_bluray: '4K UHD',
+  hddvd: 'HD DVD',
+};
 
 export function registerCollectingTools(
   server: McpServer,
   client: RewindClient
 ): void {
-  // get_vinyl_collection
+  // get_vinyl_collection ───────────────────────────────────────────
   server.tool(
     'get_vinyl_collection',
-    'Browse the vinyl record collection from Discogs. Returns records with artist, title, year, format, and label. Supports search by artist or title, and pagination.',
+    'Browse the vinyl record collection from Discogs. Returns records with artist, title, year, format, and label, plus top-N cover art and Discogs resource links. Supports search, filters, sort, and pagination.',
     {
       query: z
         .string()
@@ -49,6 +112,7 @@ export function registerCollectingTools(
         .describe('Number of records to return'),
       page: z.number().min(1).default(1).describe('Page number for pagination'),
       ...dateFilterParams,
+      ...includeImagesParam,
     },
     READ_ONLY_ANNOTATIONS,
     async ({
@@ -63,26 +127,12 @@ export function registerCollectingTools(
       date,
       from,
       to,
+      include_images,
     }) =>
-      withErrorHandling(async () => {
+      withRichResponse(async () => {
         const data = await client.get<{
-          data: Array<{
-            id: number;
-            title: string;
-            artists: string[];
-            year: number | null;
-            format: string;
-            format_detail: string;
-            label: string;
-            genres: string[];
-            date_added: string | null;
-          }>;
-          pagination: {
-            page: number;
-            limit: number;
-            total: number;
-            total_pages: number;
-          };
+          data: VinylItem[];
+          pagination: Pagination;
         }>('/collecting/vinyl', {
           q: query,
           format,
@@ -97,7 +147,12 @@ export function registerCollectingTools(
           to,
         });
 
-        if (!data.data.length) return 'No vinyl records found.';
+        if (!data.data.length) {
+          return {
+            content: [text('No vinyl records found.')],
+            structuredContent: { items: [], pagination: data.pagination },
+          };
+        }
 
         const lines = [
           `Vinyl Collection (page ${data.pagination.page} of ${data.pagination.total_pages}, ${fmt(data.pagination.total)} total):`,
@@ -106,13 +161,13 @@ export function registerCollectingTools(
         for (const [i, r] of data.data.entries()) {
           const num =
             (data.pagination.page - 1) * data.pagination.limit + i + 1;
-          const artist = r.artists.join(', ');
+          const artistStr = r.artists.join(', ');
           const year = r.year ? ` (${r.year})` : '';
-          const format = r.format_detail
+          const formatStr = r.format_detail
             ? ` [${r.format_detail}]`
             : ` [${r.format}]`;
           lines.push(
-            `${num}. ${artist} -- ${r.title}${year}${format} (${r.label})`
+            `${num}. [ID: ${r.id}] ${artistStr} -- ${r.title}${year}${formatStr} (${r.label})`
           );
         }
 
@@ -122,30 +177,61 @@ export function registerCollectingTools(
           );
         }
 
-        return lines.join('\n');
+        const topN = data.data.slice(0, TOP_N);
+        const images = include_images
+          ? await Promise.all(
+              topN.map((r) => imageBlock(client, r.image, LIST_IMAGE_PX))
+            )
+          : [];
+        const links = topN
+          .map((r) =>
+            resourceLink(r.discogs_url, `Discogs -- ${r.title}`, {
+              mimeType: 'text/html',
+            })
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [
+          text(lines.join('\n')),
+          ...images.filter((b): b is NonNullable<typeof b> => b !== null),
+          ...links,
+        ];
+
+        return {
+          content,
+          structuredContent: { items: data.data, pagination: data.pagination },
+        };
       })
   );
 
-  // get_collecting_stats
+  // get_collecting_stats ───────────────────────────────────────────
   server.tool(
     'get_collecting_stats',
     'Get overall collection statistics including total items, format breakdown (vinyl, CD, cassette), unique artists, genre data, and year range. Supports date filtering.',
     { ...dateFilterParams },
     READ_ONLY_ANNOTATIONS,
     async ({ date, from, to }) =>
-      withErrorHandling(async () => {
-        const { data } = await client.get<{
-          data: {
-            total_items: number;
-            by_format: Record<string, number>;
-            wantlist_count: number | null;
-            unique_artists: number | null;
-            top_genre: string | null;
-            oldest_release_year: number | null;
-            newest_release_year: number | null;
-            added_this_year: number | null;
-          };
-        }>('/collecting/stats', { date, from, to });
+      withRichResponse(async () => {
+        type Stats = {
+          total_items: number;
+          by_format: Record<string, number>;
+          wantlist_count: number | null;
+          unique_artists: number | null;
+          estimated_value: number | null;
+          top_genre: string | null;
+          oldest_release_year: number | null;
+          newest_release_year: number | null;
+          most_collected_artist: unknown;
+          added_this_year: number | null;
+        };
+        const { data } = await client.get<{ data: Stats }>(
+          '/collecting/stats',
+          {
+            date,
+            from,
+            to,
+          }
+        );
 
         const lines = [
           'Collection Stats:',
@@ -172,14 +258,14 @@ export function registerCollectingTools(
         if (data.added_this_year)
           lines.push(`- Added this year: ${data.added_this_year}`);
 
-        return lines.join('\n');
+        return { content: [text(lines.join('\n'))], structuredContent: data };
       })
   );
 
-  // get_physical_media
+  // get_physical_media ─────────────────────────────────────────────
   server.tool(
     'get_physical_media',
-    'Browse the physical media collection (Blu-ray, 4K UHD, HD DVD). Search by title, filter by format. Supports pagination.',
+    'Browse the physical media collection (Blu-ray, 4K UHD, HD DVD). Search by title, filter by format. Returns top-N cover art and pagination.',
     {
       query: z
         .string()
@@ -198,37 +284,25 @@ export function registerCollectingTools(
         .default(10)
         .describe('Number of items to return'),
       page: z.number().min(1).default(1).describe('Page number for pagination'),
+      ...includeImagesParam,
     },
     READ_ONLY_ANNOTATIONS,
-    async ({ query, media_type, limit, page }) =>
-      withErrorHandling(async () => {
+    async ({ query, media_type, limit, page, include_images }) =>
+      withRichResponse(async () => {
         const data = await client.get<{
-          data: Array<{
-            id: number;
-            title: string;
-            year: number | null;
-            media_type: string;
-            tmdb_rating: number | null;
-            collected_at: string | null;
-          }>;
-          pagination: {
-            page: number;
-            limit: number;
-            total: number;
-            total_pages: number;
-          };
+          data: MediaItem[];
+          pagination: Pagination;
         }>('/collecting/media', { q: query, media_type, limit, page });
 
-        if (!data.data.length) return 'No physical media found.';
-
-        const formatLabel: Record<string, string> = {
-          bluray: 'Blu-ray',
-          uhd_bluray: '4K UHD',
-          hddvd: 'HD DVD',
-        };
+        if (!data.data.length) {
+          return {
+            content: [text('No physical media found.')],
+            structuredContent: { items: [], pagination: data.pagination },
+          };
+        }
 
         const header = media_type
-          ? `${formatLabel[media_type] ?? media_type} Collection`
+          ? `${FORMAT_LABEL[media_type] ?? media_type} Collection`
           : 'Physical Media Collection';
 
         const lines = [
@@ -239,35 +313,43 @@ export function registerCollectingTools(
           const num =
             (data.pagination.page - 1) * data.pagination.limit + i + 1;
           const year = m.year ? ` (${m.year})` : '';
-          const format = ` [${formatLabel[m.media_type] ?? m.media_type}]`;
+          const formatStr = ` [${FORMAT_LABEL[m.media_type] ?? m.media_type}]`;
           const rating = m.tmdb_rating ? ` -- ${m.tmdb_rating}/10` : '';
-          lines.push(`${num}. ${m.title}${year}${format}${rating}`);
+          lines.push(
+            `${num}. [ID: ${m.id}] ${m.title}${year}${formatStr}${rating}`
+          );
         }
 
-        return lines.join('\n');
+        const topN = data.data.slice(0, TOP_N);
+        const images = include_images
+          ? await Promise.all(
+              topN.map((m) => imageBlock(client, m.image, LIST_IMAGE_PX))
+            )
+          : [];
+
+        const content: ContentBlock[] = [
+          text(lines.join('\n')),
+          ...images.filter((b): b is NonNullable<typeof b> => b !== null),
+        ];
+
+        return {
+          content,
+          structuredContent: { items: data.data, pagination: data.pagination },
+        };
       })
   );
 
-  // get_physical_media_stats
+  // get_physical_media_stats ───────────────────────────────────────
   server.tool(
     'get_physical_media_stats',
     'Get statistics for the physical media collection including total items and breakdown by format (Blu-ray, 4K UHD, HD DVD).',
     {},
     READ_ONLY_ANNOTATIONS,
     async () =>
-      withErrorHandling(async () => {
+      withRichResponse(async () => {
         const { data } = await client.get<{
-          data: Array<{
-            name: string;
-            count: number;
-          }>;
+          data: Array<{ name: string; count: number }>;
         }>('/collecting/media/formats');
-
-        const formatLabel: Record<string, string> = {
-          bluray: 'Blu-ray',
-          uhd_bluray: '4K UHD',
-          hddvd: 'HD DVD',
-        };
 
         const total = data.reduce((sum, f) => sum + f.count, 0);
         const lines = [
@@ -278,10 +360,13 @@ export function registerCollectingTools(
         ];
 
         for (const f of data) {
-          lines.push(`  ${formatLabel[f.name] ?? f.name}: ${fmt(f.count)}`);
+          lines.push(`  ${FORMAT_LABEL[f.name] ?? f.name}: ${fmt(f.count)}`);
         }
 
-        return lines.join('\n');
+        return {
+          content: [text(lines.join('\n'))],
+          structuredContent: { total, formats: data },
+        };
       })
   );
 }

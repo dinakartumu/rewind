@@ -3,6 +3,25 @@ title: Changelog
 description: API updates and new features.
 ---
 
+<Update label="April 22, 2026" tags={["New releases", "Improvements"]}>
+
+## MCP server v0.3.0
+
+Rich responses, interactive UI, and new tools across all domains.
+
+- **Interactive poster grid** for `get_recent_watches` via [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/). Renders inline in Claude Desktop, Claude web, VS Code GitHub Copilot, and Goose with thumbhash placeholders, theme-aware cards, and clickable Letterboxd links. Other clients get the existing text + image + resource_link + structuredContent response unchanged.
+- **7 new tools**: `get_listening_genres`, `get_running_years`, `get_watching_genres`, `get_watching_decades`, `get_watching_directors`, plus `browse_movies` filtering by director and year.
+- **10 entity resources** exposed as `@`-mentionable URIs (`rewind://movie/{id}`, `rewind://album/{id}`, `rewind://artist/{id}`, `rewind://vinyl/{id}`, etc.) so clients can drill from a search hit straight into the full record.
+- **Richer responses**: detail and list tools now return cover art / posters / artist imagery as `image` content blocks (top-N, default 5, disable with `include_images: false`). External platform URLs (Letterboxd, Strava, Discogs, Apple Music, Last.fm) come back as `resource_link` blocks. Every tool also returns `structuredContent` for reliable numeric reasoning.
+- **3 new prompts**: `letterboxd-review-draft`, `training-report`, `film-diet`.
+- Fixed duplicate entries in `get_recent_watches` and corrected star-rating display (0-5 scale).
+
+## API
+
+- All `/recent` endpoints raised `limit` cap from 20 to 50 and gained a `page` parameter for offset pagination.
+
+</Update>
+
 <Update label="April 3, 2026" tags={["New releases"]}>
 
 ## MCP server

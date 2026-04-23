@@ -69,6 +69,129 @@ export function registerPrompts(server: McpServer): void {
     })
   );
 
+  // Letterboxd review draft
+  server.prompt(
+    'letterboxd-review-draft',
+    'Draft a Letterboxd-style review for a recently watched film that I have rated but not yet reviewed.',
+    {
+      title: z
+        .string()
+        .optional()
+        .describe(
+          'Optional film title to review. If omitted, picks the most recent unreviewed watch.'
+        ),
+    },
+    ({ title }) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: [
+              title
+                ? `Draft a Letterboxd-style review for "${title}". First, call get_recent_watches (limit 20) to find its watch record and get the movie id. Then call get_movie_details to pull the full movie context plus my watch history and any rating.`
+                : 'Draft a Letterboxd-style review for the most recent film I watched that has a user_rating but no review_url yet. Call get_recent_watches (limit 20) first to find the right candidate, then get_movie_details to pull the full context.',
+              '',
+              'Use the poster image from the response to inform tone and aesthetic observations.',
+              'Write in my voice:',
+              '- 2-4 short paragraphs, conversational but specific',
+              '- Lead with a gut reaction, not a plot summary',
+              '- Cite at least one specific craft detail (direction, shot, needle drop, performance)',
+              '- Close with a concise take that justifies the rating',
+              '- Avoid generic adjectives ("compelling", "powerful", "thought-provoking")',
+              '',
+              'Output only the review body -- no headline, no star rating, no metadata.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+
+  // Training report
+  server.prompt(
+    'training-report',
+    'Analyze the past 7-14 days of running activity and produce a coach-style training report.',
+    {
+      days: z
+        .string()
+        .optional()
+        .describe('Number of days to analyze (default 7).'),
+    },
+    ({ days }) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: [
+              `Produce a training report covering the last ${days ?? '7'} days of running.`,
+              '',
+              'Gather:',
+              `1. get_recent_runs with from set to ${days ?? '7'} days ago`,
+              '2. get_running_stats for lifetime context',
+              '3. get_running_streaks for streak state',
+              '4. get_activity_splits on the longest run and any race in the window (use the IDs from step 1)',
+              '5. get_running_years to compare the current year pace to last year if relevant',
+              '',
+              'Structure the report:',
+              '- Headline: volume + intensity one-liner',
+              '- Weekly mileage vs a reasonable baseline (past year or lifetime average)',
+              '- Pace trend -- are splits on the long run holding pace, or drifting?',
+              '- Elevation, HR, cadence if present on the long run',
+              '- Streak status and whether to push or rest',
+              '- One concrete suggestion for the next 7 days',
+              '',
+              'Be specific with numbers. Cite exact runs by name + date. No vague phrases like "good work" or "keep it up".',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+
+  // Film diet
+  server.prompt(
+    'film-diet',
+    'Characterize the shape of my movie-watching taste: genre mix, decade distribution, top directors, rewatch rate, and where I lean vs drift.',
+    {
+      period: z
+        .string()
+        .optional()
+        .describe(
+          "Optional period scope (e.g. '12month', '2025'). Default: lifetime."
+        ),
+    },
+    ({ period }) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: [
+              `Characterize the shape of my film-watching taste${period ? ` for ${period}` : ''}. This is a portrait, not a top-10 list.`,
+              '',
+              'Use the breakdown tools:',
+              '1. get_watching_stats -- totals and top_* headlines',
+              '2. get_watching_genres -- full genre percentage distribution',
+              '3. get_watching_decades -- decade distribution',
+              '4. get_watching_directors (limit 20) -- director frequency long tail',
+              '',
+              'Cover:',
+              '- Genre mix: where is the weight? what is under-represented?',
+              '- Decade profile: am I a classics person, a recent-releases person, or bimodal?',
+              '- Directors: which are habitual (3+ films) vs one-offs? any obvious auteur loyalties?',
+              '- Any interesting tensions (e.g. stated preferences vs actual pattern)',
+              '',
+              'Tone: honest, data-specific, avoid flattery. If the data shows a gap (e.g. almost no pre-1970 films) name it.',
+              'Write as a short portrait, 3-5 tight paragraphs. Quote exact percentages and counts.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+
   // Compare periods prompt
   server.prompt(
     'compare-periods',
@@ -108,6 +231,45 @@ export function registerPrompts(server: McpServer): void {
               '- Standout items unique to each period',
               '',
               'Keep the analysis specific and data-driven.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+
+  // Find a half-remembered article
+  server.prompt(
+    'find-article',
+    'Recover an article the user only half-remembers, using hybrid keyword + semantic search, then surface related pieces',
+    {
+      description: z
+        .string()
+        .describe(
+          'Whatever the user remembers about the article: topic, person mentioned, feeling, rough time period, etc.'
+        ),
+    },
+    ({ description }) => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: [
+              `Help me find this article I vaguely remember: "${description}"`,
+              '',
+              'Strategy:',
+              "1. Call `search` with mode='hybrid', domain='reading', and the description as the query. Hybrid combines FTS for any exact keywords + semantic for paraphrased recall.",
+              '2. If hybrid returns nothing useful, fall back to `semantic_search` which is pure-vector (better for very vague descriptions).',
+              '3. Read the `@rewind://article/{id}` resource for the top match to confirm it matches. Pull out the title, author (if any), key people or concepts from the excerpt.',
+              '4. Call `find_similar_articles(article_id)` to surface 3-5 related pieces.',
+              '',
+              'Present the answer as:',
+              '- The match: title, source, and a one-sentence summary drawn from the excerpt',
+              '- 3-5 related pieces with one-line descriptions',
+              '- If multiple candidates tie, ask the user which one they meant before pulling related pieces.',
+              '',
+              'Keep it concise — the user is trying to refind something, not read a review.',
             ].join('\n'),
           },
         },

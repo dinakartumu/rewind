@@ -12,14 +12,50 @@ import { registerWatchingTools } from './tools/watching.js';
 import { registerCollectingTools } from './tools/collecting.js';
 import { registerReadingTools } from './tools/reading.js';
 import { registerCrossDomainTools } from './tools/cross-domain.js';
+import { registerDebugTools } from './tools/debug.js';
 import { registerResources } from './resources.js';
+import { registerUiResource } from './resources/ui.js';
 import { registerPrompts } from './prompts.js';
+import { UI_BUNDLES } from './ui-bundles.js';
+import {
+  EXTENSION_ID as MCP_APPS_EXTENSION_ID,
+  RESOURCE_MIME_TYPE as MCP_APPS_RESOURCE_MIME_TYPE,
+} from '@modelcontextprotocol/ext-apps/server';
+
+const SERVER_INSTRUCTIONS = [
+  'Rewind is a personal data archive covering music listening (Last.fm + Apple Music),',
+  'running (Strava), watching (Plex + Letterboxd + manual movie entries), collecting',
+  '(vinyl via Discogs, physical media), and reading (Instapaper articles and',
+  'highlights). Use these tools when the user asks about their own listening, running,',
+  'watching, reading, or collecting history, stats, streaks, top lists, or',
+  'cross-domain feeds like "what did I do on <date>" or "on this day in past years".',
+  'Tools return human-readable text plus structured JSON and, for entity details,',
+  'cover art or posters as image content. External platform URLs (Letterboxd, Strava,',
+  'Discogs, Apple Music) are returned as clickable resource links.',
+].join(' ');
 
 export function createServer(client: RewindClient): McpServer {
-  const server = new McpServer({
-    name: 'rewind',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'rewind',
+      version: '0.4.0',
+    },
+    {
+      instructions: SERVER_INSTRUCTIONS,
+      // Advertise MCP Apps support during the initialize handshake.
+      // The ext-apps SDK helpers (registerAppResource/registerAppTool)
+      // do NOT auto-advertise -- without this, Claude Desktop sees our
+      // tools' _meta.ui.resourceUri but silently skips rendering the
+      // iframe because capability negotiation failed.
+      capabilities: {
+        extensions: {
+          [MCP_APPS_EXTENSION_ID]: {
+            mimeTypes: [MCP_APPS_RESOURCE_MIME_TYPE],
+          },
+        },
+      },
+    }
+  );
 
   // System tool
   server.tool(
@@ -84,6 +120,35 @@ export function createServer(client: RewindClient): McpServer {
   // Register resources and prompts
   registerResources(server, client);
   registerPrompts(server);
+
+  // MCP Apps UI resources. HTML is inlined into the Worker bundle at build
+  // time (see scripts/inline-bundles.mjs) so this registration works in
+  // any host context without needing a Workers Static Assets binding.
+  registerUiResource(server, {
+    name: 'Rewind -- Recent Watches',
+    uri: 'ui://rewind/recent-watches.html',
+    html: UI_BUNDLES['recent-watches.html'],
+    description:
+      'Interactive poster grid for recently watched movies. Consumes get_recent_watches structuredContent.',
+    csp: {
+      // Allow poster <img> loads from the Rewind CDN. Without this the
+      // default sandbox CSP (`img-src 'self' data:`) blocks external
+      // images and the cards render as broken-image placeholders.
+      resourceDomains: ['https://cdn.rewind.rest'],
+    },
+  });
+
+  // Debug-only: reinstated alongside Phase 2 to A/B test whether Claude
+  // Desktop's "Failed to set up MCP app" is specific to the new resource
+  // or symptomatic of the whole rewind MCP server's sandbox state.
+  registerUiResource(server, {
+    name: 'Rewind -- Hello (debug)',
+    uri: 'ui://rewind/hello.html',
+    html: UI_BUNDLES['hello.html'],
+    description:
+      'Minimal diagnostic UI. Mirror of the Phase-1 app that rendered cleanly earlier today.',
+  });
+  registerDebugTools(server);
 
   return server;
 }
