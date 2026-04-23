@@ -28,7 +28,10 @@
           },
           "order": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "description": "Optional: sort order (default: desc)"
           },
           "limit": {
@@ -73,7 +76,9 @@
             "description": "Number of related articles to return"
           }
         },
-        "required": ["article_id"],
+        "required": [
+          "article_id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -89,7 +94,9 @@
             "description": "Activity ID (from get_recent_runs or get_personal_records)"
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -105,7 +112,9 @@
             "description": "Activity ID (from get_recent_runs or get_personal_records)"
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -126,7 +135,9 @@
             "description": "Include artwork/poster image content blocks in the response. Default true. Set false to keep responses small."
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -143,7 +154,9 @@
             "description": "Internal Rewind article id (from a get_recent_reads, search, semantic_search, or find_similar_articles result)"
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -164,7 +177,9 @@
             "description": "Include artwork/poster image content blocks in the response. Default true. Set false to keep responses small."
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -250,7 +265,11 @@
         "properties": {
           "group_by": {
             "type": "string",
-            "enum": ["week", "month", "year"],
+            "enum": [
+              "week",
+              "month",
+              "year"
+            ],
             "default": "month",
             "description": "Grouping period (default: month)"
           },
@@ -326,7 +345,9 @@
             "description": "Include artwork/poster image content blocks in the response. Default true. Set false to keep responses small."
           }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -391,7 +412,11 @@
           },
           "media_type": {
             "type": "string",
-            "enum": ["bluray", "uhd_bluray", "hddvd"],
+            "enum": [
+              "bluray",
+              "uhd_bluray",
+              "hddvd"
+            ],
             "description": "Optional: filter by format (bluray, uhd_bluray, hddvd)"
           },
           "limit": {
@@ -803,7 +828,10 @@
           },
           "order": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "description": "Optional: sort order (default: desc)"
           },
           "limit": {
@@ -923,7 +951,11 @@
           },
           "mode": {
             "type": "string",
-            "enum": ["keyword", "semantic", "hybrid"],
+            "enum": [
+              "keyword",
+              "semantic",
+              "hybrid"
+            ],
             "description": "Ranking mode. keyword = FTS (default). semantic = cosine-similarity over article embeddings (reading only). hybrid = FTS + semantic via reciprocal rank fusion (reading only)."
           },
           "limit": {
@@ -940,7 +972,9 @@
             "description": "Page number for pagination"
           }
         },
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
@@ -963,7 +997,9 @@
             "description": "Number of matches to return"
           }
         },
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
