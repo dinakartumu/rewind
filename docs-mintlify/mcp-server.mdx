@@ -153,6 +153,12 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
 | `get_feed`        | Unified chronological feed of all activity                                                   |
 | `get_on_this_day` | What happened on this date in previous years                                                 |
 
+### System
+
+| Tool         | Description                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `get_health` | API health + last-sync timestamps per domain. Useful first call when diagnosing stale data. |
+
 ## Example Queries
 
 - "What have I been listening to this week?"
@@ -199,7 +205,7 @@ The server exposes `@`-mentionable resources for fetching full detail on any ent
 | Highlight      | `rewind://highlight/{id}`         | `/v1/reading/highlights/{id}`  |
 | Activity       | `rewind://activity/{id}`          | `/v1/running/activities/{id}`  |
 | Sync status    | `rewind://sync/status`            | `/v1/health/sync`              |
-| Year in review | `rewind://{domain}/year/{year}`   | `/v1/{domain}/year/{year}`     |
+| Year in review | `rewind://{domain}/year/{year}`   | `/v1/{domain}/year/{year}` (listening, running, watching) |
 
 In Claude Code you can reference any of these with `@rewind:<uri>` to pull the full record into the conversation. `search` returns `resource_link`s pointing at these URIs so clients can drill from a match straight into the full record.
 

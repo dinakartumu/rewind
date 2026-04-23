@@ -3,6 +3,23 @@ title: Changelog
 description: API updates and new features.
 ---
 
+<Update label="April 23, 2026" tags={["Improvements"]}>
+
+## MCP server v0.4.1 -- click-through links + cleaner output
+
+Polish pass on the v0.4.0 reading-search shipment. No new capabilities; existing tools read better in chat and link out to the actual source.
+
+- **External URLs on search results.** `search`, `semantic_search`, and `find_similar_articles` now emit the article's real URL (nytimes.com, etc.) as a `text/html` resource_link alongside the internal `rewind://` drill-in. Models and clients can present clickable links to the source, not just opaque IDs.
+- **Inline domain + author.** Search result text lines now read `The Secret Weapon of S.N.L. by Jason Zinoman (nytimes.com)` instead of the FTS-internal `[reading/article]` prefix.
+- **No more `[ID: 42]` noise.** Stripped the internal-id bracketed prefix from user-visible text across all list tools (`get_recent_reads`, `get_recent_runs`, `get_recent_watches`, `browse_movies`, `get_top_*`, `get_personal_records`, collecting browse tools). IDs still live in `structuredContent.items[i]` for model chaining — they just no longer clutter the prose.
+- **Per-item drill-in links.** `browse_movies` and `get_personal_records` now emit `rewind://movie/{id}` and `rewind://activity/{id}` links per row.
+
+## API
+
+- **`/v1/search`** responses include `url` and `author` fields for reading-article hits (null for other domains). Semantic path fills them via the existing JOIN; FTS path does a single follow-up lookup in `reading_items`.
+
+</Update>
+
 <Update label="April 23, 2026" tags={["New releases", "Improvements"]}>
 
 ## MCP server v0.4.0 -- semantic recall for reading

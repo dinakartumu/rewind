@@ -53,8 +53,8 @@ Requires a [Rewind API key](https://docs.rewind.rest/authentication). `REWIND_AP
 | **Running**      | Strava           | Stats, recent runs, personal records, streaks, activity details, per-mile splits, per-year summaries                          |
 | **Watching**     | Plex, Letterboxd | Recent watches, movie details, browse by genre/decade/director, stats, genre/decade/director breakdowns                       |
 | **Collecting**   | Discogs, Trakt   | Vinyl collection, physical media (Blu-ray/4K UHD/HD DVD), collection and media stats                                          |
-| **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats                                                                          |
-| **Cross-domain** | All              | Full-text search, unified feed, on-this-day                                                                                   |
+| **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats, semantic similar-article recall (`find_similar_articles`)               |
+| **Cross-domain** | All              | Full-text search (keyword / semantic / hybrid modes), semantic_search, unified feed, on-this-day, health check                |
 
 ## Rich responses
 
@@ -68,20 +68,31 @@ Tool responses follow the MCP 2025-06-18 content model and include more than pla
 
 The server exposes `@`-mentionable resources for fetching full detail on any entity:
 
-| Entity         | URI                             | Source endpoint               |
-| -------------- | ------------------------------- | ----------------------------- |
-| Movie          | `rewind://movie/{id}`           | `/v1/watching/movies/{id}`    |
-| Show           | `rewind://show/{id}`            | `/v1/watching/shows/{id}`     |
-| Album          | `rewind://album/{id}`           | `/v1/listening/albums/{id}`   |
-| Artist         | `rewind://artist/{id}`          | `/v1/listening/artists/{id}`  |
-| Vinyl          | `rewind://vinyl/{id}`           | `/v1/collecting/vinyl/{id}`   |
-| Physical media | `rewind://physical-media/{id}`  | `/v1/collecting/media/{id}`   |
-| Article        | `rewind://article/{id}`         | `/v1/reading/articles/{id}`   |
-| Activity       | `rewind://activity/{id}`        | `/v1/running/activities/{id}` |
-| Sync status    | `rewind://sync/status`          | `/v1/health/sync`             |
-| Year in review | `rewind://{domain}/year/{year}` | `/v1/{domain}/year/{year}`    |
+| Entity         | URI                             | Source endpoint                                           |
+| -------------- | ------------------------------- | --------------------------------------------------------- |
+| Movie          | `rewind://movie/{id}`           | `/v1/watching/movies/{id}`                                |
+| Show           | `rewind://show/{id}`            | `/v1/watching/shows/{id}`                                 |
+| Album          | `rewind://album/{id}`           | `/v1/listening/albums/{id}`                               |
+| Artist         | `rewind://artist/{id}`          | `/v1/listening/artists/{id}`                              |
+| Vinyl          | `rewind://vinyl/{id}`           | `/v1/collecting/vinyl/{id}`                               |
+| Physical media | `rewind://physical-media/{id}`  | `/v1/collecting/media/{id}`                               |
+| Article        | `rewind://article/{id}`         | `/v1/reading/articles/{id}`                               |
+| Highlight      | `rewind://highlight/{id}`       | `/v1/reading/highlights/{id}`                             |
+| Activity       | `rewind://activity/{id}`        | `/v1/running/activities/{id}`                             |
+| Sync status    | `rewind://sync/status`          | `/v1/health/sync`                                         |
+| Year in review | `rewind://{domain}/year/{year}` | `/v1/{domain}/year/{year}` (listening, running, watching) |
 
 `search` returns `resource_link`s pointing at these URIs so clients can drill from a match straight into the full record.
+
+## Semantic search (reading)
+
+Reading articles are embedded into a [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/) index at sync time using [Voyage AI](https://docs.voyageai.com/) (voyage-3-lite, 512-dim, cosine). Three query paths are available for natural-language recall:
+
+- **`search` with `mode="semantic"` or `mode="hybrid"`** — keyword-only by default; opt in to vector-backed ranking when the user describes what an article was about rather than quoting it. Hybrid combines FTS + semantic via reciprocal rank fusion (k=60).
+- **`semantic_search`** — dedicated tool for pure semantic recall over the reading domain. Returns cosine scores alongside `rewind://article/{id}` resource links.
+- **`find_similar_articles(article_id)`** — "what else did I read like this?" — uses the article's own stored vector, no Voyage call at query time.
+
+Semantic and hybrid modes are reading-only; other domains remain keyword-FTS.
 
 ## Interactive UI (MCP Apps)
 
@@ -106,6 +117,7 @@ The server exposes slash-command prompts that orchestrate multiple tools for com
 - `letterboxd-review-draft` -- drafts a Letterboxd-style review for your most recent unrated film
 - `training-report` -- coach-style running report for the last 7-14 days
 - `film-diet` -- portrait of your film-watching taste (genre mix, decades, directors)
+- `find-article` -- recover a half-remembered article via hybrid+semantic search, then pull 3-5 related pieces
 
 ## Authentication
 
