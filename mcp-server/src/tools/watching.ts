@@ -171,7 +171,7 @@ export function registerWatchingTools(
             w.user_rating !== null ? ` -- ${formatStars(w.user_rating)}` : '';
           const rewatch = w.rewatch ? ' [rewatch]' : '';
           lines.push(
-            `${i + 1}. [ID: ${w.movie.id}] ${w.movie.title}${year}${director}${rating}${rewatch} (${timeAgo(w.watched_at)})`
+            `${i + 1}. ${w.movie.title}${year}${director}${rating}${rewatch} (${timeAgo(w.watched_at)})`
           );
         }
 
@@ -416,7 +416,7 @@ export function registerWatchingTools(
           const rating = m.tmdb_rating
             ? ` -- TMDB ${m.tmdb_rating.toFixed(1)}/10`
             : '';
-          lines.push(`${num}. [ID: ${m.id}] ${m.title}${yr}${dir}${rating}`);
+          lines.push(`${num}. ${m.title}${yr}${dir}${rating}`);
         }
 
         const topN = data.data.slice(0, POSTER_TOP_N);
@@ -426,9 +426,20 @@ export function registerWatchingTools(
             )
           : [];
 
+        // Emit a rewind://movie/{id} resource_link per item so the user can
+        // drill into the full detail (Letterboxd review, watch history, etc.).
+        const links = data.data
+          .map((m) =>
+            resourceLink(`rewind://movie/${m.id}`, `${m.title} (details)`, {
+              mimeType: 'application/json',
+            })
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
         const content: ContentBlock[] = [
           text(lines.join('\n')),
           ...images.filter((b): b is NonNullable<typeof b> => b !== null),
+          ...links,
         ];
 
         return {

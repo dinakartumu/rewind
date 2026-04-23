@@ -167,7 +167,7 @@ export function registerCollectingTools(
             ? ` [${r.format_detail}]`
             : ` [${r.format}]`;
           lines.push(
-            `${num}. [ID: ${r.id}] ${artistStr} -- ${r.title}${year}${formatStr} (${r.label})`
+            `${num}. ${artistStr} -- ${r.title}${year}${formatStr} (${r.label})`
           );
         }
 
@@ -315,9 +315,7 @@ export function registerCollectingTools(
           const year = m.year ? ` (${m.year})` : '';
           const formatStr = ` [${FORMAT_LABEL[m.media_type] ?? m.media_type}]`;
           const rating = m.tmdb_rating ? ` -- ${m.tmdb_rating}/10` : '';
-          lines.push(
-            `${num}. [ID: ${m.id}] ${m.title}${year}${formatStr}${rating}`
-          );
+          lines.push(`${num}. ${m.title}${year}${formatStr}${rating}`);
         }
 
         const topN = data.data.slice(0, TOP_N);

@@ -114,7 +114,7 @@ export function registerReadingTools(
                 ? ' [finished]'
                 : '';
           lines.push(
-            `${i + 1}. [ID: ${a.id}] ${a.title}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
+            `${i + 1}. ${a.title}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
           );
           if (a.description) {
             lines.push(`   ${truncateAtWord(a.description, 160)}`);
@@ -326,14 +326,24 @@ export function registerReadingTools(
           );
         }
 
-        const links = data.data
-          .map((r) =>
-            resourceLink(`rewind://article/${r.id}`, r.title, {
+        const links = data.data.flatMap((r) => {
+          const out: ReturnType<typeof resourceLink>[] = [];
+          if (r.url) {
+            out.push(
+              resourceLink(r.url, r.title, {
+                mimeType: 'text/html',
+                description: r.description ?? undefined,
+              })
+            );
+          }
+          out.push(
+            resourceLink(`rewind://article/${r.id}`, `${r.title} (details)`, {
               mimeType: 'application/json',
               description: r.description ?? undefined,
             })
-          )
-          .filter((b): b is NonNullable<typeof b> => b !== null);
+          );
+          return out.filter((b): b is NonNullable<typeof b> => b !== null);
+        });
 
         const content: ContentBlock[] = [text(lines.join('\n')), ...links];
 

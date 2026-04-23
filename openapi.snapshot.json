@@ -14816,6 +14816,149 @@
         }
       }
     },
+    "/v1/reading/articles/{id}/related": {
+      "get": {
+        "operationId": "getReadingArticleRelated",
+        "tags": [
+          "Reading"
+        ],
+        "summary": "Related articles (semantic similarity)",
+        "description": "Returns articles thematically similar to the given one, ranked by cosine similarity against Voyage embeddings. Requires the article to have been embedded (run the admin reembed endpoint to backfill).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "42"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 5,
+              "example": 5
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related articles, scored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "domain": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "score": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "author",
+                          "url",
+                          "domain",
+                          "description",
+                          "score"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": 742,
+                      "title": "Tim Robinson broke my boyfriend's brain",
+                      "author": null,
+                      "url": "https://...",
+                      "domain": "nytimes.com",
+                      "description": "A writer learns the hard way...",
+                      "score": 0.67
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reading/archive": {
       "get": {
         "operationId": "getReadingArchive",
@@ -16877,6 +17020,21 @@
             "description": "Page number (default 1)",
             "name": "page",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "keyword",
+                "semantic",
+                "hybrid"
+              ],
+              "description": "Ranking mode. keyword = FTS only (default). semantic = Vectorize only (reading domain). hybrid = FTS + semantic via reciprocal rank fusion (reading domain)."
+            },
+            "required": false,
+            "description": "Ranking mode. keyword = FTS only (default). semantic = Vectorize only (reading domain). hybrid = FTS + semantic via reciprocal rank fusion (reading domain).",
+            "name": "mode",
+            "in": "query"
           }
         ],
         "responses": {
@@ -16943,6 +17101,21 @@
                               "thumbhash",
                               "dominant_color"
                             ]
+                          },
+                          "url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "author": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "score": {
+                            "type": "number"
                           }
                         },
                         "required": [
@@ -17551,6 +17724,97 @@
                   "required": [
                     "scanned",
                     "updated",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reembed-reading": {
+      "post": {
+        "operationId": "reembedReading",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Embed reading_items into Vectorize",
+        "description": "Iterates reading_items that have any indexable text (title/description/body_excerpt) and upserts their Voyage embeddings into the rewind-reading Vectorize index. Batches server-side.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000
+                  },
+                  "batchSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "onlyMissing": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reembed complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "embedded": {
+                      "type": "number"
+                    },
+                    "skipped": {
+                      "type": "number"
+                    },
+                    "tokens": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "scanned",
+                    "embedded",
+                    "skipped",
+                    "tokens",
                     "took_ms"
                   ]
                 }

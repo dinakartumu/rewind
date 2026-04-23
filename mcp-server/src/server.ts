@@ -38,7 +38,7 @@ export function createServer(client: RewindClient): McpServer {
   const server = new McpServer(
     {
       name: 'rewind',
-      version: '0.4.0',
+      version: '0.4.1',
     },
     {
       instructions: SERVER_INSTRUCTIONS,

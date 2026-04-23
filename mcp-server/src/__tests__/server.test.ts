@@ -903,22 +903,30 @@ describe('MCP Server', () => {
       expect(text).toContain('Beastie Boys');
     });
 
-    it('get_recent_runs includes activity IDs', async () => {
+    it('get_recent_runs exposes activity IDs via structuredContent', async () => {
       const result = await client.callTool({
         name: 'get_recent_runs',
         arguments: {},
       });
-      const text = (result.content as Array<{ text: string }>)[0].text;
-      expect(text).toContain('[ID:');
+      const sc = (
+        result as { structuredContent?: { items?: Array<{ id?: number }> } }
+      ).structuredContent;
+      expect(sc?.items?.length).toBeGreaterThan(0);
+      expect(typeof sc?.items?.[0]?.id).toBe('number');
     });
 
-    it('get_personal_records includes activity IDs', async () => {
+    it('get_personal_records exposes activity IDs via structuredContent', async () => {
       const result = await client.callTool({
         name: 'get_personal_records',
         arguments: {},
       });
-      const text = (result.content as Array<{ text: string }>)[0].text;
-      expect(text).toContain('[ID:');
+      const sc = (
+        result as {
+          structuredContent?: { items?: Array<{ activity_id?: number }> };
+        }
+      ).structuredContent;
+      expect(sc?.items?.length).toBeGreaterThan(0);
+      expect(typeof sc?.items?.[0]?.activity_id).toBe('number');
     });
 
     it('get_activity_splits includes per-mile paces', async () => {
@@ -951,13 +959,18 @@ describe('MCP Server', () => {
       expect(text).toContain('4K UHD');
     });
 
-    it('search returns domain-labeled results', async () => {
+    it('search returns results with domain metadata in structuredContent', async () => {
       const result = await client.callTool({
         name: 'search',
         arguments: { query: 'beastie' },
       });
-      const text = (result.content as Array<{ text: string }>)[0].text;
-      expect(text).toContain('[listening/');
+      const sc = (
+        result as {
+          structuredContent?: { items?: Array<{ domain?: string }> };
+        }
+      ).structuredContent;
+      expect(sc?.items?.length).toBeGreaterThan(0);
+      expect(sc?.items?.[0]?.domain).toBe('listening');
     });
 
     it('get_on_this_day groups by year', async () => {

@@ -15,6 +15,16 @@ import {
 
 const SEARCH_TOP_N = 5;
 
+/** Extract host (e.g. "nytimes.com") from a URL for inline display. */
+function hostOf(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Map a cross-domain entity reference to a Rewind resource URI.
  * Returns null when the entity type has no registered resource template.
@@ -91,6 +101,8 @@ export function registerCrossDomainTools(
             thumbhash: string | null;
             dominant_color: string | null;
           } | null;
+          url?: string | null;
+          author?: string | null;
           score?: number;
         };
         const data = await client.get<{
@@ -115,25 +127,39 @@ export function registerCrossDomainTools(
         ];
 
         for (const [i, r] of data.data.entries()) {
-          const sub = r.subtitle ? ` -- ${r.subtitle}` : '';
+          const authorPart = r.author ? ` by ${r.author}` : '';
+          const dom = r.url ? ` (${hostOf(r.url)})` : '';
+          const sub = r.subtitle && !r.url ? ` -- ${r.subtitle}` : '';
           const score =
             typeof r.score === 'number' ? ` (score=${r.score.toFixed(2)})` : '';
-          lines.push(
-            `${i + 1}. [${r.domain}/${r.entity_type}] ${r.title}${sub}${score}`
-          );
+          lines.push(`${i + 1}. ${r.title}${authorPart}${dom}${sub}${score}`);
         }
 
-        // Emit one resource_link per result that maps to a known entity.
-        const links = data.data
-          .map((r) => {
-            const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
-            if (!uri) return null;
-            return resourceLink(uri, r.title, {
-              mimeType: 'application/json',
-              description: r.subtitle ?? undefined,
-            });
-          })
-          .filter((b): b is NonNullable<typeof b> => b !== null);
+        // Emit resource_links: prefer the external URL when present (so the
+        // user can click through to the actual article / Letterboxd review /
+        // Strava activity / etc.), and additionally emit the rewind:// URI
+        // so the model can @-mention / fetch full detail via the MCP resource.
+        const links = data.data.flatMap((r) => {
+          const out: ReturnType<typeof resourceLink>[] = [];
+          if (r.url) {
+            out.push(
+              resourceLink(r.url, r.title, {
+                mimeType: 'text/html',
+                description: r.subtitle ?? undefined,
+              })
+            );
+          }
+          const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
+          if (uri) {
+            out.push(
+              resourceLink(uri, `${r.title} (details)`, {
+                mimeType: 'application/json',
+                description: r.subtitle ?? undefined,
+              })
+            );
+          }
+          return out.filter((b): b is NonNullable<typeof b> => b !== null);
+        });
 
         // Emit image blocks for the top-N results that carry an image.
         const topN = data.data.slice(0, SEARCH_TOP_N);
@@ -184,6 +210,8 @@ export function registerCrossDomainTools(
             thumbhash: string | null;
             dominant_color: string | null;
           } | null;
+          url?: string | null;
+          author?: string | null;
           score: number;
         };
         const data = await client.get<{
@@ -207,22 +235,35 @@ export function registerCrossDomainTools(
           `Semantic matches for "${query}" (${fmt(data.data.length)} shown):`,
         ];
         for (const [i, r] of data.data.entries()) {
-          const sub = r.subtitle ? ` -- ${r.subtitle}` : '';
+          const authorPart = r.author ? ` by ${r.author}` : '';
+          const dom = r.url ? ` (${hostOf(r.url)})` : '';
+          const sub = r.subtitle && !r.url ? ` -- ${r.subtitle}` : '';
           lines.push(
-            `${i + 1}. ${r.title}${sub} (score=${r.score.toFixed(2)})`
+            `${i + 1}. ${r.title}${authorPart}${dom}${sub} (score=${r.score.toFixed(2)})`
           );
         }
 
-        const links = data.data
-          .map((r) => {
-            const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
-            if (!uri) return null;
-            return resourceLink(uri, r.title, {
-              mimeType: 'application/json',
-              description: r.subtitle ?? undefined,
-            });
-          })
-          .filter((b): b is NonNullable<typeof b> => b !== null);
+        const links = data.data.flatMap((r) => {
+          const out: ReturnType<typeof resourceLink>[] = [];
+          if (r.url) {
+            out.push(
+              resourceLink(r.url, r.title, {
+                mimeType: 'text/html',
+                description: r.subtitle ?? undefined,
+              })
+            );
+          }
+          const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
+          if (uri) {
+            out.push(
+              resourceLink(uri, `${r.title} (details)`, {
+                mimeType: 'application/json',
+                description: r.subtitle ?? undefined,
+              })
+            );
+          }
+          return out.filter((b): b is NonNullable<typeof b> => b !== null);
+        });
 
         const topN = data.data.slice(0, SEARCH_TOP_N);
         const images = await Promise.all(

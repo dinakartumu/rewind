@@ -303,9 +303,7 @@ export function registerListeningTools(
 
         const lines = [`Top Artists (${period}):`];
         for (const a of data.data) {
-          lines.push(
-            `${a.rank}. [ID: ${a.id}] ${a.name} -- ${fmt(a.playcount)} plays`
-          );
+          lines.push(`${a.rank}. ${a.name} -- ${fmt(a.playcount)} plays`);
         }
 
         const topN = data.data.slice(0, TOP_N);
@@ -368,7 +366,7 @@ export function registerListeningTools(
         const lines = [`Top Albums (${period}):`];
         for (const a of data.data) {
           lines.push(
-            `${a.rank}. [ID: ${a.id}] ${a.name} by ${a.detail} -- ${fmt(a.playcount)} plays`
+            `${a.rank}. ${a.name} by ${a.detail} -- ${fmt(a.playcount)} plays`
           );
         }
 
@@ -431,7 +429,7 @@ export function registerListeningTools(
         const lines = [`Top Tracks (${period}):`];
         for (const t of data.data) {
           lines.push(
-            `${t.rank}. [ID: ${t.id}] "${t.name}" by ${t.detail} -- ${fmt(t.playcount)} plays`
+            `${t.rank}. "${t.name}" by ${t.detail} -- ${fmt(t.playcount)} plays`
           );
         }
 

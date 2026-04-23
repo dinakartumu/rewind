@@ -38,6 +38,8 @@ const SearchResultSchema = z.object({
   subtitle: z.string().nullable(),
   image_key: z.string().nullable(),
   image: SearchImageSchema.nullable(),
+  url: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
   score: z.number().optional(),
 });
 
@@ -114,10 +116,49 @@ type HitRow = {
   image_version: number | null;
   thumbhash: string | null;
   dominant_color: string | null;
+  url: string | null;
+  author: string | null;
   score?: number;
 };
 
 type FtsResult = { rows: HitRow[]; total: number };
+
+/**
+ * After FTS returns hits, backfill `url` + `author` for reading-article
+ * rows so the consumer can render a click-through link. We query
+ * reading_items once with a single IN() instead of JOINing at FTS time
+ * (FTS5 virtual tables + LEFT JOIN chains get awkward).
+ */
+async function enrichReadingUrls(
+  db: ReturnType<typeof drizzle>,
+  rows: HitRow[]
+): Promise<void> {
+  const ids = rows
+    .filter((r) => r.domain === 'reading' && r.entity_type === 'article')
+    .map((r) => Number(r.entity_id))
+    .filter((n) => Number.isFinite(n));
+  if (ids.length === 0) return;
+
+  const meta = await db.all<{
+    id: number;
+    url: string | null;
+    author: string | null;
+  }>(
+    sql`SELECT id, url, author FROM reading_items WHERE id IN (${sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `
+    )})`
+  );
+  const byId = new Map(meta.map((m) => [m.id, m]));
+  for (const r of rows) {
+    if (r.domain !== 'reading' || r.entity_type !== 'article') continue;
+    const m = byId.get(Number(r.entity_id));
+    if (m) {
+      r.url = m.url ?? null;
+      r.author = m.author ?? null;
+    }
+  }
+}
 
 async function runFtsSearch(
   db: ReturnType<typeof drizzle>,
@@ -134,7 +175,8 @@ async function runFtsSearch(
             LIMIT ${limit} OFFSET ${offset}
           )
           SELECT m.domain, m.entity_type, m.entity_id, m.title, m.subtitle, m.image_key,
-                 i.r2_key, i.image_version, i.thumbhash, i.dominant_color
+                 i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
+                 NULL as url, NULL as author
           FROM matches m
           LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
           ORDER BY m.rank`
@@ -146,11 +188,13 @@ async function runFtsSearch(
             LIMIT ${limit} OFFSET ${offset}
           )
           SELECT m.domain, m.entity_type, m.entity_id, m.title, m.subtitle, m.image_key,
-                 i.r2_key, i.image_version, i.thumbhash, i.dominant_color
+                 i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
+                 NULL as url, NULL as author
           FROM matches m
           LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
           ORDER BY m.rank`
   );
+  await enrichReadingUrls(db, rows);
   const countRows = await db.all<{ total: number }>(
     domain
       ? sql`SELECT count(*) as total FROM search_index WHERE search_index MATCH ${ftsQuery} AND domain = ${domain}`
@@ -194,6 +238,8 @@ async function runSemanticSearch(
       id: readingItems.id,
       title: readingItems.title,
       description: readingItems.description,
+      url: readingItems.url,
+      author: readingItems.author,
       r2Key: images.r2Key,
       imageVersion: images.imageVersion,
       thumbhash: images.thumbhash,
@@ -225,6 +271,8 @@ async function runSemanticSearch(
         image_version: r.imageVersion ?? null,
         thumbhash: r.thumbhash ?? null,
         dominant_color: r.dominantColor ?? null,
+        url: r.url ?? null,
+        author: r.author ?? null,
         score: m.score,
       };
       return hit;
@@ -271,6 +319,8 @@ function toPayload(r: HitRow) {
           dominant_color: r.dominant_color,
         }
       : null,
+    url: r.url,
+    author: r.author,
     ...(typeof r.score === 'number' ? { score: r.score } : {}),
   };
 }

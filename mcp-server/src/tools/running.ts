@@ -132,7 +132,7 @@ export function registerRunningTools(
           const location = r.city && r.state ? ` in ${r.city}, ${r.state}` : '';
           const race = r.is_race ? ' [RACE]' : '';
           lines.push(
-            `${i + 1}. [ID: ${r.id}] ${r.name}${race} -- ${r.distance_mi.toFixed(1)} mi, ${r.pace}/mi, ${r.duration}${location} (${timeAgo(r.date)})`
+            `${i + 1}. ${r.name}${race} -- ${r.distance_mi.toFixed(1)} mi, ${r.pace}/mi, ${r.duration}${location} (${timeAgo(r.date)})`
           );
         }
 
@@ -179,12 +179,23 @@ export function registerRunningTools(
         const lines = ['Personal Records:'];
         for (const pr of data) {
           lines.push(
-            `- ${pr.distance_label}: ${pr.time} (${pr.pace}/mi) -- ${pr.activity_name} [ID: ${pr.activity_id}], ${formatDate(pr.date)}`
+            `- ${pr.distance_label}: ${pr.time} (${pr.pace}/mi) -- ${pr.activity_name}, ${formatDate(pr.date)}`
           );
         }
 
+        // Emit rewind://activity/{id} per PR so user can drill to Strava.
+        const links = data
+          .map((pr) =>
+            resourceLink(
+              `rewind://activity/${pr.activity_id}`,
+              `${pr.distance_label} PR -- ${pr.activity_name}`,
+              { mimeType: 'application/json' }
+            )
+          )
+          .filter((b): b is NonNullable<typeof b> => b !== null);
+
         return {
-          content: [text(lines.join('\n'))],
+          content: [text(lines.join('\n')), ...links],
           structuredContent: { items: data },
         };
       })
