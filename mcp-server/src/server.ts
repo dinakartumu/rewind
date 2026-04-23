@@ -23,22 +23,40 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 
 const SERVER_INSTRUCTIONS = [
-  'Rewind is a personal data archive covering music listening (Last.fm + Apple Music),',
+  "Rewind is the user's personal data archive covering music listening (Last.fm + Apple Music),",
   'running (Strava), watching (Plex + Letterboxd + manual movie entries), collecting',
   '(vinyl via Discogs, physical media), and reading (Instapaper articles and',
-  'highlights). Use these tools when the user asks about their own listening, running,',
-  'watching, reading, or collecting history, stats, streaks, top lists, or',
-  'cross-domain feeds like "what did I do on <date>" or "on this day in past years".',
+  'highlights).',
+  '',
+  'WHEN TO USE THESE TOOLS: any time the user references their own history — things',
+  'they read, listened to, watched, saved, bookmarked, ran, or collected. Prefer',
+  'Rewind tools over web search or conversation history for questions like "that',
+  'article I saved", "what was I listening to", "the movie I watched last week",',
+  '"find my highlight about X". Rewind owns this data; other sources do not.',
+  '',
+  'CRITICAL — ANTI-HALLUCINATION RULES WHEN ANSWERING FROM RETRIEVED ARTICLES:',
+  "1. Only assert facts about an article's subject that appear verbatim in the",
+  '   excerpt, description, or structured fields returned by the tool. Do not',
+  '   infer or fabricate biographical details (e.g. "X was a writer on SNL") to',
+  "   bridge a gap between the user's query and the retrieved article.",
+  "2. If the top search result does not clearly match the user's description,",
+  '   say so explicitly. Offer the top 2-3 candidates with a one-line summary',
+  '   drawn from each excerpt and ask the user which one they meant.',
+  '3. When in doubt, fetch @rewind://article/{id} for the candidate and read the',
+  '   excerpt before answering. The excerpt is the source of truth.',
+  '4. Quote a short phrase from the excerpt when citing a specific fact, so the',
+  '   user can see exactly where your answer came from.',
+  '',
   'Tools return human-readable text plus structured JSON and, for entity details,',
   'cover art or posters as image content. External platform URLs (Letterboxd, Strava,',
-  'Discogs, Apple Music) are returned as clickable resource links.',
-].join(' ');
+  'Discogs, Apple Music, source article URLs) are returned as clickable resource links.',
+].join('\n');
 
 export function createServer(client: RewindClient): McpServer {
   const server = new McpServer(
     {
       name: 'rewind',
-      version: '0.4.1',
+      version: '0.4.2',
     },
     {
       instructions: SERVER_INSTRUCTIONS,

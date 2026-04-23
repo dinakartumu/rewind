@@ -39,6 +39,8 @@ const ArticleSchema = z.object({
   title: z.string(),
   author: z.string().nullable(),
   url: z.string().nullable(),
+  instapaper_url: z.string().nullable(),
+  instapaper_app_url: z.string().nullable(),
   domain: z.string().nullable(),
   site_name: z.string().nullable(),
   description: z.string().nullable(),
@@ -78,6 +80,8 @@ const HighlightWithArticleSchema = HighlightSchema.extend({
     author: z.string().nullable(),
     domain: z.string().nullable(),
     url: z.string().nullable(),
+    instapaper_url: z.string().nullable(),
+    instapaper_app_url: z.string().nullable(),
   }),
 });
 
@@ -426,6 +430,8 @@ const RelatedArticleSchema = z.object({
   title: z.string(),
   author: z.string().nullable(),
   url: z.string().nullable(),
+  instapaper_url: z.string().nullable(),
+  instapaper_app_url: z.string().nullable(),
   domain: z.string().nullable(),
   description: z.string().nullable(),
   score: z.number(),
@@ -911,6 +917,23 @@ const yearRoute = createRoute({
 
 // ─── Handlers ────────────────────────────────────────────────────────
 
+function instapaperReadUrl(
+  source: string,
+  sourceId: string | null
+): string | null {
+  if (source !== 'instapaper' || !sourceId) return null;
+  return `https://www.instapaper.com/read/${sourceId}`;
+}
+
+/** iOS deep link to the Instapaper app's article view. */
+function instapaperAppUrl(
+  source: string,
+  sourceId: string | null
+): string | null {
+  if (source !== 'instapaper' || !sourceId) return null;
+  return `instapaper://read/${sourceId}`;
+}
+
 function formatArticle(
   row: typeof readingItems.$inferSelect,
   image: import('../lib/images.js').ImageAttachment | null = null
@@ -920,6 +943,8 @@ function formatArticle(
     title: row.title,
     author: row.author,
     url: row.url,
+    instapaper_url: instapaperReadUrl(row.source, row.sourceId),
+    instapaper_app_url: instapaperAppUrl(row.source, row.sourceId),
     domain: row.domain,
     site_name: row.siteName,
     description: row.description,
@@ -1163,6 +1188,8 @@ reading.openapi(relatedArticlesRoute, async (c) => {
       url: readingItems.url,
       domain: readingItems.domain,
       description: readingItems.description,
+      source: readingItems.source,
+      sourceId: readingItems.sourceId,
     })
     .from(readingItems)
     .where(inArray(readingItems.id, ids));
@@ -1177,6 +1204,8 @@ reading.openapi(relatedArticlesRoute, async (c) => {
         title: r.title,
         author: r.author,
         url: r.url,
+        instapaper_url: instapaperReadUrl(r.source, r.sourceId),
+        instapaper_app_url: instapaperAppUrl(r.source, r.sourceId),
         domain: r.domain,
         description: r.description,
         score: scoreById.get(rid) ?? 0,
@@ -1260,6 +1289,8 @@ reading.openapi(highlightsRoute, async (c) => {
       articleAuthor: readingItems.author,
       articleDomain: readingItems.domain,
       articleUrl: readingItems.url,
+      articleSource: readingItems.source,
+      articleSourceId: readingItems.sourceId,
     })
     .from(readingHighlights)
     .innerJoin(readingItems, eq(readingHighlights.itemId, readingItems.id))
@@ -1283,6 +1314,11 @@ reading.openapi(highlightsRoute, async (c) => {
         author: r.articleAuthor,
         domain: r.articleDomain,
         url: r.articleUrl,
+        instapaper_url: instapaperReadUrl(r.articleSource, r.articleSourceId),
+        instapaper_app_url: instapaperAppUrl(
+          r.articleSource,
+          r.articleSourceId
+        ),
       },
     })),
     pagination: paginate(page, limit, total),
@@ -1308,6 +1344,8 @@ reading.openapi(highlightRandomRoute, async (c) => {
       articleAuthor: readingItems.author,
       articleDomain: readingItems.domain,
       articleUrl: readingItems.url,
+      articleSource: readingItems.source,
+      articleSourceId: readingItems.sourceId,
     })
     .from(readingHighlights)
     .innerJoin(readingItems, eq(readingHighlights.itemId, readingItems.id))
@@ -1331,6 +1369,11 @@ reading.openapi(highlightRandomRoute, async (c) => {
       author: row.articleAuthor,
       domain: row.articleDomain,
       url: row.articleUrl,
+      instapaper_url: instapaperReadUrl(row.articleSource, row.articleSourceId),
+      instapaper_app_url: instapaperAppUrl(
+        row.articleSource,
+        row.articleSourceId
+      ),
     },
   });
 });
@@ -1356,6 +1399,8 @@ reading.openapi(highlightDetailRoute, async (c) => {
       articleAuthor: readingItems.author,
       articleDomain: readingItems.domain,
       articleUrl: readingItems.url,
+      articleSource: readingItems.source,
+      articleSourceId: readingItems.sourceId,
     })
     .from(readingHighlights)
     .innerJoin(readingItems, eq(readingHighlights.itemId, readingItems.id))
@@ -1378,6 +1423,11 @@ reading.openapi(highlightDetailRoute, async (c) => {
       author: row.articleAuthor,
       domain: row.articleDomain,
       url: row.articleUrl,
+      instapaper_url: instapaperReadUrl(row.articleSource, row.articleSourceId),
+      instapaper_app_url: instapaperAppUrl(
+        row.articleSource,
+        row.articleSourceId
+      ),
     },
   });
 });

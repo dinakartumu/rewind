@@ -13889,6 +13889,18 @@
                               "null"
                             ]
                           },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "domain": {
                             "type": [
                               "string",
@@ -13965,6 +13977,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -14080,6 +14094,18 @@
                               "null"
                             ]
                           },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "domain": {
                             "type": [
                               "string",
@@ -14156,6 +14182,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -14397,6 +14425,18 @@
                               "null"
                             ]
                           },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "domain": {
                             "type": [
                               "string",
@@ -14473,6 +14513,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -14599,6 +14641,18 @@
                       ]
                     },
                     "url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "instapaper_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "instapaper_app_url": {
                       "type": [
                         "string",
                         "null"
@@ -14736,6 +14790,8 @@
                     "title",
                     "author",
                     "url",
+                    "instapaper_url",
+                    "instapaper_app_url",
                     "domain",
                     "site_name",
                     "description",
@@ -14878,6 +14934,18 @@
                               "null"
                             ]
                           },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "domain": {
                             "type": [
                               "string",
@@ -14899,6 +14967,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "description",
                           "score"
@@ -15057,6 +15127,18 @@
                               "null"
                             ]
                           },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "domain": {
                             "type": [
                               "string",
@@ -15133,6 +15215,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -15324,6 +15408,18 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "instapaper_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "instapaper_app_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               }
                             },
                             "required": [
@@ -15331,7 +15427,9 @@
                               "title",
                               "author",
                               "domain",
-                              "url"
+                              "url",
+                              "instapaper_url",
+                              "instapaper_app_url"
                             ]
                           }
                         },
@@ -15483,6 +15581,18 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "instapaper_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "instapaper_app_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -15490,7 +15600,9 @@
                         "title",
                         "author",
                         "domain",
-                        "url"
+                        "url",
+                        "instapaper_url",
+                        "instapaper_app_url"
                       ]
                     }
                   },
@@ -15633,6 +15745,18 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "instapaper_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "instapaper_app_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -15640,7 +15764,9 @@
                         "title",
                         "author",
                         "domain",
-                        "url"
+                        "url",
+                        "instapaper_url",
+                        "instapaper_app_url"
                       ]
                     }
                   },
@@ -17103,6 +17229,18 @@
                             ]
                           },
                           "url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "instapaper_app_url": {
                             "type": [
                               "string",
                               "null"

@@ -120,6 +120,16 @@ function resizeCdnUrl(url: string, targetPx: number): string {
 /** Target pixel size for list-tool image blocks. Keeps responses under ~250KB. */
 export const LIST_IMAGE_PX = 150;
 
+/** Extract host (e.g. "nytimes.com") from a URL for inline labels. */
+export function hostOf(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Convert bytes to base64. Uses globalThis.Buffer when available (Node / Workers),
  * falls back to a manual encoding that works in any JS runtime.

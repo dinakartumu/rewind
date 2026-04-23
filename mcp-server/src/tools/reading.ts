@@ -9,6 +9,7 @@ import {
   formatDate,
   timeAgo,
   fmt,
+  hostOf,
   READ_ONLY_ANNOTATIONS,
   dateFilterParams,
   includeImagesParam,
@@ -38,6 +39,8 @@ type Article = {
   title: string;
   author: string | null;
   url: string | null;
+  instapaper_url: string | null;
+  instapaper_app_url: string | null;
   domain: string | null;
   description: string | null;
   estimated_read_min: number | null;
@@ -57,6 +60,8 @@ type Highlight = {
     author: string | null;
     domain: string | null;
     url?: string | null;
+    instapaper_url?: string | null;
+    instapaper_app_url?: string | null;
   };
 };
 
@@ -127,13 +132,39 @@ export function registerReadingTools(
               topN.map((a) => imageBlock(client, a.image, LIST_IMAGE_PX))
             )
           : [];
-        const links = topN
-          .map((a) =>
-            resourceLink(a.url, `Article -- ${a.title}`, {
-              mimeType: 'text/html',
-            })
-          )
-          .filter((b): b is NonNullable<typeof b> => b !== null);
+        const links = topN.flatMap((a) => {
+          const out: ReturnType<typeof resourceLink>[] = [];
+          if (a.url) {
+            const host = hostOf(a.url);
+            out.push(
+              resourceLink(
+                a.url,
+                host ? `${a.title} — read on ${host}` : a.title,
+                { mimeType: 'text/html' }
+              )
+            );
+          }
+          if (a.instapaper_url) {
+            out.push(
+              resourceLink(
+                a.instapaper_url,
+                `${a.title} — read in Instapaper`,
+                {
+                  mimeType: 'text/html',
+                }
+              )
+            );
+          }
+          if (a.instapaper_app_url) {
+            out.push(
+              resourceLink(
+                a.instapaper_app_url,
+                `${a.title} — open in Instapaper app`
+              )
+            );
+          }
+          return out.filter((b): b is NonNullable<typeof b> => b !== null);
+        });
 
         const content: ContentBlock[] = [
           text(lines.join('\n')),
@@ -184,18 +215,49 @@ export function registerReadingTools(
           lines.push(`  -- ${source} (${formatDate(h.created_at)})`);
         }
 
-        // Deduplicate article URLs before emitting as resource_links
+        // Dedupe article URLs before emitting as resource_links.
+        // Emit both the source URL and the Instapaper reader URL for
+        // each distinct parent article.
         const seen = new Set<string>();
-        const links = data.data
-          .map((h) => {
-            const url = h.article.url ?? null;
-            if (!url || seen.has(url)) return null;
-            seen.add(url);
-            return resourceLink(url, `Article -- ${h.article.title}`, {
-              mimeType: 'text/html',
-            });
-          })
-          .filter((b): b is NonNullable<typeof b> => b !== null);
+        const links = data.data.flatMap((h) => {
+          const sourceUrl = h.article.url ?? null;
+          const instapaperUrl = h.article.instapaper_url ?? null;
+          const instapaperAppUrl = h.article.instapaper_app_url ?? null;
+          const key = sourceUrl ?? instapaperUrl;
+          if (!key || seen.has(key)) return [];
+          seen.add(key);
+          const out: ReturnType<typeof resourceLink>[] = [];
+          if (sourceUrl) {
+            const host = hostOf(sourceUrl);
+            out.push(
+              resourceLink(
+                sourceUrl,
+                host ? `${h.article.title} — read on ${host}` : h.article.title,
+                { mimeType: 'text/html' }
+              )
+            );
+          }
+          if (instapaperUrl) {
+            out.push(
+              resourceLink(
+                instapaperUrl,
+                `${h.article.title} — read in Instapaper`,
+                {
+                  mimeType: 'text/html',
+                }
+              )
+            );
+          }
+          if (instapaperAppUrl) {
+            out.push(
+              resourceLink(
+                instapaperAppUrl,
+                `${h.article.title} — open in Instapaper app`
+              )
+            );
+          }
+          return out.filter((b): b is NonNullable<typeof b> => b !== null);
+        });
 
         const content: ContentBlock[] = [text(lines.join('\n')), ...links];
 
@@ -224,15 +286,28 @@ export function registerReadingTools(
         if (data.note) lines.push(`Note: ${data.note}`);
         lines.push(`-- ${source}`);
 
-        const link = resourceLink(
-          data.article.url ?? null,
-          `Article -- ${data.article.title}`,
+        const sourceUrl = data.article.url ?? null;
+        const host = hostOf(sourceUrl);
+        const sourceLink = resourceLink(
+          sourceUrl,
+          host ? `${data.article.title} — read on ${host}` : data.article.title,
           { mimeType: 'text/html' }
+        );
+        const instapaperLink = resourceLink(
+          data.article.instapaper_url ?? null,
+          `${data.article.title} — read in Instapaper`,
+          { mimeType: 'text/html' }
+        );
+        const instapaperAppLink = resourceLink(
+          data.article.instapaper_app_url ?? null,
+          `${data.article.title} — open in Instapaper app`
         );
 
         const content: ContentBlock[] = [
           text(lines.join('\n')),
-          ...(link ? [link] : []),
+          ...(sourceLink ? [sourceLink] : []),
+          ...(instapaperLink ? [instapaperLink] : []),
+          ...(instapaperAppLink ? [instapaperAppLink] : []),
         ];
 
         return { content, structuredContent: data };
@@ -297,6 +372,8 @@ export function registerReadingTools(
           title: string;
           author: string | null;
           url: string | null;
+          instapaper_url: string | null;
+          instapaper_app_url: string | null;
           domain: string | null;
           description: string | null;
           score: number;
@@ -329,11 +406,37 @@ export function registerReadingTools(
         const links = data.data.flatMap((r) => {
           const out: ReturnType<typeof resourceLink>[] = [];
           if (r.url) {
+            const host = hostOf(r.url);
             out.push(
-              resourceLink(r.url, r.title, {
-                mimeType: 'text/html',
-                description: r.description ?? undefined,
-              })
+              resourceLink(
+                r.url,
+                host ? `${r.title} — read on ${host}` : r.title,
+                {
+                  mimeType: 'text/html',
+                  description: r.description ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_url,
+                `${r.title} — read in Instapaper`,
+                {
+                  mimeType: 'text/html',
+                  description: r.description ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_app_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_app_url,
+                `${r.title} — open in Instapaper app`,
+                { description: r.description ?? undefined }
+              )
             );
           }
           out.push(

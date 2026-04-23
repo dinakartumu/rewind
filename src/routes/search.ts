@@ -39,6 +39,8 @@ const SearchResultSchema = z.object({
   image_key: z.string().nullable(),
   image: SearchImageSchema.nullable(),
   url: z.string().nullable().optional(),
+  instapaper_url: z.string().nullable().optional(),
+  instapaper_app_url: z.string().nullable().optional(),
   author: z.string().nullable().optional(),
   score: z.number().optional(),
 });
@@ -117,9 +119,27 @@ type HitRow = {
   thumbhash: string | null;
   dominant_color: string | null;
   url: string | null;
+  instapaper_url: string | null;
+  instapaper_app_url: string | null;
   author: string | null;
   score?: number;
 };
+
+function instapaperReadUrl(
+  source: string | null | undefined,
+  sourceId: string | null | undefined
+): string | null {
+  if (source !== 'instapaper' || !sourceId) return null;
+  return `https://www.instapaper.com/read/${sourceId}`;
+}
+
+function instapaperAppUrl(
+  source: string | null | undefined,
+  sourceId: string | null | undefined
+): string | null {
+  if (source !== 'instapaper' || !sourceId) return null;
+  return `instapaper://read/${sourceId}`;
+}
 
 type FtsResult = { rows: HitRow[]; total: number };
 
@@ -143,8 +163,10 @@ async function enrichReadingUrls(
     id: number;
     url: string | null;
     author: string | null;
+    source: string;
+    source_id: string;
   }>(
-    sql`SELECT id, url, author FROM reading_items WHERE id IN (${sql.join(
+    sql`SELECT id, url, author, source, source_id FROM reading_items WHERE id IN (${sql.join(
       ids.map((id) => sql`${id}`),
       sql`, `
     )})`
@@ -156,6 +178,8 @@ async function enrichReadingUrls(
     if (m) {
       r.url = m.url ?? null;
       r.author = m.author ?? null;
+      r.instapaper_url = instapaperReadUrl(m.source, m.source_id);
+      r.instapaper_app_url = instapaperAppUrl(m.source, m.source_id);
     }
   }
 }
@@ -176,7 +200,7 @@ async function runFtsSearch(
           )
           SELECT m.domain, m.entity_type, m.entity_id, m.title, m.subtitle, m.image_key,
                  i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
-                 NULL as url, NULL as author
+                 NULL as url, NULL as author, NULL as instapaper_url, NULL as instapaper_app_url
           FROM matches m
           LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
           ORDER BY m.rank`
@@ -189,7 +213,7 @@ async function runFtsSearch(
           )
           SELECT m.domain, m.entity_type, m.entity_id, m.title, m.subtitle, m.image_key,
                  i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
-                 NULL as url, NULL as author
+                 NULL as url, NULL as author, NULL as instapaper_url, NULL as instapaper_app_url
           FROM matches m
           LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
           ORDER BY m.rank`
@@ -240,6 +264,8 @@ async function runSemanticSearch(
       description: readingItems.description,
       url: readingItems.url,
       author: readingItems.author,
+      source: readingItems.source,
+      sourceId: readingItems.sourceId,
       r2Key: images.r2Key,
       imageVersion: images.imageVersion,
       thumbhash: images.thumbhash,
@@ -273,6 +299,8 @@ async function runSemanticSearch(
         dominant_color: r.dominantColor ?? null,
         url: r.url ?? null,
         author: r.author ?? null,
+        instapaper_url: instapaperReadUrl(r.source, r.sourceId),
+        instapaper_app_url: instapaperAppUrl(r.source, r.sourceId),
         score: m.score,
       };
       return hit;
@@ -320,6 +348,8 @@ function toPayload(r: HitRow) {
         }
       : null,
     url: r.url,
+    instapaper_url: r.instapaper_url,
+    instapaper_app_url: r.instapaper_app_url,
     author: r.author,
     ...(typeof r.score === 'number' ? { score: r.score } : {}),
   };

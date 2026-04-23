@@ -8,22 +8,13 @@ import {
   imageBlock,
   timeAgo,
   fmt,
+  hostOf,
   READ_ONLY_ANNOTATIONS,
   LIST_IMAGE_PX,
   type ContentBlock,
 } from './helpers.js';
 
 const SEARCH_TOP_N = 5;
-
-/** Extract host (e.g. "nytimes.com") from a URL for inline display. */
-function hostOf(url: string | null | undefined): string {
-  if (!url) return '';
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return '';
-  }
-}
 
 /**
  * Map a cross-domain entity reference to a Rewind resource URI.
@@ -102,6 +93,8 @@ export function registerCrossDomainTools(
             dominant_color: string | null;
           } | null;
           url?: string | null;
+          instapaper_url?: string | null;
+          instapaper_app_url?: string | null;
           author?: string | null;
           score?: number;
         };
@@ -142,11 +135,37 @@ export function registerCrossDomainTools(
         const links = data.data.flatMap((r) => {
           const out: ReturnType<typeof resourceLink>[] = [];
           if (r.url) {
+            const host = hostOf(r.url);
             out.push(
-              resourceLink(r.url, r.title, {
-                mimeType: 'text/html',
-                description: r.subtitle ?? undefined,
-              })
+              resourceLink(
+                r.url,
+                host ? `${r.title} — read on ${host}` : r.title,
+                {
+                  mimeType: 'text/html',
+                  description: r.subtitle ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_url,
+                `${r.title} — read in Instapaper`,
+                {
+                  mimeType: 'text/html',
+                  description: r.subtitle ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_app_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_app_url,
+                `${r.title} — open in Instapaper app`,
+                { description: r.subtitle ?? undefined }
+              )
             );
           }
           const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
@@ -211,6 +230,8 @@ export function registerCrossDomainTools(
             dominant_color: string | null;
           } | null;
           url?: string | null;
+          instapaper_url?: string | null;
+          instapaper_app_url?: string | null;
           author?: string | null;
           score: number;
         };
@@ -246,11 +267,37 @@ export function registerCrossDomainTools(
         const links = data.data.flatMap((r) => {
           const out: ReturnType<typeof resourceLink>[] = [];
           if (r.url) {
+            const host = hostOf(r.url);
             out.push(
-              resourceLink(r.url, r.title, {
-                mimeType: 'text/html',
-                description: r.subtitle ?? undefined,
-              })
+              resourceLink(
+                r.url,
+                host ? `${r.title} — read on ${host}` : r.title,
+                {
+                  mimeType: 'text/html',
+                  description: r.subtitle ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_url,
+                `${r.title} — read in Instapaper`,
+                {
+                  mimeType: 'text/html',
+                  description: r.subtitle ?? undefined,
+                }
+              )
+            );
+          }
+          if (r.instapaper_app_url) {
+            out.push(
+              resourceLink(
+                r.instapaper_app_url,
+                `${r.title} — open in Instapaper app`,
+                { description: r.subtitle ?? undefined }
+              )
             );
           }
           const uri = rewindUri(r.domain, r.entity_type, r.entity_id);
