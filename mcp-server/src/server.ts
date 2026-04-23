@@ -53,6 +53,18 @@ const SERVER_INSTRUCTIONS = [
   "user's saved, paywall-free archive copy) and `instapaper_app_url` (iOS",
   'deep-link). Mention the Instapaper options when relevant so the user can',
   'choose between reading on the source or in their own archive.',
+  '',
+  'LINKING — Claude Desktop and Claude iOS do NOT render resource_link',
+  "blocks inline with your response; they're tucked away in the tool-use",
+  'accordion where most users never see them. To give users clickable',
+  'URLs, render titles as markdown links in your prose using the URL',
+  'fields from each item in structuredContent:',
+  '- Reading articles: `[title](url)`; if `url` is null, fall back to',
+  '  `instapaper_url`. Mention the Instapaper option when useful.',
+  '- Albums / artists / tracks: `[title](apple_music_url)`.',
+  '- Movies / shows: `[title](letterboxd_url)` or the relevant source URL.',
+  '- Runs / activities: `[title](strava_url)`.',
+  'Always prefer markdown links over bare titles when a URL is available.',
 ].join('\n');
 
 export function createServer(client: RewindClient): McpServer {
