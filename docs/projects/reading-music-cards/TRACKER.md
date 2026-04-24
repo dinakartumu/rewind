@@ -46,30 +46,40 @@ Scope that wasn't in the original plan but shipped because we hit it.
 - [x] **Inline markdown links in tool text** — `[title](url)` in all reading + music tool outputs, not just SERVER_INSTRUCTIONS nudge. Commit `67dd581`
 - [x] **OG backfill executed**: 54% → 97% CDN image coverage (from 599 to 1078 of 1111 articles). ~5,700 ScraperAPI credits used (5.7% of quota).
 
-## Phase 4 — stretch (not committed)
+## Phase 4 — deferred
 
-Optional extensions. No pressure to do any of these unless motivated.
+Revisit only if searching feels worse than browsing. The inline-markdown-links bonus fix already solved clickability in prose, so the card UI here is cosmetic — real visual richness matters most during browsing flows (`get_recent_reads`, `get_top_albums`), less during search where the user already has a query in mind.
 
-- [ ] Interactive **card UI for `search` / `semantic_search`** when `domain=reading` or `domain=listening` (text/prose path already has markdown links via the bonus fix, so benefit is smaller)
-- [ ] Card UI for `find_similar_articles`
-- [ ] Card UI for `get_recent_listens` (scrobble feed — would reuse AlbumCard components)
-- [ ] Revisit 33 genuinely-unrescuable articles in case ScraperAPI + DataDome relationship changes
+If revisiting, in priority order:
 
-## Phase 5 — publish to npm + remote Worker ⏳
+- [ ] Card UI for `find_similar_articles` (trivial — reuse `ArticleList` verbatim)
+- [ ] Card UI for `search` / `semantic_search` when `domain=reading` or `domain=listening` (reading especially)
+- [ ] Card UI for `get_recent_listens` (new `ScrobbleRow` component)
+- [ ] Mixed-domain card UI — skip unless a strong use-case emerges; text + inline links is good enough
+- [ ] Revisit 33 still-unrescuable articles if ScraperAPI's DataDome relationship shifts
 
-- [ ] User green-lights ship
-- [ ] Bump `rewind-mcp-server` version: 0.4.3 → **0.5.0** (meaningful new UI surface: 3 new interactive cards + inline links + new tools + bonus infra)
-- [ ] `npm publish`
-- [ ] Deploy remote Worker at `mcp.rewind.rest` via `cd mcp-server && npm run deploy:worker` (or wrangler deploy)
-- [ ] Update `docs-mintlify/changelog.mdx` with v0.5.0 entry
-- [ ] Rotate the loaned ScraperAPI + OpenGraph.io keys from claudenotes (user mentioned they'd do this; currently using the shared keys in prod Worker secrets)
-- [ ] Verify Claude Desktop users on the public `rewind` (npm) entry see parity with `rewind-local`
+## Phase 5 — publish to npm + remote Worker ✅ shipped
+
+- [x] Bump `rewind-mcp-server` 0.4.3 → 0.5.0 (package.json + server.ts version string)
+- [x] Manifest snapshot regenerated for version change
+- [x] `check:docs` passes
+- [x] `npm publish` — live at [rewind-mcp-server@0.5.0](https://www.npmjs.com/package/rewind-mcp-server)
+- [x] `wrangler deploy` — Worker live at `mcp.rewind.rest`
+- [x] `docs-mintlify/changelog.mdx` v0.5.0 entry
+- [x] Commit: `2c23f02`
+- [ ] (deferred by user) Rotate the loaned ScraperAPI + OpenGraph.io keys — currently using the shared keys from claudenotes in prod Worker secrets
 
 ## Shipped
 
-- Phase 0, 1, 2, 3 as documented above
-- All bonus infra
+- Phase 0: `description` ?? `og_description` coalesce
+- Phase 1: SERVER_INSTRUCTIONS LINKING (superseded by inline markdown)
+- Phase 2: reading card UI (`get_recent_reads`)
+- Phase 3: music card UIs (`get_top_albums`, `get_top_artists`)
+- Phase 5: v0.5.0 published to npm + Worker deployed
+- All bonus infrastructure (multi-tier OG fetch, placeholder retry-days, author URL cleanup, parallel backfill, inline markdown links)
+
+**Final measured result**: reading image CDN coverage 54% → 97% (599/1111 → 1078/1111), ~5,700 ScraperAPI credits used (5.7% of quota).
 
 ## Blockers / escalations
 
-None open.
+None. Project wound down.
