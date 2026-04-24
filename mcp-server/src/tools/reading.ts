@@ -231,8 +231,13 @@ export function registerReadingTools(
               : a.status === 'archived'
                 ? ' [finished]'
                 : '';
+          // Embed click-through URL as a markdown link on the title so the
+          // model's natural echo of tool text preserves clickability (resource_link
+          // blocks are hidden from inline responses in Claude Desktop).
+          const titleUrl = a.url ?? a.instapaper_url ?? null;
+          const titleMd = titleUrl ? `[${a.title}](${titleUrl})` : a.title;
           lines.push(
-            `${i + 1}. ${a.title}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
+            `${i + 1}. ${titleMd}${author}${domain}${readTime}${status} (${timeAgo(a.saved_at)})`
           );
           if (a.description) {
             lines.push(`   ${truncateAtWord(a.description, 160)}`);
@@ -509,10 +514,12 @@ export function registerReadingTools(
 
         const lines = [`Articles similar to #${article_id}:`];
         for (const [i, r] of data.data.entries()) {
+          const titleUrl = r.url ?? r.instapaper_url ?? null;
+          const titleMd = titleUrl ? `[${r.title}](${titleUrl})` : r.title;
           const author = r.author ? ` by ${r.author}` : '';
           const dom = r.domain ? ` (${r.domain})` : '';
           lines.push(
-            `${i + 1}. ${r.title}${author}${dom} (score=${r.score.toFixed(2)})`
+            `${i + 1}. ${titleMd}${author}${dom} (score=${r.score.toFixed(2)})`
           );
         }
 

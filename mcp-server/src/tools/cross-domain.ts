@@ -120,12 +120,19 @@ export function registerCrossDomainTools(
         ];
 
         for (const [i, r] of data.data.entries()) {
+          // Embed the click-through URL as a markdown link on the title so
+          // Claude's natural echo of the tool text preserves clickability.
+          // Resource_link blocks alone are hidden from the inline response
+          // in Claude Desktop, and instructing the model to synthesize
+          // `[title](url)` from structuredContent is unreliable.
+          const titleUrl = r.url ?? r.instapaper_url ?? null;
+          const titleMd = titleUrl ? `[${r.title}](${titleUrl})` : r.title;
           const authorPart = r.author ? ` by ${r.author}` : '';
           const dom = r.url ? ` (${hostOf(r.url)})` : '';
           const sub = r.subtitle && !r.url ? ` -- ${r.subtitle}` : '';
           const score =
             typeof r.score === 'number' ? ` (score=${r.score.toFixed(2)})` : '';
-          lines.push(`${i + 1}. ${r.title}${authorPart}${dom}${sub}${score}`);
+          lines.push(`${i + 1}. ${titleMd}${authorPart}${dom}${sub}${score}`);
         }
 
         // Emit resource_links: prefer the external URL when present (so the
@@ -256,11 +263,13 @@ export function registerCrossDomainTools(
           `Semantic matches for "${query}" (${fmt(data.data.length)} shown):`,
         ];
         for (const [i, r] of data.data.entries()) {
+          const titleUrl = r.url ?? r.instapaper_url ?? null;
+          const titleMd = titleUrl ? `[${r.title}](${titleUrl})` : r.title;
           const authorPart = r.author ? ` by ${r.author}` : '';
           const dom = r.url ? ` (${hostOf(r.url)})` : '';
           const sub = r.subtitle && !r.url ? ` -- ${r.subtitle}` : '';
           lines.push(
-            `${i + 1}. ${r.title}${authorPart}${dom}${sub} (score=${r.score.toFixed(2)})`
+            `${i + 1}. ${titleMd}${authorPart}${dom}${sub} (score=${r.score.toFixed(2)})`
           );
         }
 

@@ -318,7 +318,9 @@ export function registerListeningTools(
 
         const lines = [`Top Artists (${period}):`];
         for (const a of data.data) {
-          lines.push(`${a.rank}. ${a.name} -- ${fmt(a.playcount)} plays`);
+          const linkUrl = a.apple_music_url ?? a.url ?? null;
+          const nameMd = linkUrl ? `[${a.name}](${linkUrl})` : a.name;
+          lines.push(`${a.rank}. ${nameMd} -- ${fmt(a.playcount)} plays`);
         }
 
         const topN = data.data.slice(0, TOP_N);
@@ -395,8 +397,10 @@ export function registerListeningTools(
 
         const lines = [`Top Albums (${period}):`];
         for (const a of data.data) {
+          const linkUrl = a.apple_music_url ?? a.url ?? null;
+          const nameMd = linkUrl ? `[${a.name}](${linkUrl})` : a.name;
           lines.push(
-            `${a.rank}. ${a.name} by ${a.detail} -- ${fmt(a.playcount)} plays`
+            `${a.rank}. ${nameMd} by ${a.detail} -- ${fmt(a.playcount)} plays`
           );
         }
 
@@ -458,8 +462,10 @@ export function registerListeningTools(
 
         const lines = [`Top Tracks (${period}):`];
         for (const t of data.data) {
+          const linkUrl = t.apple_music_url ?? t.url ?? null;
+          const nameMd = linkUrl ? `[${t.name}](${linkUrl})` : `"${t.name}"`;
           lines.push(
-            `${t.rank}. "${t.name}" by ${t.detail} -- ${fmt(t.playcount)} plays`
+            `${t.rank}. ${nameMd} by ${t.detail} -- ${fmt(t.playcount)} plays`
           );
         }
 
