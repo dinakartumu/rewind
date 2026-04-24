@@ -60,7 +60,7 @@ export function createServer(client: RewindClient): McpServer {
     {
       name: 'rewind',
       title: 'Rewind',
-      version: '0.4.3',
+      version: '0.5.0',
       websiteUrl: 'https://rewind.rest',
       icons: [
         {
