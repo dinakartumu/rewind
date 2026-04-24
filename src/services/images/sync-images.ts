@@ -4,7 +4,7 @@
  * Designed to run inside waitUntil() to stay within Worker execution limits.
  */
 
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { lastfmAlbums, lastfmArtists } from '../../db/schema/lastfm.js';
 import { movies, plexShows } from '../../db/schema/watching.js';
@@ -18,7 +18,7 @@ import { images, syncRuns } from '../../db/schema/system.js';
 import { insertNoSourcePlaceholder } from './placeholder.js';
 import type { PipelineEnv } from './pipeline.js';
 import { runPipeline } from './pipeline.js';
-import type { SourceSearchParams } from './sources/types.js';
+import type { ImageResult, SourceSearchParams } from './sources/types.js';
 
 const DEFAULT_MAX_ITEMS = 50;
 const BATCH_SIZE = 5;
@@ -323,6 +323,204 @@ export async function processReadingImages(
   }));
 
   return [await processItems(db, env, 'reading', 'articles', articleItems)];
+}
+
+const APPLE_MUSIC_ARTIST_URL =
+  'https://api.music.apple.com/v1/catalog/us/artists';
+
+// Null-placeholder rows older than this are candidates for a retry. Short
+// window because the typical reason for a placeholder is "image pipeline
+// couldn't find this artist by name", and with an Apple Music id in hand we
+// can do a deterministic lookup that is likely to succeed now.
+const PLACEHOLDER_RETRY_DAYS = 7;
+
+interface AppleMusicArtistResponse {
+  data?: Array<{
+    id?: string;
+    attributes?: {
+      artwork?: {
+        url?: string;
+        width?: number;
+        height?: number;
+      };
+    };
+  }>;
+}
+
+/**
+ * Fetch a single artist's artwork directly from the Apple Music catalog
+ * using the stored `apple_music_id`. Bypasses the name-search step that
+ * produces false negatives for artists whose names don't survive the
+ * existing `artistMatches()` filter (e.g. obscure / non-English artists).
+ *
+ * Returns at most one candidate — the catalog endpoint is deterministic.
+ */
+async function fetchAppleMusicArtistArtwork(
+  token: string,
+  appleMusicId: number
+): Promise<ImageResult | null> {
+  const response = await fetch(`${APPLE_MUSIC_ARTIST_URL}/${appleMusicId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    // 404 is expected for stale / invalid ids — log softly and move on.
+    if (response.status !== 404) {
+      console.log(
+        `[ERROR] Apple Music artist fetch failed for id ${appleMusicId}: ${response.status}`
+      );
+    }
+    return null;
+  }
+
+  const data = (await response.json()) as AppleMusicArtistResponse;
+  const artwork = data.data?.[0]?.attributes?.artwork;
+  if (!artwork?.url) return null;
+
+  return {
+    source: 'apple-music',
+    url: artwork.url.replace('{w}', '1000').replace('{h}', '1000'),
+    width: 1000,
+    height: 1000,
+  };
+}
+
+/**
+ * Refresh artist images using the stored Apple Music artist id.
+ *
+ * Targets two populations:
+ *   1. Artists with `apple_music_id` but no `images` row at all
+ *      (image sync hasn't run against them yet).
+ *   2. Artists with a null-source placeholder row (`source = 'none'`) that
+ *      is older than PLACEHOLDER_RETRY_DAYS. These are artists where the
+ *      name-search waterfall failed; a direct-by-id fetch often succeeds.
+ *
+ * Requires `APPLE_MUSIC_DEVELOPER_TOKEN`. If unset, returns zero-work.
+ */
+export async function refreshArtistImageFromAppleMusicId(
+  db: Database,
+  env: PipelineEnv,
+  limit = DEFAULT_MAX_ITEMS
+): Promise<SyncImageResult> {
+  const result: SyncImageResult = {
+    domain: 'listening',
+    entityType: 'artists',
+    queued: 0,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
+  const token = env.APPLE_MUSIC_DEVELOPER_TOKEN;
+  if (!token) {
+    console.log(
+      '[INFO] refreshArtistImageFromAppleMusicId: APPLE_MUSIC_DEVELOPER_TOKEN unset, skipping'
+    );
+    return result;
+  }
+
+  const retryCutoff = new Date(
+    Date.now() - PLACEHOLDER_RETRY_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const rows = await db
+    .select({
+      id: lastfmArtists.id,
+      name: lastfmArtists.name,
+      appleMusicId: lastfmArtists.appleMusicId,
+    })
+    .from(lastfmArtists)
+    .where(
+      and(
+        eq(lastfmArtists.isFiltered, 0),
+        isNotNull(lastfmArtists.appleMusicId),
+        sql`(
+          ${lastfmArtists.id} NOT IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening' AND ${images.entityType} = 'artists'
+          )
+          OR ${lastfmArtists.id} IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening'
+              AND ${images.entityType} = 'artists'
+              AND ${images.source} = 'none'
+              AND ${images.createdAt} < ${retryCutoff}
+          )
+        )`
+      )
+    )
+    .orderBy(desc(lastfmArtists.playcount))
+    .limit(limit);
+
+  result.queued = rows.length;
+  if (rows.length === 0) return result;
+
+  console.log(
+    `[SYNC] Refreshing images for ${rows.length} artists via Apple Music id`
+  );
+
+  for (const row of rows) {
+    if (row.appleMusicId == null) continue;
+    try {
+      const candidate = await fetchAppleMusicArtistArtwork(
+        token,
+        row.appleMusicId
+      );
+
+      if (!candidate) {
+        // No artwork in the catalog — refresh the placeholder timestamp so
+        // we don't retry again for PLACEHOLDER_RETRY_DAYS. Insert-or-ignore
+        // handles the "no row yet" case.
+        await insertNoSourcePlaceholder(
+          db,
+          'listening',
+          'artists',
+          String(row.id)
+        );
+        await db
+          .update(images)
+          .set({ createdAt: new Date().toISOString() })
+          .where(
+            and(
+              eq(images.domain, 'listening'),
+              eq(images.entityType, 'artists'),
+              eq(images.entityId, String(row.id)),
+              eq(images.source, 'none')
+            )
+          );
+        result.skipped++;
+        continue;
+      }
+
+      const pipelineResult = await runPipeline(
+        db,
+        env,
+        {
+          domain: 'listening',
+          entityType: 'artists',
+          entityId: String(row.id),
+          artistName: row.name,
+        },
+        { prefetchedCandidates: [candidate] }
+      );
+
+      if (pipelineResult) {
+        result.succeeded++;
+      } else {
+        result.failed++;
+      }
+    } catch (error) {
+      result.failed++;
+      console.log(
+        `[ERROR] refreshArtistImageFromAppleMusicId failed for artist ${row.id}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  console.log(
+    `[SYNC] Image refresh complete: ${result.succeeded} succeeded, ${result.failed} failed, ${result.skipped} skipped`
+  );
+  return result;
 }
 
 const IMAGE_SYNC_DEDUP_HOURS = 6;

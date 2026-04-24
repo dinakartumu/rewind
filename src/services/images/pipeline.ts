@@ -330,7 +330,12 @@ export async function runPipeline(
   db: Database,
   env: PipelineEnv,
   params: SourceSearchParams,
-  options: { skipOverrideCheck?: boolean } = {}
+  options: {
+    skipOverrideCheck?: boolean;
+    // Pre-resolved candidates, e.g. from a deterministic by-id lookup.
+    // When present, the waterfall resolver is skipped entirely.
+    prefetchedCandidates?: ImageResult[];
+  } = {}
 ): Promise<PipelineResult | null> {
   const { domain, entityType, entityId } = params;
 
@@ -356,8 +361,9 @@ export async function runPipeline(
     }
   }
 
-  // Resolve image from sources
-  const candidates = await resolveImage(params, env);
+  // Resolve image from sources (or use pre-resolved candidates)
+  const candidates =
+    options.prefetchedCandidates ?? (await resolveImage(params, env));
   if (candidates.length === 0) {
     console.log(
       `[INFO] No image found for ${domain}/${entityType}/${entityId}`

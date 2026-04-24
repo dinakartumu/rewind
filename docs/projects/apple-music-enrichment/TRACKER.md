@@ -40,21 +40,26 @@
       `Date.toISOString()` format exactly — avoids ~1-day retry-boundary drift
 - [x] `npx tsc --noEmit` clean; `npm test` all 599 tests pass (no regressions)
 
-## Phase 2 — Code: image refresh from Apple Music id
+## Phase 2 — Code: image refresh from Apple Music id ✅
 
-- [ ] Add `refreshArtistImageFromAppleMusicId(db, limit)` in
+- [x] Add `refreshArtistImageFromAppleMusicId(db, env, limit)` in
       `src/services/images/sync-images.ts`
-  - [ ] Selects artists with `apple_music_id IS NOT NULL` AND either (no row
-        in `images` for domain='listening' entity_type='artists') OR (row
-        exists but source is null-placeholder older than 7d)
-  - [ ] Fetches `https://api.music.apple.com/v1/catalog/us/artists/{id}`
+  - [x] Selects artists with `apple_music_id IS NOT NULL` AND either
+        (no row in `images` for domain='listening' entity_type='artists')
+        OR (row exists but `source='none'` AND `created_at <` 7d-ago)
+  - [x] Fetches `https://api.music.apple.com/v1/catalog/us/artists/{id}`
         with the Apple Music developer token
-  - [ ] Extracts `attributes.artwork.url`, substitutes `{w}`/`{h}` with 1000
-  - [ ] Feeds into existing `processItems()` so thumbhash + color extraction +
-        R2 upload reuse current plumbing
-  - [ ] Skips silently (no error) when artist has no artwork in the catalog
-  - [ ] Respects same idempotency guards as the existing Apple Music source
-        (source name `apple-music`, same column)
+  - [x] Extracts `attributes.artwork.url`, substitutes `{w}`/`{h}` with 1000
+  - [x] Feeds into `runPipeline()` with pre-resolved candidates so thumbhash +
+        color extraction + R2 upload reuse existing plumbing
+  - [x] On no artwork: bumps `images.created_at` on the placeholder so
+        next retry honors the 7-day cooldown
+  - [x] Skips silently when `APPLE_MUSIC_DEVELOPER_TOKEN` is unset
+- [x] Extended `runPipeline` signature with
+      `options.prefetchedCandidates?: ImageResult[]` — when present, bypasses
+      the name-search waterfall (clean-separates deterministic by-id lookups
+      from the existing name-search flow)
+- [x] `npx tsc --noEmit` clean; `npm test` all 599 tests pass
 
 ## Phase 3 — Code: cron wiring + retry TTL
 
