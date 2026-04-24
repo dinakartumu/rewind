@@ -645,4 +645,62 @@ async function buildCollecting(
   }));
 }
 
+// ─── Clear reading image placeholders ────────────────────────────────
+// When the image pipeline fails for an article, it inserts a row in
+// `images` with source='none' as a placeholder so we don't retry
+// endlessly. But that placeholder persists even after a later tier-3/4
+// OG rescue populates og_image_url — processReadingImages will never
+// re-pick the article because its id is in the images table.
+//
+// This endpoint clears placeholders for articles whose og_image_url
+// has been populated since the placeholder was inserted, unblocking
+// them so processReadingImages (or POST /v1/reading/admin/backfill-images)
+// can flow the new URL into R2 + thumbhash + CDN.
+
+const ClearPlaceholdersResponseSchema = z.object({
+  cleared: z.number(),
+  took_ms: z.number(),
+});
+
+const clearPlaceholdersRoute = createRoute({
+  method: 'post',
+  path: '/clear-reading-image-placeholders',
+  operationId: 'clearReadingImagePlaceholders',
+  tags: ['Admin'],
+  summary:
+    'Clear images.source=none placeholders for reading articles with populated og_image_url',
+  description:
+    'Unblocks articles rescued by reenrich-reading missing-images mode so the image pipeline can process them.',
+  responses: {
+    200: {
+      description: 'Cleared',
+      content: {
+        'application/json': { schema: ClearPlaceholdersResponseSchema },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminReindex.openapi(clearPlaceholdersRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  const t0 = Date.now();
+  const result = await db.run(sql`
+    DELETE FROM images
+    WHERE domain = 'reading'
+      AND entity_type = 'articles'
+      AND source = 'none'
+      AND CAST(entity_id AS INTEGER) IN (
+        SELECT id FROM reading_items
+        WHERE og_image_url IS NOT NULL
+      )
+  `);
+  return c.json({
+    cleared: Number(
+      (result as { meta?: { changes?: number } }).meta?.changes ?? 0
+    ),
+    took_ms: Date.now() - t0,
+  });
+});
+
 export default adminReindex;
