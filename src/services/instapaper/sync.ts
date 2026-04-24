@@ -20,6 +20,7 @@ import {
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import { htmlToText } from '../../lib/html-to-text.js';
+import { BROWSER_HEADERS_NAVIGATE } from '../../lib/browser-headers.js';
 
 interface SyncResult {
   itemsSynced: number;
@@ -96,11 +97,7 @@ async function fetchOgMetadata(url: string): Promise<OgMetadata> {
   };
   try {
     const response = await fetch(url, {
-      headers: {
-        Accept: 'text/html',
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
+      headers: BROWSER_HEADERS_NAVIGATE,
       redirect: 'follow',
     });
     if (!response.ok) return result;

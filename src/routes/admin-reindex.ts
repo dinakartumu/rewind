@@ -126,6 +126,12 @@ adminReindex.openapi(reindexRoute, async (c) => {
 const ReenrichBodySchema = z
   .object({
     limit: z.number().int().min(1).max(2000).optional(),
+    mode: z
+      .enum(['failed', 'missing-images'])
+      .optional()
+      .describe(
+        'failed (default): retry rows where enrichment_status=failed. missing-images: re-run on rows that are completed but have no og_image_url, useful after upgrading the OG-fetch headers to rescue NYT/Bloomberg-style articles.'
+      ),
   })
   .optional();
 
@@ -171,9 +177,10 @@ adminReindex.openapi(reenrichRoute, async (c) => {
   const db = createDb(c.env.DB);
 
   const body = (await c.req.json().catch(() => undefined)) as
-    | { limit?: number }
+    | { limit?: number; mode?: 'failed' | 'missing-images' }
     | undefined;
   const limit = body?.limit ?? 500;
+  const mode = body?.mode ?? 'failed';
 
   const client = new InstapaperClient(
     env.INSTAPAPER_CONSUMER_KEY,
@@ -183,6 +190,10 @@ adminReindex.openapi(reenrichRoute, async (c) => {
   );
 
   const t0 = Date.now();
+  const filter =
+    mode === 'missing-images'
+      ? sql`${readingItems.userId} = 1 AND ${readingItems.ogImageUrl} IS NULL AND ${readingItems.url} IS NOT NULL`
+      : sql`${readingItems.userId} = 1 AND ${readingItems.enrichmentStatus} = 'failed'`;
   const rows = await db
     .select({
       id: readingItems.id,
@@ -190,9 +201,7 @@ adminReindex.openapi(reenrichRoute, async (c) => {
       url: readingItems.url,
     })
     .from(readingItems)
-    .where(
-      sql`${readingItems.userId} = 1 AND ${readingItems.enrichmentStatus} = 'failed'`
-    )
+    .where(filter)
     .limit(limit);
 
   let succeeded = 0;
@@ -207,11 +216,21 @@ adminReindex.openapi(reenrichRoute, async (c) => {
     try {
       await enrichArticle(db, client, row.id, bookmarkId, row.url);
       const [after] = await db
-        .select({ status: readingItems.enrichmentStatus })
+        .select({
+          status: readingItems.enrichmentStatus,
+          ogImageUrl: readingItems.ogImageUrl,
+        })
         .from(readingItems)
         .where(eq(readingItems.id, row.id))
         .limit(1);
-      if (after?.status === 'completed') succeeded++;
+      // In missing-images mode, success means the og_image_url got
+      // populated (the row is already `completed`). In failed mode,
+      // success means the row graduated from `failed` to `completed`.
+      const ok =
+        mode === 'missing-images'
+          ? after?.ogImageUrl != null
+          : after?.status === 'completed';
+      if (ok) succeeded++;
       else stillFailed++;
     } catch {
       stillFailed++;

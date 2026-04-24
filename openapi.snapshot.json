@@ -17782,6 +17782,14 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 2000
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "failed",
+                      "missing-images"
+                    ],
+                    "description": "failed (default): retry rows where enrichment_status=failed. missing-images: re-run on rows that are completed but have no og_image_url, useful after upgrading the OG-fetch headers to rescue NYT/Bloomberg-style articles."
                   }
                 }
               }

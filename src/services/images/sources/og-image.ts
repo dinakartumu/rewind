@@ -4,6 +4,7 @@
  * Used as the primary image source for the reading domain.
  */
 
+import { BROWSER_HEADERS_NAVIGATE } from '../../../lib/browser-headers.js';
 import type { ImageResult, SourceClient, SourceSearchParams } from './types.js';
 
 export class OgImageClient implements SourceClient {
@@ -36,10 +37,7 @@ export class OgImageClient implements SourceClient {
 
     try {
       const response = await fetch(articleUrl, {
-        headers: {
-          'User-Agent': 'RewindAPI/1.0',
-          Accept: 'text/html',
-        },
+        headers: BROWSER_HEADERS_NAVIGATE,
         redirect: 'follow',
       });
 
