@@ -9,7 +9,8 @@ dist/
 .turbo/
 coverage/
 .claudelint-cache/
-.claude/
+.claude/settings.local.json
+.claude/worktrees/
 scripts/**/.*.json
 scripts/**/.tmp-sql.sql
 scripts/**/*.csv
