@@ -66,6 +66,7 @@ export function ArticleCard({
   const dominant = article.image?.dominant_color ?? '#d4d4d4';
 
   const meta = [
+    article.author,
     article.domain,
     article.estimated_read_min
       ? `${article.estimated_read_min} min read`

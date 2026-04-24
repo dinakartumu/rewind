@@ -27,7 +27,11 @@ export function ArtistCard({
   item: TopItem;
   onOpen?: (url: string) => void;
 }) {
-  const clickable = item.apple_music_url != null;
+  // Prefer Apple Music, fall back to Last.fm URL so the card stays
+  // clickable for artists we haven't enriched with an Apple Music match
+  // (~70% of top artists in practice).
+  const primaryUrl = item.apple_music_url ?? item.url ?? null;
+  const clickable = primaryUrl != null;
   const [loaded, setLoaded] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -39,11 +43,7 @@ export function ArtistCard({
   return (
     <Tag
       type={clickable ? 'button' : undefined}
-      onClick={
-        clickable && item.apple_music_url
-          ? () => onOpen?.(item.apple_music_url!)
-          : undefined
-      }
+      onClick={clickable && primaryUrl ? () => onOpen?.(primaryUrl) : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -51,7 +51,7 @@ export function ArtistCard({
         cursor: clickable ? 'pointer' : 'default',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
       }}
-      aria-label={clickable ? `Open ${item.name} on Apple Music` : item.name}
+      aria-label={clickable ? `Open ${item.name}` : item.name}
     >
       <div
         style={{

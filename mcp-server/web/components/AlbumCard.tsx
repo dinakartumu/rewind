@@ -44,7 +44,10 @@ export function AlbumCard({
   item: TopItem;
   onOpen?: (url: string) => void;
 }) {
-  const clickable = item.apple_music_url != null;
+  // Prefer Apple Music, fall back to Last.fm URL so the card stays
+  // clickable for items we haven't enriched with an Apple Music match.
+  const primaryUrl = item.apple_music_url ?? item.url ?? null;
+  const clickable = primaryUrl != null;
   const [loaded, setLoaded] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -56,11 +59,7 @@ export function AlbumCard({
   return (
     <Tag
       type={clickable ? 'button' : undefined}
-      onClick={
-        clickable && item.apple_music_url
-          ? () => onOpen?.(item.apple_music_url!)
-          : undefined
-      }
+      onClick={clickable && primaryUrl ? () => onOpen?.(primaryUrl) : undefined}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -70,9 +69,7 @@ export function AlbumCard({
         boxShadow: hovered ? hoverShadow : restShadow,
       }}
       aria-label={
-        clickable
-          ? `Open ${item.name} on Apple Music`
-          : `${item.name} by ${item.detail}`
+        clickable ? `Open ${item.name}` : `${item.name} by ${item.detail}`
       }
     >
       <div
