@@ -33,6 +33,9 @@ const DOCS_DIR = join(REPO_ROOT, 'docs-mintlify');
 const UNDOCUMENTED_ALLOWLIST = new Set([
   'ui_hello_debug', // Phase-1 MCP Apps diagnostic tool; not end-user-facing
   'ui://rewind/recent-watches.html', // MCP Apps UI asset, referenced in docs by its owning tool
+  'ui://rewind/recent-reads.html', // MCP Apps UI asset for get_recent_reads (documented)
+  'ui://rewind/top-albums.html', // MCP Apps UI asset for get_top_albums (documented)
+  'ui://rewind/top-artists.html', // MCP Apps UI asset for get_top_artists (documented)
   'ui://rewind/hello.html', // MCP Apps debug UI
 ]);
 
