@@ -5,21 +5,21 @@ description: API updates and new features.
 
 <Update label="April 24, 2026" tags={["New releases", "Improvements"]}>
 
-## MCP server v0.5.0
+## MCP server
 
-Interactive card UIs for reading and music, inline clickable links across all list tools, and a major uplift in reading-image coverage.
+Interactive card UIs for reading and music, plus inline clickable links across list tools.
 
-- **Instapaper-style article list** for `get_recent_reads` via MCP Apps. Title, author, domain · read time · time-ago, 2-line excerpt, 80×80 thumbnail with thumbhash fade-in, accent-color fallback tile.
-- **Album cover grid** for `get_top_albums` and **circular portrait grid** for `get_top_artists`. Both click through to Apple Music (or Last.fm when no match).
-- **Inline `[title](url)` markdown links** in `search`, `semantic_search`, `find_similar_articles`, `get_recent_reads`, `get_top_artists`, `get_top_albums`, `get_top_tracks`. Clickable in every client without relying on resource_link rendering.
-- **Authors render correctly** — NYT's URL-shaped `article:author` tag (`.../by/mike-isaac`) is now titlecased to "Mike Isaac" at extraction time.
+- **Article list UI** for `get_recent_reads` via [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) — titles, authors, domains, read time, excerpts, and thumbnails.
+- **Cover grid** for `get_top_albums` and **portrait grid** for `get_top_artists` — both click through to Apple Music (or Last.fm when no match).
+- **Inline markdown links** in `search`, `semantic_search`, `find_similar_articles`, `get_recent_reads`, `get_top_artists`, `get_top_albums`, and `get_top_tracks` — clickable in every client.
+- **Author names** render correctly when a source article's `article:author` tag is URL-shaped.
 
 ## API
 
-- **Reading image coverage: 54% → 97%.** Multi-tier OG fetch: browser-mimicking headers → ScraperAPI (rescues NYT/Reuters) → OpenGraph.io (rescues WSJ).
-- **`description`** now coalesces to `og_description` when the editorial field is null (~54% coverage, matches `og_image`).
-- **`POST /v1/admin/reenrich-reading`** gains a `mode` param: `failed` (default) or `missing-images` for re-running enrichment on articles that completed but have no `og_image_url`.
-- **Reading image placeholders auto-expire** after 7 days (previously permanent). Mirrors the listening-domain retry-days pattern.
+- Reading articles now have thumbnails for most paywalled sources (NYT, Reuters, WSJ) via multi-tier OG extraction.
+- `description` now falls back to `og_description` when the editorial field is null.
+- `POST /v1/admin/reenrich-reading` gains a `mode` param: `failed` (default) or `missing-images`.
+- Reading image placeholders auto-expire after 7 days (previously permanent).
 
 </Update>
 
