@@ -17,6 +17,10 @@ export type TopItem = {
   url: string;
   apple_music_url: string | null;
   preview_url?: string | null;
+  sparkline?: {
+    granularity: 'day' | 'week';
+    points: number[];
+  };
 };
 
 const COVER_PX = 180;

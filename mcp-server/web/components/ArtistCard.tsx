@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
 import type { TopItem } from './AlbumCard.js';
+import { Sparkline } from './Sparkline.js';
 
 const PORTRAIT_PX = 140;
 const CDN_TRANSFORM = `width=${PORTRAIT_PX * 2},height=${PORTRAIT_PX * 2},fit=cover,format=auto,quality=85`;
@@ -105,6 +106,15 @@ export function ArtistCard({
         <div style={rankStyle}>#{item.rank}</div>
         <div style={titleStyle}>{item.name}</div>
         <div style={playsStyle}>{formatPlays(item.playcount)}</div>
+        {item.sparkline && (
+          <div style={sparklineRowStyle}>
+            <Sparkline
+              points={item.sparkline.points}
+              color={dominant}
+              ariaLabel={`Plays over time for ${item.name}`}
+            />
+          </div>
+        )}
       </div>
     </Tag>
   );
@@ -158,4 +168,11 @@ const playsStyle: CSSProperties = {
   opacity: 0.55,
   fontSize: 11,
   marginTop: 2,
+};
+
+const sparklineRowStyle: CSSProperties = {
+  marginTop: 4,
+  display: 'flex',
+  justifyContent: 'center',
+  opacity: 0.65,
 };

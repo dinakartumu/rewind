@@ -301,9 +301,9 @@ export function registerListeningTools(
         ...includeImagesParam,
         include_sparklines: z
           .boolean()
-          .default(false)
+          .default(true)
           .describe(
-            'When true, attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted otherwise.'
+            'When true (default), attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted otherwise. Set false to keep responses small.'
           ),
       },
       annotations: READ_ONLY_ANNOTATIONS,
