@@ -3,6 +3,7 @@ import { env, SELF } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/d1';
 import { setupTestDbWithFts5, createTestApiKey } from '../test-helpers.js';
 import { upsertSearchIndex, upsertSearchIndexBatch } from './search.js';
+import { images } from '../db/schema/system.js';
 
 describe('search routes', () => {
   let token: string;
@@ -182,6 +183,98 @@ describe('search routes', () => {
       expect(body.data.length).toBe(1);
       expect(body.data[0].entity_id).toBe('a-1');
     });
+
+    it('resolves image for a listening album hit (search_index singular vs images plural)', async () => {
+      const db = drizzle(env.DB);
+      await env.DB.exec('DELETE FROM images');
+      await db.insert(images).values({
+        userId: 1,
+        domain: 'listening',
+        entityType: 'albums',
+        entityId: '172',
+        r2Key: 'listening/albums/172/original.jpg',
+        source: 'apple-music',
+        thumbhash: 'DggGBwD+R5a5l6uKlxdmdqq0Rab5aasP',
+        dominantColor: '#13181d',
+      });
+      await upsertSearchIndex(db, {
+        domain: 'listening',
+        entityType: 'album',
+        entityId: '172',
+        title: "Paul's Boutique",
+        subtitle: 'Beastie Boys',
+      });
+
+      const res = await SELF.fetch(
+        'http://localhost/v1/search?q=Boutique&domain=listening',
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].image).not.toBeNull();
+      expect(body.data[0].image.cdn_url).toContain(
+        'listening/albums/172/original.jpg'
+      );
+      expect(body.data[0].image.thumbhash).toBe(
+        'DggGBwD+R5a5l6uKlxdmdqq0Rab5aasP'
+      );
+    });
+
+    // Schema-consistency guard for the singular↔plural convention between
+    // search_index.entity_type (written by buildSearchItemsForDomain in
+    // admin-reindex.ts) and images.entity_type (written by the image
+    // pipeline). runFtsSearch relies on `entity_type || 's'` matching the
+    // images row; if a new indexer emits an entity type that doesn't
+    // pluralize with a trailing 's' (e.g. 'activity' → 'activities'), this
+    // test forces us to revisit the join.
+    describe.each([
+      { domain: 'listening', singular: 'album', plural: 'albums' },
+      { domain: 'listening', singular: 'artist', plural: 'artists' },
+      { domain: 'listening', singular: 'track', plural: 'tracks' },
+      { domain: 'watching', singular: 'movie', plural: 'movies' },
+      { domain: 'collecting', singular: 'release', plural: 'releases' },
+      { domain: 'reading', singular: 'article', plural: 'articles' },
+    ])(
+      'singular/plural join - $domain/$singular',
+      ({ domain, singular, plural }) => {
+        it('resolves image when search_index emits singular and images stores plural', async () => {
+          expect(singular + 's').toBe(plural);
+
+          const db = drizzle(env.DB);
+          await env.DB.exec('DELETE FROM images');
+          const entityId = `sp-${singular}-1`;
+          await db.insert(images).values({
+            userId: 1,
+            domain,
+            entityType: plural,
+            entityId,
+            r2Key: `${domain}/${plural}/${entityId}/original.jpg`,
+            source: 'test',
+            thumbhash: 'abc',
+            dominantColor: '#000000',
+          });
+          await upsertSearchIndex(db, {
+            domain,
+            entityType: singular,
+            entityId,
+            title: `SchemaGuard${singular}`,
+          });
+
+          const res = await SELF.fetch(
+            `http://localhost/v1/search?q=SchemaGuard${singular}&domain=${domain}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          expect(res.status).toBe(200);
+          const body = (await res.json()) as any;
+          expect(body.data).toHaveLength(1);
+          expect(body.data[0].image).not.toBeNull();
+          expect(body.data[0].image.cdn_url).toContain(
+            `${domain}/${plural}/${entityId}/original.jpg`
+          );
+        });
+      }
+    );
 
     it('matches content in the body column', async () => {
       const db = drizzle(env.DB);

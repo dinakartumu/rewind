@@ -189,6 +189,9 @@ async function runFtsSearch(
   opts: { ftsQuery: string; domain?: string; limit: number; offset: number }
 ): Promise<FtsResult> {
   const { ftsQuery, domain, limit, offset } = opts;
+  // search_index stores singular entity_type ('album', 'movie', ...) while
+  // the images table stores plural ('albums', 'movies', ...). Append 's'
+  // when joining so artwork actually resolves for search hits.
   const rows = await db.all<HitRow>(
     domain
       ? sql`WITH matches AS (
@@ -202,7 +205,7 @@ async function runFtsSearch(
                  i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
                  NULL as url, NULL as author, NULL as instapaper_url, NULL as instapaper_app_url
           FROM matches m
-          LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
+          LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type || 's' AND i.entity_id = m.entity_id
           ORDER BY m.rank`
       : sql`WITH matches AS (
             SELECT domain, entity_type, entity_id, title, subtitle, image_key, rank
@@ -215,7 +218,7 @@ async function runFtsSearch(
                  i.r2_key, i.image_version, i.thumbhash, i.dominant_color,
                  NULL as url, NULL as author, NULL as instapaper_url, NULL as instapaper_app_url
           FROM matches m
-          LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type AND i.entity_id = m.entity_id
+          LEFT JOIN images i ON i.domain = m.domain AND i.entity_type = m.entity_type || 's' AND i.entity_id = m.entity_id
           ORDER BY m.rank`
   );
   await enrichReadingUrls(db, rows);
