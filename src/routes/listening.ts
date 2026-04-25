@@ -2721,17 +2721,13 @@ listening.openapi(yearRoute, async (c) => {
     eq(lastfmArtists.isFiltered, 0)
   );
 
-  // Total scrobbles
-  const [{ count: totalScrobbles }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(lastfmScrobbles)
-    .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
-    .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
-    .where(filteredDateRange);
-
-  // Unique counts
-  const [uniqueCounts] = await db
+  // Five aggregates fan out in parallel against the same filtered date
+  // range. Each one is its own scan over scrobbles+tracks+artists, so
+  // running them sequentially burned up to ~6x the round-trip cost on
+  // cache miss for a heavy listening year.
+  const totalsPromise = db
     .select({
+      total: sql<number>`count(*)`,
       artists: sql<number>`count(distinct ${lastfmTracks.artistId})`,
       albums: sql<number>`count(distinct ${lastfmTracks.albumId})`,
       tracks: sql<number>`count(distinct ${lastfmScrobbles.trackId})`,
@@ -2741,8 +2737,7 @@ listening.openapi(yearRoute, async (c) => {
     .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
     .where(filteredDateRange);
 
-  // Top artists
-  const topArtists = await db
+  const topArtistsPromise = db
     .select({
       id: lastfmArtists.id,
       name: lastfmArtists.name,
@@ -2757,8 +2752,7 @@ listening.openapi(yearRoute, async (c) => {
     .orderBy(desc(sql`count(*)`))
     .limit(10);
 
-  // Top albums
-  const topAlbums = await db
+  const topAlbumsPromise = db
     .select({
       id: lastfmAlbums.id,
       name: lastfmAlbums.name,
@@ -2775,8 +2769,7 @@ listening.openapi(yearRoute, async (c) => {
     .orderBy(desc(sql`count(*)`))
     .limit(10);
 
-  // Top tracks
-  const topTracks = await db
+  const topTracksPromise = db
     .select({
       id: lastfmTracks.id,
       name: lastfmTracks.name,
@@ -2793,10 +2786,17 @@ listening.openapi(yearRoute, async (c) => {
     .orderBy(desc(sql`count(*)`))
     .limit(10);
 
-  // Monthly breakdown (skip when scoped to a single month)
-  const monthlyBreakdown = monthParam
-    ? []
-    : await db
+  // Monthly breakdown (skip when scoped to a single month).
+  const monthlyBreakdownPromise = monthParam
+    ? Promise.resolve(
+        [] as Array<{
+          month: string;
+          scrobbles: number;
+          artists: number;
+          albums: number;
+        }>
+      )
+    : db
         .select({
           month: sql<string>`strftime('%Y-%m', ${lastfmScrobbles.scrobbledAt})`,
           scrobbles: sql<number>`count(*)`,
@@ -2810,7 +2810,28 @@ listening.openapi(yearRoute, async (c) => {
         .groupBy(sql`strftime('%Y-%m', ${lastfmScrobbles.scrobbledAt})`)
         .orderBy(asc(sql`strftime('%Y-%m', ${lastfmScrobbles.scrobbledAt})`));
 
-  // Batch fetch images
+  const [totalsRows, topArtists, topAlbums, topTracks, monthlyBreakdown] =
+    await Promise.all([
+      totalsPromise,
+      topArtistsPromise,
+      topAlbumsPromise,
+      topTracksPromise,
+      monthlyBreakdownPromise,
+    ]);
+  const totalsRow = totalsRows[0] ?? {
+    total: 0,
+    artists: 0,
+    albums: 0,
+    tracks: 0,
+  };
+  const totalScrobbles = totalsRow.total;
+  const uniqueCounts = {
+    artists: totalsRow.artists,
+    albums: totalsRow.albums,
+    tracks: totalsRow.tracks,
+  };
+
+  // Image attachments fan out in parallel after the top lists land.
   const artistIds = topArtists.map((a) => String(a.id));
   const albumIds = topAlbums.map((a) => String(a.id));
   const [artistImageMap, albumImageMap] = await Promise.all([
