@@ -37,6 +37,19 @@ Top list endpoints accept a `period` parameter:
 | `12month` | Last 365 days |
 | `overall` | All time      |
 
+## Sparklines
+
+[GET /listening/top/artists](/api-reference/listening/top-artists) accepts `?include_sparklines=true` to attach a per-artist play-count time series, suitable for rendering an inline sparkline next to each item.
+
+| Period    | Granularity | Points |
+| --------- | ----------- | ------ |
+| `1month`  | day         | 28     |
+| `3month`  | week        | 13     |
+| `6month`  | week        | 26     |
+| `12month` | week        | 52     |
+
+`points` is ordered oldest to newest and zero-filled. The most recent bucket is partial (current week or current day in progress). Weekly buckets anchor on the Monday of the week. `7day` and `overall` omit the field; treat its absence as "no sparkline".
+
 ## Filtering
 
 Audiobooks, podcasts, and holiday music are automatically filtered from all listening endpoints. The filter system uses a combination of artist matching, album/track pattern matching, and Last.fm tag-based auto-detection.

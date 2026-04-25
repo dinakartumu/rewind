@@ -3,7 +3,7 @@ title: Changelog
 description: API updates and new features.
 ---
 
-<Update label="April 24, 2026" tags={["New releases", "Improvements"]}>
+<Update label="April 24, 2026" tags={["New releases", "New features", "Improvements"]}>
 
 ## MCP server
 
@@ -13,8 +13,23 @@ Interactive card UIs for reading and music, plus inline clickable links across l
 - **Cover grid** for `get_top_albums` and **portrait grid** for `get_top_artists` — both click through to Apple Music (or Last.fm when no match).
 - **Inline markdown links** in `search`, `semantic_search`, `find_similar_articles`, `get_recent_reads`, `get_top_artists`, `get_top_albums`, and `get_top_tracks` — clickable in every client.
 - **Author names** render correctly when a source article's `article:author` tag is URL-shaped.
+- `get_top_artists` accepts `include_sparklines` and forwards the new per-artist play-count series.
 
-## API
+## Listening
+
+- **Sparklines on top artists** — pass `include_sparklines=true` to [`GET /v1/listening/top/artists`](/api-reference/listening/top-artists) to attach a zero-filled play-count series per artist. Supported for `1month`, `3month`, `6month`, and `12month`. See [Listening domain](/domains/listening#sparklines).
+- Album and artist artwork now resolves for ampersand-named artists like Matt & Kim, Simon & Garfunkel, and Hall & Oates.
+- Listening image placeholders auto-expire after 7 days, matching reading-domain behavior.
+
+## Search
+
+- [`GET /v1/search`](/api-reference/search/cross-domain-search) results now include `image` URLs and thumbhashes for listening, watching, collecting, and reading hits. The field was previously always null in keyword mode.
+
+## API discovery
+
+The OpenAPI 3.1 spec is reachable without auth at `https://api.rewind.rest/openapi.json` (redirects to the canonical `/v1/openapi.json`). Use it to generate clients, drive agent tools, or import into Postman or Insomnia.
+
+## Reading
 
 - Reading articles now have thumbnails for most paywalled sources (NYT, Reuters, WSJ) via multi-tier OG extraction.
 - `description` now falls back to `og_description` when the editorial field is null.
