@@ -92,6 +92,10 @@ docs/                      -- Project documentation
 - Pagination: `{ data: [...], pagination: { page, limit, total, total_pages } }`
 - Date filtering: most list/recent/stats/feed endpoints accept optional `date` (YYYY-MM-DD), `from`, `to` (ISO 8601) query params via shared `DateFilterQuery` schema
 
+## Documentation style
+
+- **No parentheticals in user-facing headings.** Reader-facing pages (`README.md`, `docs-mintlify/**`, `docs-site/src/pages/**`, public changelog entries) keep headings clean — never `## Foo (Bar)`. If you need to qualify, use an em-dash (`## Foo — Bar`), a colon (`## Foo: Bar`), or rewrite as a subhead. Internal `docs/` design notes are exempt — they're allowed to use parens for project-tracking shorthand like `## Phase 7 (deferred)`.
+
 ## Environment Variables
 
 | Variable                         | Domain     | Description                                                                 |
