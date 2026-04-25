@@ -32,6 +32,7 @@
     "db:remote": "wrangler d1 migrations apply rewind-db --remote",
     "db:studio": "drizzle-kit studio",
     "spec:update": "vitest run src/__tests__/openapi-snapshot.test.ts --update",
+    "snapshots:check": "vitest run src/__tests__/openapi-snapshot.test.ts && cd mcp-server && vitest run src/__tests__/manifest-snapshot.test.ts",
     "lint:api": "spectral lint openapi.snapshot.json",
     "www:dev": "cd docs-site && npx astro dev",
     "www:build": "cd docs-site && npx astro build",
