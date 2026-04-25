@@ -62,6 +62,10 @@ type TopItem = {
   url: string;
   apple_music_url: string | null;
   preview_url?: string | null;
+  sparkline?: {
+    granularity: 'day' | 'week';
+    points: number[];
+  };
 };
 
 type ArtistDetail = {
@@ -295,6 +299,12 @@ export function registerListeningTools(
           .default(1)
           .describe('Page number for pagination'),
         ...includeImagesParam,
+        include_sparklines: z
+          .boolean()
+          .default(false)
+          .describe(
+            'When true, attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted otherwise.'
+          ),
       },
       annotations: READ_ONLY_ANNOTATIONS,
       _meta: {
@@ -302,11 +312,16 @@ export function registerListeningTools(
         'ui/resourceUri': 'ui://rewind/top-artists.html',
       },
     },
-    async ({ period, limit, page, include_images }) =>
+    async ({ period, limit, page, include_images, include_sparklines }) =>
       withRichResponse(async () => {
         const data = await client.get<{ period: string; data: TopItem[] }>(
           '/listening/top/artists',
-          { period, limit, page }
+          {
+            period,
+            limit,
+            page,
+            ...(include_sparklines ? { include_sparklines: 'true' } : {}),
+          }
         );
 
         if (!data.data.length) {
