@@ -25,6 +25,11 @@ import { refreshArtistImageFromAppleMusicId } from '../services/images/sync-imag
 import type { BackfillItem } from '../services/images/backfill.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import { errorResponses, PaginationMeta } from '../lib/schemas/common.js';
+import {
+  buildSparklines,
+  isSparklinePeriod,
+  type SparklinePeriod,
+} from '../lib/listening-sparklines.js';
 
 const listening = createOpenAPIApp();
 
@@ -81,6 +86,23 @@ const TopItemSchema = z.object({
   url: z.string(),
   apple_music_url: z.string().nullable(),
   preview_url: z.string().nullable().optional(),
+});
+
+const SparklineSchema = z.object({
+  granularity: z.enum(['day', 'week']),
+  points: z.array(z.number()),
+});
+
+const TopArtistItemSchema = TopItemSchema.extend({
+  sparkline: SparklineSchema.optional(),
+});
+
+const TopArtistsQuery = PeriodQuery.extend({
+  include_sparklines: z.coerce.boolean().optional().openapi({
+    description:
+      'When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.',
+    example: false,
+  }),
 });
 
 const NowPlayingSchema = z.object({
@@ -439,8 +461,9 @@ const topArtistsRoute = createRoute({
   operationId: 'getListeningTopArtists',
   tags: ['Listening'],
   summary: 'Top artists',
-  description: 'Returns top artists for a given time period.',
-  request: { query: PeriodQuery },
+  description:
+    'Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist (1month/3month/6month/12month only).',
+  request: { query: TopArtistsQuery },
   responses: {
     200: {
       description: 'Top artists list',
@@ -448,11 +471,11 @@ const topArtistsRoute = createRoute({
         'application/json': {
           schema: z.object({
             period: z.string(),
-            data: z.array(TopItemSchema),
+            data: z.array(TopArtistItemSchema),
             pagination: PaginationMeta,
           }),
           example: {
-            period: 'overall',
+            period: '12month',
             data: [
               {
                 rank: 1,
@@ -469,6 +492,15 @@ const topArtistsRoute = createRoute({
                 },
                 url: 'https://www.last.fm/music/Beastie+Boys',
                 apple_music_url: null,
+                sparkline: {
+                  granularity: 'week',
+                  points: [
+                    3, 5, 12, 8, 4, 0, 0, 6, 9, 11, 14, 7, 5, 8, 12, 18, 22, 19,
+                    11, 6, 4, 8, 13, 17, 21, 16, 9, 5, 3, 7, 12, 18, 24, 19, 14,
+                    8, 5, 9, 13, 17, 22, 28, 25, 18, 12, 7, 4, 9, 14, 19, 23,
+                    26,
+                  ],
+                },
               },
               {
                 rank: 2,
@@ -1664,6 +1696,10 @@ listening.openapi(topArtistsRoute, async (c) => {
   );
   const offset = (page - 1) * limit;
 
+  const includeSparklinesParam = c.req.query('include_sparklines');
+  const includeSparklines =
+    includeSparklinesParam === 'true' || includeSparklinesParam === '1';
+
   const [{ count: total }] = await db
     .select({ count: sql<number>`count(*)` })
     .from(lastfmTopArtists)
@@ -1691,27 +1727,34 @@ listening.openapi(topArtistsRoute, async (c) => {
     .limit(limit)
     .offset(offset);
 
-  const artistIds = items.map((i) => String(i.artistId));
-  const imageMap = await getImageAttachmentBatch(
-    db,
-    'listening',
-    'artists',
-    artistIds
-  );
+  const artistIdStrings = items.map((i) => String(i.artistId));
+  const numericArtistIds = items.map((i) => i.artistId);
+  const wantsSparklines = includeSparklines && isSparklinePeriod(period);
+
+  const [imageMap, sparklineMap] = await Promise.all([
+    getImageAttachmentBatch(db, 'listening', 'artists', artistIdStrings),
+    wantsSparklines
+      ? buildSparklines(db, numericArtistIds, period as SparklinePeriod)
+      : Promise.resolve(undefined),
+  ]);
 
   return c.json({
     period,
-    data: items.map((item) => ({
-      rank: item.rank,
-      id: item.artistId,
-      name: item.artistName,
-      detail: '',
-      playcount: item.playcount,
-      genre: item.artistGenre ?? null,
-      image: imageMap.get(String(item.artistId)) ?? null,
-      url: item.artistUrl ?? '',
-      apple_music_url: item.artistAppleMusicUrl ?? null,
-    })),
+    data: items.map((item) => {
+      const sparkline = sparklineMap?.get(item.artistId);
+      return {
+        rank: item.rank,
+        id: item.artistId,
+        name: item.artistName,
+        detail: '',
+        playcount: item.playcount,
+        genre: item.artistGenre ?? null,
+        image: imageMap.get(String(item.artistId)) ?? null,
+        url: item.artistUrl ?? '',
+        apple_music_url: item.artistAppleMusicUrl ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
     pagination: paginate(page, limit, total),
   });
 });

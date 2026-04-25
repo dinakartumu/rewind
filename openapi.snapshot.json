@@ -957,7 +957,7 @@
           "Listening"
         ],
         "summary": "Top artists",
-        "description": "Returns top artists for a given time period.",
+        "description": "Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist (1month/3month/6month/12month only).",
         "parameters": [
           {
             "schema": {
@@ -998,6 +998,20 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+              "example": false
+            },
+            "required": false,
+            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+            "name": "include_sparklines",
             "in": "query"
           }
         ],
@@ -1047,6 +1061,28 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
+                            ]
                           }
                         },
                         "required": [
@@ -1071,7 +1107,7 @@
                   ]
                 },
                 "example": {
-                  "period": "overall",
+                  "period": "12month",
                   "data": [
                     {
                       "rank": 1,
@@ -1087,7 +1123,64 @@
                         "accent_color": "#7e7e7e"
                       },
                       "url": "https://www.last.fm/music/Beastie+Boys",
-                      "apple_music_url": null
+                      "apple_music_url": null,
+                      "sparkline": {
+                        "granularity": "week",
+                        "points": [
+                          3,
+                          5,
+                          12,
+                          8,
+                          4,
+                          0,
+                          0,
+                          6,
+                          9,
+                          11,
+                          14,
+                          7,
+                          5,
+                          8,
+                          12,
+                          18,
+                          22,
+                          19,
+                          11,
+                          6,
+                          4,
+                          8,
+                          13,
+                          17,
+                          21,
+                          16,
+                          9,
+                          5,
+                          3,
+                          7,
+                          12,
+                          18,
+                          24,
+                          19,
+                          14,
+                          8,
+                          5,
+                          9,
+                          13,
+                          17,
+                          22,
+                          28,
+                          25,
+                          18,
+                          12,
+                          7,
+                          4,
+                          9,
+                          14,
+                          19,
+                          23,
+                          26
+                        ]
+                      }
                     },
                     {
                       "rank": 2,
@@ -18147,6 +18240,117 @@
                     "embedded",
                     "skipped",
                     "tokens",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/cleanup-reading-url-authors": {
+      "post": {
+        "operationId": "cleanupReadingUrlAuthors",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Titlecase URL-shaped authors (e.g. 'https://.../by/mike-isaac' → 'Mike Isaac')",
+        "responses": {
+          "200": {
+            "description": "Cleanup complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "scanned",
+                    "updated",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/clear-reading-image-placeholders": {
+      "post": {
+        "operationId": "clearReadingImagePlaceholders",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Clear images.source=none placeholders for reading articles with populated og_image_url",
+        "description": "Unblocks articles rescued by reenrich-reading missing-images mode so the image pipeline can process them.",
+        "responses": {
+          "200": {
+            "description": "Cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cleared": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "cleared",
                     "took_ms"
                   ]
                 }

@@ -122,6 +122,10 @@ export const lastfmScrobbles = sqliteTable(
     index('idx_lastfm_scrobbles_track_id').on(table.trackId),
     index('idx_lastfm_scrobbles_scrobbled_at').on(table.scrobbledAt),
     index('idx_lastfm_scrobbles_user_id').on(table.userId),
+    index('idx_lastfm_scrobbles_track_scrobbled').on(
+      table.trackId,
+      table.scrobbledAt
+    ),
   ]
 );
 
