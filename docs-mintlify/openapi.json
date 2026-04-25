@@ -136,9 +136,28 @@
                 "error_rate"
               ]
             }
+          },
+          "enrichment": {
+            "type": "object",
+            "properties": {
+              "artists_missing_apple_music_url_with_plays": {
+                "type": "integer"
+              },
+              "artists_missing_apple_music_url": {
+                "type": "integer"
+              },
+              "tracks_missing_itunes_enrichment": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "artists_missing_apple_music_url_with_plays",
+              "artists_missing_apple_music_url",
+              "tracks_missing_itunes_enrichment"
+            ]
           }
         },
-        "required": ["status", "domains"]
+        "required": ["status", "domains", "enrichment"]
       },
       "ErrorResponse": {
         "type": "object",
@@ -556,7 +575,7 @@
         "operationId": "getListeningRecent",
         "tags": ["Listening"],
         "summary": "Recent scrobbles",
-        "description": "Returns the most recent scrobbles. Supports date filtering via date, from, and to params.",
+        "description": "Returns the most recent scrobbles. Supports date filtering via date, from, and to params and page-based pagination.",
         "parameters": [
           {
             "schema": {
@@ -568,6 +587,17 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -767,7 +797,7 @@
         "operationId": "getListeningTopArtists",
         "tags": ["Listening"],
         "summary": "Top artists",
-        "description": "Returns top artists for a given time period.",
+        "description": "Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist (1month/3month/6month/12month only).",
         "parameters": [
           {
             "schema": {
@@ -808,6 +838,17 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": ["boolean", "null"],
+              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+              "example": false
+            },
+            "required": false,
+            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+            "name": "include_sparklines",
             "in": "query"
           }
         ],
@@ -851,6 +892,22 @@
                           },
                           "preview_url": {
                             "type": ["string", "null"]
+                          },
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": ["day", "week"]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": ["granularity", "points"]
                           }
                         },
                         "required": [
@@ -871,7 +928,7 @@
                   "required": ["period", "data", "pagination"]
                 },
                 "example": {
-                  "period": "overall",
+                  "period": "12month",
                   "data": [
                     {
                       "rank": 1,
@@ -887,7 +944,16 @@
                         "accent_color": "#7e7e7e"
                       },
                       "url": "https://www.last.fm/music/Beastie+Boys",
-                      "apple_music_url": null
+                      "apple_music_url": null,
+                      "sparkline": {
+                        "granularity": "week",
+                        "points": [
+                          3, 5, 12, 8, 4, 0, 0, 6, 9, 11, 14, 7, 5, 8, 12, 18,
+                          22, 19, 11, 6, 4, 8, 13, 17, 21, 16, 9, 5, 3, 7, 12,
+                          18, 24, 19, 14, 8, 5, 9, 13, 17, 22, 28, 25, 18, 12,
+                          7, 4, 9, 14, 19, 23, 26
+                        ]
+                      }
                     },
                     {
                       "rank": 2,
@@ -3355,6 +3421,17 @@
                     "maximum": 200,
                     "default": 50,
                     "example": 50
+                  },
+                  "retry": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Retry albums/artists that previously failed (source=none placeholders)",
+                    "example": true
+                  },
+                  "artist": {
+                    "type": "string",
+                    "description": "Filter to a specific artist name (case-insensitive partial match)",
+                    "example": "Beastie Boys"
                   }
                 }
               }
@@ -3440,6 +3517,129 @@
                         }
                       },
                       "required": ["total", "succeeded", "skipped", "failed"]
+                    }
+                  },
+                  "required": ["success", "results"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/listening/admin/enrich-artists": {
+      "post": {
+        "operationId": "enrichListeningArtists",
+        "x-hidden": true,
+        "tags": ["Listening", "Admin"],
+        "summary": "Enrich artists with Apple Music URLs via direct iTunes lookup",
+        "description": "Fallback for artists the track-driven enrichBatch path cannot reach. Searches iTunes with entity=musicArtist and writes apple_music_id + apple_music_url on a name match. Retries rows whose last attempt was >30 days ago.",
+        "responses": {
+          "200": {
+            "description": "Enrichment results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "results": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "succeeded": {
+                          "type": "number"
+                        },
+                        "skipped": {
+                          "type": "number"
+                        },
+                        "failed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["total", "succeeded", "skipped", "failed"]
+                    }
+                  },
+                  "required": ["success", "results"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/listening/admin/refresh-artist-images": {
+      "post": {
+        "operationId": "refreshListeningArtistImages",
+        "x-hidden": true,
+        "tags": ["Listening", "Admin"],
+        "summary": "Refresh artist images via stored Apple Music id",
+        "description": "Deterministic-by-id fetch against the Apple Music catalog for artists that have an apple_music_id but no image row (or a stale null-source placeholder). Bypasses the name-search waterfall.",
+        "responses": {
+          "200": {
+            "description": "Image refresh results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "results": {
+                      "type": "object",
+                      "properties": {
+                        "domain": {
+                          "type": "string"
+                        },
+                        "entityType": {
+                          "type": "string"
+                        },
+                        "queued": {
+                          "type": "number"
+                        },
+                        "succeeded": {
+                          "type": "number"
+                        },
+                        "skipped": {
+                          "type": "number"
+                        },
+                        "failed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "domain",
+                        "entityType",
+                        "queued",
+                        "succeeded",
+                        "skipped",
+                        "failed"
+                      ]
                     }
                   },
                   "required": ["success", "results"]
@@ -3871,17 +4071,27 @@
         "operationId": "getRunningRecent",
         "tags": ["Running"],
         "summary": "Latest runs",
-        "description": "Returns the last N activities (default 5, max 20). Supports date filtering via date, from, and to params.",
+        "description": "Returns the last N activities (default 10, max 50). Supports date filtering via date, from, and to params and page-based pagination.",
         "parameters": [
           {
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -5854,11 +6064,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -9554,11 +9774,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -11151,11 +11381,21 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 20,
-              "default": 5
+              "maximum": 50,
+              "default": 10
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -12055,6 +12295,140 @@
         }
       }
     },
+    "/v1/admin/collecting/vinyl": {
+      "post": {
+        "operationId": "adminAddCollectingVinyl",
+        "x-hidden": true,
+        "tags": ["Collecting", "Admin"],
+        "summary": "Add music to collection",
+        "description": "Add a release to the Discogs collection. Searches Discogs by title/artist or accepts a discogs_id directly. Adds to Discogs, stores locally, and processes cover image.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discogs_id": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "artist": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Release added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "release": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "artist": {
+                          "type": "string"
+                        },
+                        "year": {
+                          "type": ["number", "null"]
+                        },
+                        "discogs_id": {
+                          "type": "number"
+                        },
+                        "format": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "artist",
+                        "year",
+                        "discogs_id",
+                        "format"
+                      ]
+                    },
+                    "discogs": {
+                      "type": "object",
+                      "properties": {
+                        "instance_id": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["instance_id"]
+                    },
+                    "image_processed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "release",
+                    "discogs",
+                    "image_processed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reading/recent": {
       "get": {
         "operationId": "getReadingRecent",
@@ -12072,6 +12446,17 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
             "in": "query"
           },
           {
@@ -12134,6 +12519,12 @@
                           "url": {
                             "type": ["string", "null"]
                           },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
                           "domain": {
                             "type": ["string", "null"]
                           },
@@ -12186,6 +12577,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -12213,6 +12606,8 @@
                       "title": "The Age of AI",
                       "author": "Derek Thompson",
                       "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                      "instapaper_url": "https://www.instapaper.com/read/1234567",
+                      "instapaper_app_url": "instapaper://read/1234567",
                       "domain": "theatlantic.com",
                       "site_name": "The Atlantic",
                       "description": "How artificial intelligence is reshaping every industry.",
@@ -12288,6 +12683,12 @@
                           "url": {
                             "type": ["string", "null"]
                           },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
                           "domain": {
                             "type": ["string", "null"]
                           },
@@ -12340,6 +12741,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -12367,6 +12770,8 @@
                       "title": "Why the Internet Isn't Working",
                       "author": "Maxwell Zeff",
                       "url": "https://www.wired.com/story/why-the-internet-isnt-working",
+                      "instapaper_url": "https://www.instapaper.com/read/2345678",
+                      "instapaper_app_url": "instapaper://read/2345678",
                       "domain": "wired.com",
                       "site_name": "Wired",
                       "description": "The web was supposed to connect us. What went wrong?",
@@ -12554,6 +12959,12 @@
                           "url": {
                             "type": ["string", "null"]
                           },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
                           "domain": {
                             "type": ["string", "null"]
                           },
@@ -12606,6 +13017,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -12636,6 +13049,8 @@
                       "title": "The Age of AI",
                       "author": "Derek Thompson",
                       "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                      "instapaper_url": "https://www.instapaper.com/read/1234567",
+                      "instapaper_app_url": "instapaper://read/1234567",
                       "domain": "theatlantic.com",
                       "site_name": "The Atlantic",
                       "description": "How artificial intelligence is reshaping every industry.",
@@ -12723,6 +13138,12 @@
                     "url": {
                       "type": ["string", "null"]
                     },
+                    "instapaper_url": {
+                      "type": ["string", "null"]
+                    },
+                    "instapaper_app_url": {
+                      "type": ["string", "null"]
+                    },
                     "domain": {
                       "type": ["string", "null"]
                     },
@@ -12769,6 +13190,12 @@
                     "finished_at": {
                       "type": ["string", "null"]
                     },
+                    "excerpt": {
+                      "type": ["string", "null"]
+                    },
+                    "content": {
+                      "type": ["string", "null"]
+                    },
                     "highlights": {
                       "type": "array",
                       "items": {
@@ -12813,6 +13240,8 @@
                     "title",
                     "author",
                     "url",
+                    "instapaper_url",
+                    "instapaper_app_url",
                     "domain",
                     "site_name",
                     "description",
@@ -12827,6 +13256,8 @@
                     "saved_at",
                     "started_at",
                     "finished_at",
+                    "excerpt",
+                    "content",
                     "highlights"
                   ]
                 },
@@ -12835,6 +13266,8 @@
                   "title": "The Age of AI",
                   "author": "Derek Thompson",
                   "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                  "instapaper_url": "https://www.instapaper.com/read/1234567",
+                  "instapaper_app_url": "instapaper://read/1234567",
                   "domain": "theatlantic.com",
                   "site_name": "The Atlantic",
                   "description": "How artificial intelligence is reshaping every industry.",
@@ -12850,6 +13283,8 @@
                   "saved_at": "2026-03-18T14:30:00.000Z",
                   "started_at": "2026-03-19T08:00:00.000Z",
                   "finished_at": "2026-03-19T08:15:00.000Z",
+                  "excerpt": null,
+                  "content": null,
                   "highlights": [
                     {
                       "id": 1,
@@ -12861,6 +13296,143 @@
                       "created_at": "2026-03-19T08:10:00.000Z"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reading/articles/{id}/related": {
+      "get": {
+        "operationId": "getReadingArticleRelated",
+        "tags": ["Reading"],
+        "summary": "Related articles (semantic similarity)",
+        "description": "Returns articles thematically similar to the given one, ranked by cosine similarity against Voyage embeddings. Requires the article to have been embedded (run the admin reembed endpoint to backfill).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "42"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 5,
+              "example": 5
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related articles, scored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": ["string", "null"]
+                          },
+                          "url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
+                          "domain": {
+                            "type": ["string", "null"]
+                          },
+                          "description": {
+                            "type": ["string", "null"]
+                          },
+                          "score": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "author",
+                          "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
+                          "domain",
+                          "description",
+                          "score"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["data"]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": 742,
+                      "title": "Tim Robinson broke my boyfriend's brain",
+                      "author": null,
+                      "url": "https://...",
+                      "instapaper_url": "https://www.instapaper.com/read/3456789",
+                      "instapaper_app_url": "instapaper://read/3456789",
+                      "domain": "nytimes.com",
+                      "description": "A writer learns the hard way...",
+                      "score": 0.67
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -12978,6 +13550,12 @@
                           "url": {
                             "type": ["string", "null"]
                           },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
                           "domain": {
                             "type": ["string", "null"]
                           },
@@ -13030,6 +13608,8 @@
                           "title",
                           "author",
                           "url",
+                          "instapaper_url",
+                          "instapaper_app_url",
                           "domain",
                           "site_name",
                           "description",
@@ -13060,6 +13640,8 @@
                       "title": "The Age of AI",
                       "author": "Derek Thompson",
                       "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                      "instapaper_url": "https://www.instapaper.com/read/1234567",
+                      "instapaper_app_url": "instapaper://read/1234567",
                       "domain": "theatlantic.com",
                       "site_name": "The Atlantic",
                       "description": "How artificial intelligence is reshaping every industry.",
@@ -13192,6 +13774,12 @@
                               },
                               "url": {
                                 "type": ["string", "null"]
+                              },
+                              "instapaper_url": {
+                                "type": ["string", "null"]
+                              },
+                              "instapaper_app_url": {
+                                "type": ["string", "null"]
                               }
                             },
                             "required": [
@@ -13199,7 +13787,9 @@
                               "title",
                               "author",
                               "domain",
-                              "url"
+                              "url",
+                              "instapaper_url",
+                              "instapaper_app_url"
                             ]
                           }
                         },
@@ -13236,7 +13826,9 @@
                         "title": "The Age of AI",
                         "author": "Derek Thompson",
                         "domain": "theatlantic.com",
-                        "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai"
+                        "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                        "instapaper_url": "https://www.instapaper.com/read/1234567",
+                        "instapaper_app_url": "instapaper://read/1234567"
                       }
                     }
                   ],
@@ -13325,9 +13917,23 @@
                         },
                         "url": {
                           "type": ["string", "null"]
+                        },
+                        "instapaper_url": {
+                          "type": ["string", "null"]
+                        },
+                        "instapaper_app_url": {
+                          "type": ["string", "null"]
                         }
                       },
-                      "required": ["id", "title", "author", "domain", "url"]
+                      "required": [
+                        "id",
+                        "title",
+                        "author",
+                        "domain",
+                        "url",
+                        "instapaper_url",
+                        "instapaper_app_url"
+                      ]
                     }
                   },
                   "required": [
@@ -13354,7 +13960,146 @@
                     "title": "Why the Internet Isn't Working",
                     "author": "Maxwell Zeff",
                     "domain": "wired.com",
-                    "url": "https://www.wired.com/story/why-the-internet-isnt-working"
+                    "url": "https://www.wired.com/story/why-the-internet-isnt-working",
+                    "instapaper_url": "https://www.instapaper.com/read/2345678",
+                    "instapaper_app_url": "instapaper://read/2345678"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reading/highlights/{id}": {
+      "get": {
+        "operationId": "getReadingHighlight",
+        "tags": ["Reading"],
+        "summary": "Highlight detail",
+        "description": "Returns a single highlight by internal Rewind id, with nested parent-article context.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "42"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Highlight detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": ["string", "null"]
+                    },
+                    "position": {
+                      "type": ["number", "null"]
+                    },
+                    "chapter": {
+                      "type": ["string", "null"]
+                    },
+                    "page": {
+                      "type": ["number", "null"]
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "article": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "number"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "author": {
+                          "type": ["string", "null"]
+                        },
+                        "domain": {
+                          "type": ["string", "null"]
+                        },
+                        "url": {
+                          "type": ["string", "null"]
+                        },
+                        "instapaper_url": {
+                          "type": ["string", "null"]
+                        },
+                        "instapaper_app_url": {
+                          "type": ["string", "null"]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "author",
+                        "domain",
+                        "url",
+                        "instapaper_url",
+                        "instapaper_app_url"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "note",
+                    "position",
+                    "chapter",
+                    "page",
+                    "created_at",
+                    "article"
+                  ]
+                },
+                "example": {
+                  "id": 42,
+                  "text": "The question is not whether AI will transform society, but how quickly institutions can adapt.",
+                  "note": "Key thesis",
+                  "position": 1,
+                  "chapter": null,
+                  "page": null,
+                  "created_at": "2026-03-19T08:10:00.000Z",
+                  "article": {
+                    "id": 42,
+                    "title": "The Age of AI",
+                    "author": "Derek Thompson",
+                    "domain": "theatlantic.com",
+                    "url": "https://www.theatlantic.com/technology/archive/2025/the-age-of-ai",
+                    "instapaper_url": "https://www.instapaper.com/read/1234567",
+                    "instapaper_app_url": "instapaper://read/1234567"
                   }
                 }
               }
@@ -14534,7 +15279,7 @@
         "operationId": "getSearch",
         "tags": ["Search"],
         "summary": "Cross-domain search",
-        "description": "Full-text search across all data domains (listening, running, watching, collecting).",
+        "description": "Full-text search across all data domains (listening, running, watching, collecting, reading).",
         "parameters": [
           {
             "schema": {
@@ -14549,7 +15294,13 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["listening", "running", "watching", "collecting"],
+              "enum": [
+                "listening",
+                "running",
+                "watching",
+                "collecting",
+                "reading"
+              ],
               "description": "Filter results to a specific domain"
             },
             "required": false,
@@ -14575,6 +15326,17 @@
             "required": false,
             "description": "Page number (default 1)",
             "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["keyword", "semantic", "hybrid"],
+              "description": "Ranking mode. keyword = FTS only (default). semantic = Vectorize only (reading domain). hybrid = FTS + semantic via reciprocal rank fusion (reading domain)."
+            },
+            "required": false,
+            "description": "Ranking mode. keyword = FTS only (default). semantic = Vectorize only (reading domain). hybrid = FTS + semantic via reciprocal rank fusion (reading domain).",
+            "name": "mode",
             "in": "query"
           }
         ],
@@ -14608,6 +15370,40 @@
                           },
                           "image_key": {
                             "type": ["string", "null"]
+                          },
+                          "image": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "cdn_url": {
+                                "type": "string"
+                              },
+                              "thumbhash": {
+                                "type": ["string", "null"]
+                              },
+                              "dominant_color": {
+                                "type": ["string", "null"]
+                              }
+                            },
+                            "required": [
+                              "cdn_url",
+                              "thumbhash",
+                              "dominant_color"
+                            ]
+                          },
+                          "url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_url": {
+                            "type": ["string", "null"]
+                          },
+                          "instapaper_app_url": {
+                            "type": ["string", "null"]
+                          },
+                          "author": {
+                            "type": ["string", "null"]
+                          },
+                          "score": {
+                            "type": "number"
                           }
                         },
                         "required": [
@@ -14616,7 +15412,8 @@
                           "entity_id",
                           "title",
                           "subtitle",
-                          "image_key"
+                          "image_key",
+                          "image"
                         ]
                       }
                     },
@@ -14634,7 +15431,8 @@
                       "entity_id": "189",
                       "title": "Nirvana",
                       "subtitle": null,
-                      "image_key": null
+                      "image_key": null,
+                      "image": null
                     }
                   ],
                   "pagination": {
@@ -14962,6 +15760,422 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reindex-search": {
+      "post": {
+        "operationId": "reindexSearch",
+        "tags": ["Admin"],
+        "summary": "Rebuild the FTS search_index",
+        "description": "Truncates and repopulates the search_index FTS table from source tables. Pass `domains` in the body to limit scope; default rebuilds all five domains.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "reading",
+                        "watching",
+                        "listening",
+                        "running",
+                        "collecting"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reindex complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domains": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "indexed": {
+                            "type": "number"
+                          },
+                          "took_ms": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["indexed", "took_ms"]
+                      }
+                    }
+                  },
+                  "required": ["domains"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reenrich-reading": {
+      "post": {
+        "operationId": "reenrichReading",
+        "tags": ["Admin"],
+        "summary": "Retry enrichment for failed reading items",
+        "description": "Iterates reading_items where enrichment_status = \"failed\" and re-runs enrichArticle on each. Instapaper often has full body text even when the original URL fetch 403s, so this typically rescues articles that stalled on legacy OG-fetch errors.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["failed", "missing-images"],
+                    "description": "failed (default): retry rows where enrichment_status=failed. missing-images: re-run on rows that are completed but have no og_image_url, useful after upgrading the OG-fetch headers to rescue NYT/Bloomberg-style articles."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Re-enrichment complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "retried": {
+                      "type": "number"
+                    },
+                    "succeeded": {
+                      "type": "number"
+                    },
+                    "still_failed": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "retried",
+                    "succeeded",
+                    "still_failed",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/backfill-body-excerpt": {
+      "post": {
+        "operationId": "backfillBodyExcerpt",
+        "tags": ["Admin"],
+        "summary": "Populate reading_items.body_excerpt from existing content column",
+        "description": "Iterates reading_items WHERE body_excerpt IS NULL AND content IS NOT NULL and applies htmlToText to derive the excerpt. Idempotent: re-running touches nothing already populated.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["scanned", "updated", "took_ms"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reembed-reading": {
+      "post": {
+        "operationId": "reembedReading",
+        "tags": ["Admin"],
+        "summary": "Embed reading_items into Vectorize",
+        "description": "Iterates reading_items that have any indexable text (title/description/body_excerpt) and upserts their Voyage embeddings into the rewind-reading Vectorize index. Batches server-side.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000
+                  },
+                  "batchSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "onlyMissing": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reembed complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "embedded": {
+                      "type": "number"
+                    },
+                    "skipped": {
+                      "type": "number"
+                    },
+                    "tokens": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "scanned",
+                    "embedded",
+                    "skipped",
+                    "tokens",
+                    "took_ms"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/cleanup-reading-url-authors": {
+      "post": {
+        "operationId": "cleanupReadingUrlAuthors",
+        "tags": ["Admin"],
+        "summary": "Titlecase URL-shaped authors (e.g. 'https://.../by/mike-isaac' → 'Mike Isaac')",
+        "responses": {
+          "200": {
+            "description": "Cleanup complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scanned": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["scanned", "updated", "took_ms"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/clear-reading-image-placeholders": {
+      "post": {
+        "operationId": "clearReadingImagePlaceholders",
+        "tags": ["Admin"],
+        "summary": "Clear images.source=none placeholders for reading articles with populated og_image_url",
+        "description": "Unblocks articles rescued by reenrich-reading missing-images mode so the image pipeline can process them.",
+        "responses": {
+          "200": {
+            "description": "Cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cleared": {
+                      "type": "number"
+                    },
+                    "took_ms": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["cleared", "took_ms"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
