@@ -44,6 +44,23 @@ jobs:
       - name: Verify package contents
         run: npm pack --dry-run
 
+      # Catches manual `mcp-server/package.json` version bumps that bypass
+      # release-please. Bumps must come from the release-please PR (which
+      # updates package.json AND .release-please-manifest.json atomically),
+      # never by hand. Without this guard, npm and the manifest drift and
+      # the GitHub Releases page goes empty.
+      - name: Verify release-please manifest matches package.json
+        working-directory: ${{ github.workspace }}
+        run: |
+          PKG_VERSION=$(node -p "require('./mcp-server/package.json').version")
+          MANIFEST_VERSION=$(node -p "require('./.release-please-manifest.json')['mcp-server']")
+          if [ "$PKG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Version drift: mcp-server/package.json is $PKG_VERSION but .release-please-manifest.json is $MANIFEST_VERSION."
+            echo "Do not bump mcp-server/package.json manually. Let release-please open a release PR; merging that PR updates both files atomically."
+            exit 1
+          fi
+          echo "OK: both files at $PKG_VERSION."
+
   publish-npm:
     name: Publish to npm
     needs: build
@@ -72,7 +89,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check if version is already published
+        id: version_check
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "rewind-mcp-server@${PKG_VERSION}" version --silent >/dev/null 2>&1; then
+            echo "Version ${PKG_VERSION} is already on npm; skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${PKG_VERSION} is new; will publish."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm
+        if: steps.version_check.outputs.skip != 'true'
         run: npm publish --provenance --access public
 
   deploy-worker:
