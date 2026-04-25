@@ -71,4 +71,22 @@ describe('OpenAPI spec endpoint', () => {
       expect(cacheControl).toContain('max-age=300');
     });
   });
+
+  describe('GET /openapi.json (root alias)', () => {
+    it('redirects to /v1/openapi.json', async () => {
+      const res = await SELF.fetch('http://localhost/openapi.json', {
+        redirect: 'manual',
+      });
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toBe('/v1/openapi.json');
+    });
+
+    it('does not require auth (no Authorization header)', async () => {
+      const res = await SELF.fetch('http://localhost/openapi.json');
+      // Followed redirect lands on the canonical spec.
+      expect(res.status).toBe(200);
+      const spec = (await res.json()) as any;
+      expect(spec.openapi).toBe('3.1.0');
+    });
+  });
 });

@@ -69,6 +69,12 @@ app.use('/v1/*', async (c, next) => {
   return authMiddleware(c, next);
 });
 
+// Root alias for the OpenAPI spec. The canonical path is /v1/openapi.json,
+// but agents and SDK generators commonly probe /openapi.json at the API
+// origin first — redirect there so discovery works without prior knowledge
+// of the version prefix.
+app.get('/openapi.json', (c) => c.redirect('/v1/openapi.json', 301));
+
 // Route registration
 
 const routes = app

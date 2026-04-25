@@ -108,6 +108,16 @@ curl -H "Authorization: Bearer rw_live_..." \
   "https://api.rewind.rest/v1/listening/recent?from=2026-01-01&to=2026-03-31"
 ```
 
+## OpenAPI spec
+
+The full machine-readable schema for every endpoint is published as an OpenAPI 3.1 document at the API origin -- no auth required:
+
+```bash
+curl https://api.rewind.rest/openapi.json
+```
+
+`https://api.rewind.rest/openapi.json` (root) redirects to the canonical `https://api.rewind.rest/v1/openapi.json`. Use it to generate clients, drive agent tools, or import into Postman / Insomnia.
+
 ## Errors
 
 All errors follow the same envelope:
