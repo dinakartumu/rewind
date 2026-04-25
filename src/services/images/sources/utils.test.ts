@@ -36,6 +36,12 @@ describe('cleanAlbumName', () => {
       cleanAlbumName("Paul's Boutique (20th Anniversary Edition / Remastered)")
     ).toBe("Paul's Boutique");
   });
+
+  it('rewrites ampersand to "and" in album titles', () => {
+    expect(cleanAlbumName('Hall & Oates Greatest Hits')).toBe(
+      'Hall and Oates Greatest Hits'
+    );
+  });
 });
 
 describe('cleanArtistName', () => {
@@ -55,8 +61,9 @@ describe('cleanArtistName', () => {
     expect(cleanArtistName('The Black Keys')).toBe('The Black Keys');
   });
 
-  it('preserves ampersand in names', () => {
-    expect(cleanArtistName('Simon & Garfunkel')).toBe('Simon & Garfunkel');
+  it('rewrites ampersand to "and" for upstream search recall', () => {
+    expect(cleanArtistName('Simon & Garfunkel')).toBe('Simon and Garfunkel');
+    expect(cleanArtistName('Matt & Kim')).toBe('Matt and Kim');
   });
 });
 
@@ -96,6 +103,16 @@ describe('artistMatches', () => {
 
   it('rejects Buddy for Buddy Holly', () => {
     expect(artistMatches('Buddy Holly', 'Buddy')).toBe(false);
+  });
+
+  // Ampersand vs "and" normalization: catalogs sometimes index "Matt & Kim"
+  // and sometimes "Matt and Kim". Both forms should match each way.
+  it('matches ampersand against spelled-out "and"', () => {
+    expect(artistMatches('Matt & Kim', 'Matt and Kim')).toBe(true);
+    expect(artistMatches('Matt and Kim', 'Matt & Kim')).toBe(true);
+    expect(artistMatches('Simon & Garfunkel', 'Simon and Garfunkel')).toBe(
+      true
+    );
   });
 });
 

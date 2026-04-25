@@ -3,30 +3,42 @@
  */
 
 /**
+ * Substitute `&` with `and` for friendlier upstream search behavior.
+ * Apple Music / iTunes / Deezer free-text search occasionally tokenizes `&`
+ * oddly, and most catalogs index "Matt & Kim" alongside the spelled-out form.
+ */
+function substituteAmpersand(name: string): string {
+  return name.replace(/\s*&\s*/g, ' and ').replace(/\s+/g, ' ');
+}
+
+/**
  * Strip featured artist suffixes from artist names for cleaner search results.
  * Last.fm creates separate entries like "Kendrick Lamar feat. DODY6" or
  * "Gorillaz feat. IDLES" which fail to match on iTunes/Apple Music.
  *
- * Only strips feat/ft/featuring -- NOT "&" or "and", which are part of
- * legitimate artist names (e.g., "Simon & Garfunkel", "Tom Petty and The Heartbreakers").
+ * Also rewrites `&` to `and` so artists like "Matt & Kim" or "Simon &
+ * Garfunkel" match the spelled-out form returned by upstream catalogs.
  */
 export function cleanArtistName(name: string): string {
-  return name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].trim();
+  const stripped = name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0].trim();
+  return substituteAmpersand(stripped);
 }
 
 /**
  * Clean an album name for search queries.
  * Strips parenthetical/bracketed suffixes (deluxe, remastered, bonus, EP, single)
  * and version suffixes that confuse search APIs without affecting matching accuracy.
+ * Also rewrites `&` to `and` for the same reason as cleanArtistName.
  */
 export function cleanAlbumName(name: string): string {
-  return name
+  const stripped = name
     .replace(
       /\s*[([][^)\]]*(?:deluxe|remaster|bonus|expanded|anniversary|edition|version|ep|single)[^)\]]*[)\]]/gi,
       ''
     )
     .replace(/\s*-\s*(?:EP|Single)$/i, '')
     .trim();
+  return substituteAmpersand(stripped);
 }
 
 /** Map of number words to digits for title normalization. */

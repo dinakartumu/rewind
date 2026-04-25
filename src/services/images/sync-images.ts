@@ -123,7 +123,17 @@ export async function processListeningImages(
 ): Promise<SyncImageResult[]> {
   const results: SyncImageResult[] = [];
 
-  // Albums without images
+  // Listening album/artist queries pick up two populations:
+  //   1. Entities with no images row at all (first-time pipeline run).
+  //   2. Entities with a source='none' placeholder older than
+  //      PLACEHOLDER_RETRY_DAYS. Without this, an album that fails once
+  //      (e.g. an upstream search returned bad results before a recall
+  //      improvement landed) would be locked out forever.
+  const retryCutoff = new Date(
+    Date.now() - PLACEHOLDER_RETRY_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  // Albums without images, OR with stale placeholder rows
   const albumRows = await db
     .select({
       id: lastfmAlbums.id,
@@ -139,9 +149,18 @@ export async function processListeningImages(
     .where(
       and(
         eq(lastfmAlbums.isFiltered, 0),
-        sql`${lastfmAlbums.id} NOT IN (
-          SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
-          WHERE ${images.domain} = 'listening' AND ${images.entityType} = 'albums'
+        sql`(
+          ${lastfmAlbums.id} NOT IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening' AND ${images.entityType} = 'albums'
+          )
+          OR ${lastfmAlbums.id} IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening'
+              AND ${images.entityType} = 'albums'
+              AND ${images.source} = 'none'
+              AND ${images.createdAt} < ${retryCutoff}
+          )
         )`
       )
     )
@@ -158,7 +177,7 @@ export async function processListeningImages(
 
   results.push(await processItems(db, env, 'listening', 'albums', albumItems));
 
-  // Artists without images
+  // Artists without images, OR with stale placeholder rows
   const artistRows = await db
     .select({
       id: lastfmArtists.id,
@@ -169,9 +188,18 @@ export async function processListeningImages(
     .where(
       and(
         eq(lastfmArtists.isFiltered, 0),
-        sql`${lastfmArtists.id} NOT IN (
-          SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
-          WHERE ${images.domain} = 'listening' AND ${images.entityType} = 'artists'
+        sql`(
+          ${lastfmArtists.id} NOT IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening' AND ${images.entityType} = 'artists'
+          )
+          OR ${lastfmArtists.id} IN (
+            SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
+            WHERE ${images.domain} = 'listening'
+              AND ${images.entityType} = 'artists'
+              AND ${images.source} = 'none'
+              AND ${images.createdAt} < ${retryCutoff}
+          )
         )`
       )
     )
