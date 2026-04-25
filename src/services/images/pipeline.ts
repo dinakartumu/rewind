@@ -465,7 +465,15 @@ export async function runPipeline(
   let imageVersion = 1;
 
   if (existing.length > 0) {
-    imageVersion = existing[0].imageVersion;
+    // Carry the existing version forward so CDN cache-keys stay stable for
+    // unchanged artwork. Placeholder rows (source='none', imageVersion=0)
+    // are an exception: they were a sentinel meaning "no real image yet",
+    // so promoting to a real fetch should land at version 1 (the proper
+    // baseline) rather than persisting the sentinel.
+    imageVersion =
+      existing[0].source === 'none' && existing[0].imageVersion === 0
+        ? 1
+        : existing[0].imageVersion;
     await db
       .update(images)
       .set({
@@ -478,6 +486,7 @@ export async function runPipeline(
         dominantColor,
         accentColor,
         searchHints,
+        imageVersion,
       })
       .where(eq(images.id, existing[0].id));
   } else {
