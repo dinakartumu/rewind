@@ -3,15 +3,20 @@ import { env } from 'cloudflare:test';
 import { createDb, type Database } from '../db/client.js';
 import {
   lastfmArtists,
+  lastfmAlbums,
   lastfmTracks,
   lastfmScrobbles,
 } from '../db/schema/lastfm.js';
 import { setupTestDb } from '../test-helpers.js';
 import {
   buildSparklines,
+  buildSparklinesForWindow,
   isSparklinePeriod,
+  overallToWindow,
   periodToWindow,
   SPARKLINE_PERIODS,
+  yearMonthToWindow,
+  yearToWindow,
 } from './listening-sparklines.js';
 
 describe('isSparklinePeriod', () => {
@@ -102,6 +107,83 @@ describe('periodToWindow', () => {
   });
 });
 
+describe('yearToWindow', () => {
+  it('returns 12 monthly buckets across the calendar year', () => {
+    const w = yearToWindow(2025);
+    expect(w.granularity).toBe('month');
+    expect(w.bucketCount).toBe(12);
+    expect(w.bucketKeys).toEqual([
+      '2025-01',
+      '2025-02',
+      '2025-03',
+      '2025-04',
+      '2025-05',
+      '2025-06',
+      '2025-07',
+      '2025-08',
+      '2025-09',
+      '2025-10',
+      '2025-11',
+      '2025-12',
+    ]);
+    expect(w.from).toBe('2025-01-01T00:00:00.000Z');
+    expect(w.to).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('yearMonthToWindow', () => {
+  it('returns daily buckets for a 31-day month', () => {
+    const w = yearMonthToWindow(2025, 1);
+    expect(w.granularity).toBe('day');
+    expect(w.bucketCount).toBe(31);
+    expect(w.bucketKeys[0]).toBe('2025-01-01');
+    expect(w.bucketKeys[30]).toBe('2025-01-31');
+    expect(w.from).toBe('2025-01-01T00:00:00.000Z');
+    expect(w.to).toBe('2025-02-01T00:00:00.000Z');
+  });
+
+  it('returns 28 days for a non-leap February', () => {
+    const w = yearMonthToWindow(2025, 2);
+    expect(w.bucketCount).toBe(28);
+    expect(w.bucketKeys[27]).toBe('2025-02-28');
+  });
+
+  it('returns 29 days for a leap February', () => {
+    const w = yearMonthToWindow(2024, 2);
+    expect(w.bucketCount).toBe(29);
+    expect(w.bucketKeys[28]).toBe('2024-02-29');
+  });
+
+  it('rolls year boundary at December', () => {
+    const w = yearMonthToWindow(2025, 12);
+    expect(w.bucketCount).toBe(31);
+    expect(w.from).toBe('2025-12-01T00:00:00.000Z');
+    expect(w.to).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('overallToWindow', () => {
+  it('returns one bucket per year, oldest -> newest', () => {
+    const w = overallToWindow(2012, 2026);
+    expect(w.granularity).toBe('year');
+    expect(w.bucketCount).toBe(15);
+    expect(w.bucketKeys[0]).toBe('2012');
+    expect(w.bucketKeys[14]).toBe('2026');
+    expect(w.from).toBe('2012-01-01T00:00:00.000Z');
+    expect(w.to).toBe('2027-01-01T00:00:00.000Z');
+  });
+
+  it('handles a single-year span', () => {
+    const w = overallToWindow(2026, 2026);
+    expect(w.bucketCount).toBe(1);
+    expect(w.bucketKeys).toEqual(['2026']);
+  });
+
+  it('throws when currentYear precedes earliestYear', () => {
+    expect(() => overallToWindow(2026, 2025)).toThrow();
+  });
+});
+
 describe('buildSparklines', () => {
   let db: Database;
 
@@ -113,6 +195,7 @@ describe('buildSparklines', () => {
     db = createDb(env.DB);
     await db.delete(lastfmScrobbles);
     await db.delete(lastfmTracks);
+    await db.delete(lastfmAlbums);
     await db.delete(lastfmArtists);
   });
 
@@ -262,6 +345,151 @@ describe('buildSparklines', () => {
     expect(series!.granularity).toBe('week');
     expect(series!.points).toHaveLength(13);
     expect(series!.points.every((p) => p === 0)).toBe(true);
+  });
+
+  it('groups by album_id when entity is "album"', async () => {
+    const NOW = new Date('2026-04-22T12:00:00Z');
+    const [artist] = await db
+      .insert(lastfmArtists)
+      .values({
+        userId: 1,
+        name: 'Album Test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    const [album] = await db
+      .insert(lastfmAlbums)
+      .values({
+        userId: 1,
+        name: 'Test Album',
+        artistId: artist.id,
+        isFiltered: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    const [trackOnAlbum] = await db
+      .insert(lastfmTracks)
+      .values({
+        userId: 1,
+        name: 'Track on album',
+        artistId: artist.id,
+        albumId: album.id,
+        isFiltered: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    const [trackNoAlbum] = await db
+      .insert(lastfmTracks)
+      .values({
+        userId: 1,
+        name: 'Track without album',
+        artistId: artist.id,
+        albumId: null,
+        isFiltered: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+
+    await db.insert(lastfmScrobbles).values([
+      {
+        userId: 1,
+        trackId: trackOnAlbum.id,
+        scrobbledAt: '2026-04-21T09:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        userId: 1,
+        trackId: trackOnAlbum.id,
+        scrobbledAt: '2026-04-21T10:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+      // This scrobble has no album — must not show up under album.id.
+      {
+        userId: 1,
+        trackId: trackNoAlbum.id,
+        scrobbledAt: '2026-04-21T11:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    const map = await buildSparklinesForWindow(
+      db,
+      [album.id],
+      periodToWindow('12month', NOW),
+      'album'
+    );
+    const series = map.get(album.id);
+    expect(series).toBeDefined();
+    expect(series!.points[51]).toBe(2);
+  });
+
+  it('groups by track_id when entity is "track"', async () => {
+    const NOW = new Date('2026-04-22T12:00:00Z');
+    const [artist] = await db
+      .insert(lastfmArtists)
+      .values({
+        userId: 1,
+        name: 'Track Test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    const [trackA] = await db
+      .insert(lastfmTracks)
+      .values({
+        userId: 1,
+        name: 'Track A',
+        artistId: artist.id,
+        isFiltered: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    const [trackB] = await db
+      .insert(lastfmTracks)
+      .values({
+        userId: 1,
+        name: 'Track B',
+        artistId: artist.id,
+        isFiltered: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+
+    await db.insert(lastfmScrobbles).values([
+      {
+        userId: 1,
+        trackId: trackA.id,
+        scrobbledAt: '2026-04-21T09:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        userId: 1,
+        trackId: trackB.id,
+        scrobbledAt: '2026-04-21T10:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+      {
+        userId: 1,
+        trackId: trackB.id,
+        scrobbledAt: '2026-04-21T11:00:00Z',
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    const map = await buildSparklinesForWindow(
+      db,
+      [trackA.id, trackB.id],
+      periodToWindow('12month', NOW),
+      'track'
+    );
+    expect(map.get(trackA.id)!.points[51]).toBe(1);
+    expect(map.get(trackB.id)!.points[51]).toBe(2);
   });
 
   it('respects the period window (does not count out-of-window scrobbles)', async () => {

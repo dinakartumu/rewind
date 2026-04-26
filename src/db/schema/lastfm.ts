@@ -259,3 +259,32 @@ export const lastfmMonthlyStats = sqliteTable(
     index('idx_lastfm_monthly_stats_user_id').on(table.userId),
   ]
 );
+
+// Precomputed per-year listening stats. Powers GET /v1/listening/years —
+// the year-picker summary used by the portfolio's listening page. Unique
+// counts can't be derived by summing the monthly precompute (an artist
+// listened to in Jan + Feb is one unique artist for the year, not two),
+// so this table holds them at year granularity. Refreshed alongside the
+// monthly precompute on the daily 0 3 cron.
+export const lastfmYearlyStats = sqliteTable(
+  'lastfm_yearly_stats',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id').notNull().default(1),
+    year: integer('year').notNull(),
+    scrobbles: integer('scrobbles').notNull().default(0),
+    uniqueArtists: integer('unique_artists').notNull().default(0),
+    uniqueAlbums: integer('unique_albums').notNull().default(0),
+    uniqueTracks: integer('unique_tracks').notNull().default(0),
+    topArtistId: integer('top_artist_id').references(() => lastfmArtists.id, {
+      onDelete: 'set null',
+    }),
+    computedAt: text('computed_at')
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex('idx_lastfm_yearly_stats_unique').on(table.userId, table.year),
+    index('idx_lastfm_yearly_stats_user_id').on(table.userId),
+  ]
+);

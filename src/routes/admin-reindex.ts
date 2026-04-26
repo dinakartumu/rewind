@@ -63,6 +63,7 @@ const reindexRoute = createRoute({
   method: 'post',
   path: '/reindex-search',
   operationId: 'reindexSearch',
+  'x-hidden': true,
   tags: ['Admin'],
   summary: 'Rebuild the FTS search_index',
   description:
@@ -146,6 +147,7 @@ const reenrichRoute = createRoute({
   method: 'post',
   path: '/reenrich-reading',
   operationId: 'reenrichReading',
+  'x-hidden': true,
   tags: ['Admin'],
   summary: 'Retry enrichment for failed reading items',
   description:
@@ -263,6 +265,7 @@ const backfillBodyRoute = createRoute({
   method: 'post',
   path: '/backfill-body-excerpt',
   operationId: 'backfillBodyExcerpt',
+  'x-hidden': true,
   tags: ['Admin'],
   summary: 'Populate reading_items.body_excerpt from existing content column',
   description:
@@ -342,6 +345,7 @@ const reembedRoute = createRoute({
   method: 'post',
   path: '/reembed-reading',
   operationId: 'reembedReading',
+  'x-hidden': true,
   tags: ['Admin'],
   summary: 'Embed reading_items into Vectorize',
   description:
@@ -666,6 +670,7 @@ const clearPlaceholdersRoute = createRoute({
   method: 'post',
   path: '/clear-reading-image-placeholders',
   operationId: 'clearReadingImagePlaceholders',
+  'x-hidden': true,
   tags: ['Admin'],
   summary:
     'Clear images.source=none placeholders for reading articles with populated og_image_url',
@@ -699,6 +704,7 @@ const cleanupAuthorsRoute = createRoute({
   method: 'post',
   path: '/cleanup-reading-url-authors',
   operationId: 'cleanupReadingUrlAuthors',
+  'x-hidden': true,
   tags: ['Admin'],
   summary:
     "Titlecase URL-shaped authors (e.g. 'https://.../by/mike-isaac' → 'Mike Isaac')",

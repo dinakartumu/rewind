@@ -10,6 +10,7 @@ import {
   lastfmTopTracks,
   lastfmUserStats,
   lastfmMonthlyStats,
+  lastfmYearlyStats,
 } from '../../db/schema/lastfm.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { LastfmClient, LASTFM_PERIODS } from './client.js';
@@ -423,6 +424,7 @@ export async function syncTopLists(
     // GROUP-BY) and runs daily, so the listening page year view reads
     // from precompute instead of paying live-aggregate cost per request.
     totalSynced += await syncMonthlyStats(db);
+    totalSynced += await syncYearlyStats(db);
 
     await completeSyncRun(db, runId, totalSynced);
     console.log(`[SYNC] Synced ${totalSynced} top list entries`);
@@ -484,6 +486,98 @@ export async function syncMonthlyStats(db: Database): Promise<number> {
   }
 
   console.log(`[SYNC] Refreshed monthly stats for ${rows.length} months`);
+  return rows.length;
+}
+
+/**
+ * Refresh per-year listening stats. Same single-scan pattern as the
+ * monthly precompute, but groups by year and adds `count(distinct
+ * track_id)` so callers get all four unique counts at year granularity
+ * — those can't be derived by summing the monthly precompute (an artist
+ * listened to in Jan + Feb is one unique artist for the year, not two).
+ *
+ * `top_artist_id` is the most-scrobbled artist in the year, computed in a
+ * second pass (cheap; one row per year keyed on the same indexed scope).
+ */
+export async function syncYearlyStats(db: Database): Promise<number> {
+  const rows = await db
+    .select({
+      year: sql<number>`cast(strftime('%Y', ${lastfmScrobbles.scrobbledAt}) as integer)`,
+      scrobbles: sql<number>`count(*)`,
+      uniqueArtists: sql<number>`count(distinct ${lastfmTracks.artistId})`,
+      uniqueAlbums: sql<number>`count(distinct ${lastfmTracks.albumId})`,
+      uniqueTracks: sql<number>`count(distinct ${lastfmScrobbles.trackId})`,
+    })
+    .from(lastfmScrobbles)
+    .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
+    .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
+    .where(and(eq(lastfmTracks.isFiltered, 0), eq(lastfmArtists.isFiltered, 0)))
+    .groupBy(
+      sql`cast(strftime('%Y', ${lastfmScrobbles.scrobbledAt}) as integer)`
+    );
+
+  // Per-year top artist: scan once, keep the artist with max scrobble count
+  // per year. Cheap because we already pay for the scan above; this just
+  // adds an aggregate.
+  const topArtistRows = await db
+    .select({
+      year: sql<number>`cast(strftime('%Y', ${lastfmScrobbles.scrobbledAt}) as integer)`,
+      artistId: lastfmTracks.artistId,
+      plays: sql<number>`count(*)`,
+    })
+    .from(lastfmScrobbles)
+    .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
+    .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
+    .where(and(eq(lastfmTracks.isFiltered, 0), eq(lastfmArtists.isFiltered, 0)))
+    .groupBy(
+      sql`cast(strftime('%Y', ${lastfmScrobbles.scrobbledAt}) as integer)`,
+      lastfmTracks.artistId
+    );
+  const topArtistByYear = new Map<
+    number,
+    { artistId: number; plays: number }
+  >();
+  for (const row of topArtistRows) {
+    if (row.year == null) continue;
+    const current = topArtistByYear.get(row.year);
+    if (!current || row.plays > current.plays) {
+      topArtistByYear.set(row.year, {
+        artistId: row.artistId,
+        plays: row.plays,
+      });
+    }
+  }
+
+  const computedAt = new Date().toISOString();
+  for (const row of rows) {
+    if (row.year == null) continue;
+    const topArtist = topArtistByYear.get(row.year);
+    await db
+      .insert(lastfmYearlyStats)
+      .values({
+        userId: 1,
+        year: row.year,
+        scrobbles: row.scrobbles,
+        uniqueArtists: row.uniqueArtists,
+        uniqueAlbums: row.uniqueAlbums,
+        uniqueTracks: row.uniqueTracks,
+        topArtistId: topArtist?.artistId ?? null,
+        computedAt,
+      })
+      .onConflictDoUpdate({
+        target: [lastfmYearlyStats.userId, lastfmYearlyStats.year],
+        set: {
+          scrobbles: row.scrobbles,
+          uniqueArtists: row.uniqueArtists,
+          uniqueAlbums: row.uniqueAlbums,
+          uniqueTracks: row.uniqueTracks,
+          topArtistId: topArtist?.artistId ?? null,
+          computedAt,
+        },
+      });
+  }
+
+  console.log(`[SYNC] Refreshed yearly stats for ${rows.length} years`);
   return rows.length;
 }
 

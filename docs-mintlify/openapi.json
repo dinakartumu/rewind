@@ -1931,7 +1931,7 @@
           "Listening"
         ],
         "summary": "Top artists",
-        "description": "Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist (1month/3month/6month/12month only).",
+        "description": "Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist. Rolling periods (1month/3month/6month/12month) return daily or weekly buckets; `overall` returns yearly buckets covering the artist's lifetime; `7day` is unsupported and the field is omitted.",
         "parameters": [
           {
             "schema": {
@@ -1980,11 +1980,11 @@
                 "boolean",
                 "null"
               ],
-              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
               "example": false
             },
             "required": false,
-            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.",
+            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
             "name": "include_sparklines",
             "in": "query"
           }
@@ -2043,7 +2043,9 @@
                                 "type": "string",
                                 "enum": [
                                   "day",
-                                  "week"
+                                  "week",
+                                  "month",
+                                  "year"
                                 ]
                               },
                               "points": {
@@ -2219,7 +2221,7 @@
           "Listening"
         ],
         "summary": "Top albums",
-        "description": "Returns top albums for a given time period.",
+        "description": "Returns top albums for a given time period. Pass `include_sparklines=true` to attach a play-count time series per album (1month/3month/6month/12month/overall).",
         "parameters": [
           {
             "schema": {
@@ -2260,6 +2262,20 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
+              "example": false
+            },
+            "required": false,
+            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
+            "name": "include_sparklines",
             "in": "query"
           }
         ],
@@ -2308,6 +2324,30 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week",
+                                  "month",
+                                  "year"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
                             ]
                           }
                         },
@@ -2411,7 +2451,7 @@
           "Listening"
         ],
         "summary": "Top tracks",
-        "description": "Returns top tracks for a given time period.",
+        "description": "Returns top tracks for a given time period. Pass `include_sparklines=true` to attach a play-count time series per track (1month/3month/6month/12month/overall).",
         "parameters": [
           {
             "schema": {
@@ -2452,6 +2492,20 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
+              "example": false
+            },
+            "required": false,
+            "description": "When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.",
+            "name": "include_sparklines",
             "in": "query"
           }
         ],
@@ -2500,6 +2554,30 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week",
+                                  "month",
+                                  "year"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
                             ]
                           }
                         },
@@ -4107,6 +4185,117 @@
         }
       }
     },
+    "/v1/listening/years": {
+      "get": {
+        "operationId": "listListeningYears",
+        "tags": [
+          "Listening"
+        ],
+        "summary": "All year summaries",
+        "description": "Returns one entry per year tracked, with total scrobbles and unique artist/album/track counts. Mirrors the shape of /v1/running/stats/years for symmetry. Reads from the lastfm_yearly_stats precompute (refreshed daily on the 0 3 cron); no live aggregate.",
+        "responses": {
+          "200": {
+            "description": "Year summaries, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "year": {
+                            "type": "number"
+                          },
+                          "total_scrobbles": {
+                            "type": "number"
+                          },
+                          "unique_artists": {
+                            "type": "number"
+                          },
+                          "unique_albums": {
+                            "type": "number"
+                          },
+                          "unique_tracks": {
+                            "type": "number"
+                          },
+                          "top_artist": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "number"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "year",
+                          "total_scrobbles",
+                          "unique_artists",
+                          "unique_albums",
+                          "unique_tracks"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "year": 2026,
+                      "total_scrobbles": 3200,
+                      "unique_artists": 180,
+                      "unique_albums": 410,
+                      "unique_tracks": 1250,
+                      "top_artist": {
+                        "id": 92,
+                        "name": "Taylor Swift"
+                      }
+                    },
+                    {
+                      "year": 2025,
+                      "total_scrobbles": 12345,
+                      "unique_artists": 234,
+                      "unique_albums": 567,
+                      "unique_tracks": 890,
+                      "top_artist": {
+                        "id": 189,
+                        "name": "Nirvana"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/listening/year/{year}": {
       "get": {
         "operationId": "getListeningYearInReview",
@@ -4136,6 +4325,20 @@
             "required": false,
             "description": "Optional month (1-12) to scope results to a single month",
             "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "When true, attach a `sparkline` object to each item in `top_artists`, `top_albums`, and `top_tracks`. Without `month`, returns 12 monthly buckets for the year. With `month`, returns daily buckets within that month (28-31 points).",
+              "example": false
+            },
+            "required": false,
+            "description": "When true, attach a `sparkline` object to each item in `top_artists`, `top_albums`, and `top_tracks`. Without `month`, returns 12 monthly buckets for the year. With `month`, returns daily buckets within that month (28-31 points).",
+            "name": "include_sparklines",
             "in": "query"
           }
         ],
@@ -4185,7 +4388,31 @@
                               "null"
                             ]
                           },
-                          "image": {}
+                          "image": {},
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week",
+                                  "month",
+                                  "year"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
+                            ]
+                          }
                         },
                         "required": [
                           "id",
@@ -4218,7 +4445,31 @@
                               "null"
                             ]
                           },
-                          "image": {}
+                          "image": {},
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week",
+                                  "month",
+                                  "year"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
+                            ]
+                          }
                         },
                         "required": [
                           "id",
@@ -4256,6 +4507,30 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "sparkline": {
+                            "type": "object",
+                            "properties": {
+                              "granularity": {
+                                "type": "string",
+                                "enum": [
+                                  "day",
+                                  "week",
+                                  "month",
+                                  "year"
+                                ]
+                              },
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "required": [
+                              "granularity",
+                              "points"
                             ]
                           }
                         },
@@ -4414,7 +4689,7 @@
           "Listening"
         ],
         "summary": "Genre breakdown",
-        "description": "Returns genre breakdown over time, grouped by period. Designed for stacked bar charts.",
+        "description": "Returns genre breakdown over time, grouped by period. Designed for stacked bar charts. Pass `compare_to=previous_year` to also receive the same window shifted back by one year as a `compare` array — useful for ghost-overlay charts that need both windows in a single round trip.",
         "parameters": [
           {
             "schema": {
@@ -4478,6 +4753,20 @@
             "description": "Max genres to return (rest grouped as \"Other\")",
             "name": "limit",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "previous_year"
+              ],
+              "example": "previous_year",
+              "description": "When set to `previous_year`, returns a `compare` array with the same shape as `data` but for the window shifted back one year. Requires `from` + `to` or `date` to be set; ignored otherwise."
+            },
+            "required": false,
+            "description": "When set to `previous_year`, returns a `compare` array with the same shape as `data` but for the window shifted back one year. Requires `from` + `to` or `date` to be set; ignored otherwise.",
+            "name": "compare_to",
+            "in": "query"
           }
         ],
         "responses": {
@@ -4489,6 +4778,39 @@
                   "type": "object",
                   "properties": {
                     "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "period": {
+                            "type": "string",
+                            "example": "2025-01"
+                          },
+                          "genres": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "number"
+                            },
+                            "example": {
+                              "Rock": 245,
+                              "Hip-Hop": 112,
+                              "Electronic": 87,
+                              "Other": 89
+                            }
+                          },
+                          "total": {
+                            "type": "number",
+                            "example": 637
+                          }
+                        },
+                        "required": [
+                          "period",
+                          "genres",
+                          "total"
+                        ]
+                      }
+                    },
+                    "compare": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -21188,6 +21510,7 @@
     "/v1/admin/reindex-search": {
       "post": {
         "operationId": "reindexSearch",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],
@@ -21271,6 +21594,7 @@
     "/v1/admin/reenrich-reading": {
       "post": {
         "operationId": "reenrichReading",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],
@@ -21358,6 +21682,7 @@
     "/v1/admin/backfill-body-excerpt": {
       "post": {
         "operationId": "backfillBodyExcerpt",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],
@@ -21433,6 +21758,7 @@
     "/v1/admin/reembed-reading": {
       "post": {
         "operationId": "reembedReading",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],
@@ -21524,6 +21850,7 @@
     "/v1/admin/cleanup-reading-url-authors": {
       "post": {
         "operationId": "cleanupReadingUrlAuthors",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],
@@ -21582,6 +21909,7 @@
     "/v1/admin/clear-reading-image-placeholders": {
       "post": {
         "operationId": "clearReadingImagePlaceholders",
+        "x-hidden": true,
         "tags": [
           "Admin"
         ],

@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and, desc, sql, gte, lte, like, asc } from 'drizzle-orm';
-import { createDb } from '../db/client.js';
+import { createDb, type Database } from '../db/client.js';
 import {
   lastfmArtists,
   lastfmAlbums,
@@ -12,6 +12,7 @@ import {
   lastfmUserStats,
   lastfmFilters,
   lastfmMonthlyStats,
+  lastfmYearlyStats,
 } from '../db/schema/lastfm.js';
 import { setCache } from '../lib/cache.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
@@ -27,8 +28,12 @@ import type { BackfillItem } from '../services/images/backfill.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import { errorResponses, PaginationMeta } from '../lib/schemas/common.js';
 import {
-  buildSparklines,
+  buildSparklinesForWindow,
   isSparklinePeriod,
+  overallToWindow,
+  periodToWindow,
+  yearMonthToWindow,
+  yearToWindow,
   type SparklinePeriod,
 } from '../lib/listening-sparklines.js';
 
@@ -90,7 +95,7 @@ const TopItemSchema = z.object({
 });
 
 const SparklineSchema = z.object({
-  granularity: z.enum(['day', 'week']),
+  granularity: z.enum(['day', 'week', 'month', 'year']),
   points: z.array(z.number()),
 });
 
@@ -98,12 +103,30 @@ const TopArtistItemSchema = TopItemSchema.extend({
   sparkline: SparklineSchema.optional(),
 });
 
+const TopAlbumItemSchema = TopItemSchema.extend({
+  sparkline: SparklineSchema.optional(),
+});
+
+const TopTrackItemSchema = TopItemSchema.extend({
+  sparkline: SparklineSchema.optional(),
+});
+
+const includeSparklinesField = z.coerce.boolean().optional().openapi({
+  description:
+    'When true, attach a `sparkline` object (granularity + zero-filled points) to each item. On rolling-period endpoints, supported for period in {1month, 3month, 6month, 12month, overall}. `overall` returns yearly buckets covering the artist/album/track lifetime; `7day` is unsupported and the field is omitted.',
+  example: false,
+});
+
 const TopArtistsQuery = PeriodQuery.extend({
-  include_sparklines: z.coerce.boolean().optional().openapi({
-    description:
-      'When true, attach a `sparkline` object (granularity + zero-filled points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted for unsupported periods.',
-    example: false,
-  }),
+  include_sparklines: includeSparklinesField,
+});
+
+const TopAlbumsQuery = PeriodQuery.extend({
+  include_sparklines: includeSparklinesField,
+});
+
+const TopTracksQuery = PeriodQuery.extend({
+  include_sparklines: includeSparklinesField,
 });
 
 const NowPlayingSchema = z.object({
@@ -274,6 +297,7 @@ const YearSchema = z.object({
       scrobbles: z.number(),
       apple_music_url: z.string().nullable(),
       image: z.any().nullable(),
+      sparkline: SparklineSchema.optional(),
     })
   ),
   top_albums: z.array(
@@ -284,6 +308,7 @@ const YearSchema = z.object({
       scrobbles: z.number(),
       apple_music_url: z.string().nullable(),
       image: z.any().nullable(),
+      sparkline: SparklineSchema.optional(),
     })
   ),
   top_tracks: z.array(
@@ -294,6 +319,7 @@ const YearSchema = z.object({
       scrobbles: z.number(),
       apple_music_url: z.string().nullable(),
       preview_url: z.string().nullable(),
+      sparkline: SparklineSchema.optional(),
     })
   ),
   monthly: z.array(
@@ -463,7 +489,7 @@ const topArtistsRoute = createRoute({
   tags: ['Listening'],
   summary: 'Top artists',
   description:
-    'Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist (1month/3month/6month/12month only).',
+    "Returns top artists for a given time period. Pass `include_sparklines=true` to attach a play-count time series per artist. Rolling periods (1month/3month/6month/12month) return daily or weekly buckets; `overall` returns yearly buckets covering the artist's lifetime; `7day` is unsupported and the field is omitted.",
   request: { query: TopArtistsQuery },
   responses: {
     200: {
@@ -543,8 +569,9 @@ const topAlbumsRoute = createRoute({
   operationId: 'getListeningTopAlbums',
   tags: ['Listening'],
   summary: 'Top albums',
-  description: 'Returns top albums for a given time period.',
-  request: { query: PeriodQuery },
+  description:
+    'Returns top albums for a given time period. Pass `include_sparklines=true` to attach a play-count time series per album (1month/3month/6month/12month/overall).',
+  request: { query: TopAlbumsQuery },
   responses: {
     200: {
       description: 'Top albums list',
@@ -552,7 +579,7 @@ const topAlbumsRoute = createRoute({
         'application/json': {
           schema: z.object({
             period: z.string(),
-            data: z.array(TopItemSchema),
+            data: z.array(TopAlbumItemSchema),
             pagination: PaginationMeta,
           }),
           example: {
@@ -609,8 +636,9 @@ const topTracksRoute = createRoute({
   operationId: 'getListeningTopTracks',
   tags: ['Listening'],
   summary: 'Top tracks',
-  description: 'Returns top tracks for a given time period.',
-  request: { query: PeriodQuery },
+  description:
+    'Returns top tracks for a given time period. Pass `include_sparklines=true` to attach a play-count time series per track (1month/3month/6month/12month/overall).',
+  request: { query: TopTracksQuery },
   responses: {
     200: {
       description: 'Top tracks list',
@@ -618,7 +646,7 @@ const topTracksRoute = createRoute({
         'application/json': {
           schema: z.object({
             period: z.string(),
-            data: z.array(TopItemSchema),
+            data: z.array(TopTrackItemSchema),
             pagination: PaginationMeta,
           }),
           example: {
@@ -1182,6 +1210,11 @@ const YearQuerySchema = z.object({
     example: 3,
     description: 'Optional month (1-12) to scope results to a single month',
   }),
+  include_sparklines: z.coerce.boolean().optional().openapi({
+    description:
+      'When true, attach a `sparkline` object to each item in `top_artists`, `top_albums`, and `top_tracks`. Without `month`, returns 12 monthly buckets for the year. With `month`, returns daily buckets within that month (28-31 points).',
+    example: false,
+  }),
 });
 
 const yearRoute = createRoute({
@@ -1281,6 +1314,59 @@ const yearRoute = createRoute({
   },
 });
 
+const YearSummarySchema = z.object({
+  year: z.number(),
+  total_scrobbles: z.number(),
+  unique_artists: z.number(),
+  unique_albums: z.number(),
+  unique_tracks: z.number(),
+  top_artist: z
+    .object({ id: z.number(), name: z.string() })
+    .nullable()
+    .optional(),
+});
+
+const yearsRoute = createRoute({
+  method: 'get',
+  path: '/years',
+  operationId: 'listListeningYears',
+  tags: ['Listening'],
+  summary: 'All year summaries',
+  description:
+    'Returns one entry per year tracked, with total scrobbles and unique artist/album/track counts. Mirrors the shape of /v1/running/stats/years for symmetry. Reads from the lastfm_yearly_stats precompute (refreshed daily on the 0 3 cron); no live aggregate.',
+  responses: {
+    200: {
+      description: 'Year summaries, newest first',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(YearSummarySchema) }),
+          example: {
+            data: [
+              {
+                year: 2026,
+                total_scrobbles: 3200,
+                unique_artists: 180,
+                unique_albums: 410,
+                unique_tracks: 1250,
+                top_artist: { id: 92, name: 'Taylor Swift' },
+              },
+              {
+                year: 2025,
+                total_scrobbles: 12345,
+                unique_artists: 234,
+                unique_albums: 567,
+                unique_tracks: 890,
+                top_artist: { id: 189, name: 'Nirvana' },
+              },
+            ],
+          },
+        },
+      },
+    },
+    ...errorResponses(401),
+  },
+});
+
 const GenrePeriodSchema = z.object({
   period: z.string().openapi({ example: '2025-01' }),
   genres: z.record(z.string(), z.number()).openapi({
@@ -1296,7 +1382,7 @@ const genresRoute = createRoute({
   tags: ['Listening'],
   summary: 'Genre breakdown',
   description:
-    'Returns genre breakdown over time, grouped by period. Designed for stacked bar charts.',
+    'Returns genre breakdown over time, grouped by period. Designed for stacked bar charts. Pass `compare_to=previous_year` to also receive the same window shifted back by one year as a `compare` array — useful for ghost-overlay charts that need both windows in a single round trip.',
   request: {
     query: DateFilterQuery.extend({
       group_by: z
@@ -1315,6 +1401,11 @@ const genresRoute = createRoute({
           example: 10,
           description: 'Max genres to return (rest grouped as "Other")',
         }),
+      compare_to: z.enum(['previous_year']).optional().openapi({
+        example: 'previous_year',
+        description:
+          'When set to `previous_year`, returns a `compare` array with the same shape as `data` but for the window shifted back one year. Requires `from` + `to` or `date` to be set; ignored otherwise.',
+      }),
     }),
   },
   responses: {
@@ -1322,7 +1413,10 @@ const genresRoute = createRoute({
       description: 'Genre breakdown by period',
       content: {
         'application/json': {
-          schema: z.object({ data: z.array(GenrePeriodSchema) }),
+          schema: z.object({
+            data: z.array(GenrePeriodSchema),
+            compare: z.array(GenrePeriodSchema).optional(),
+          }),
           example: {
             data: [
               {
@@ -1677,6 +1771,31 @@ listening.openapi(recentRoute, async (c) => {
   });
 });
 
+// Resolve which sparkline window to use for a top-* endpoint based on the
+// period string. Returns null when sparklines are unsupported (e.g. `7day`)
+// or there's no data to anchor an `overall` window against.
+async function resolveTopListSparklineWindow(
+  db: Database,
+  period: string
+): Promise<ReturnType<typeof periodToWindow> | null> {
+  if (isSparklinePeriod(period)) {
+    return periodToWindow(period as SparklinePeriod);
+  }
+  if (period === 'overall') {
+    const earliest = await db
+      .select({
+        first: sql<string>`strftime('%Y', min(${lastfmScrobbles.scrobbledAt}))`,
+      })
+      .from(lastfmScrobbles)
+      .where(eq(lastfmScrobbles.userId, 1))
+      .limit(1);
+    const year = parseInt(earliest[0]?.first ?? '');
+    if (!Number.isFinite(year)) return null;
+    return overallToWindow(year, new Date().getUTCFullYear());
+  }
+  return null;
+}
+
 // GET /v1/listening/top/artists
 listening.openapi(topArtistsRoute, async (c) => {
   setCache(c, 'medium');
@@ -1730,12 +1849,19 @@ listening.openapi(topArtistsRoute, async (c) => {
 
   const artistIdStrings = items.map((i) => String(i.artistId));
   const numericArtistIds = items.map((i) => i.artistId);
-  const wantsSparklines = includeSparklines && isSparklinePeriod(period);
+  const sparklineWindow = includeSparklines
+    ? await resolveTopListSparklineWindow(db, period)
+    : null;
 
   const [imageMap, sparklineMap] = await Promise.all([
     getImageAttachmentBatch(db, 'listening', 'artists', artistIdStrings),
-    wantsSparklines
-      ? buildSparklines(db, numericArtistIds, period as SparklinePeriod)
+    sparklineWindow
+      ? buildSparklinesForWindow(
+          db,
+          numericArtistIds,
+          sparklineWindow,
+          'artist'
+        )
       : Promise.resolve(undefined),
   ]);
 
@@ -1809,25 +1935,38 @@ listening.openapi(topAlbumsRoute, async (c) => {
     .offset(offset);
 
   const albumIds = items.map((i) => String(i.albumId));
-  const imageMap = await getImageAttachmentBatch(
-    db,
-    'listening',
-    'albums',
-    albumIds
-  );
+  const numericAlbumIds = items.map((i) => i.albumId);
+
+  const includeSparklinesParam = c.req.query('include_sparklines');
+  const includeSparklines =
+    includeSparklinesParam === 'true' || includeSparklinesParam === '1';
+  const sparklineWindow = includeSparklines
+    ? await resolveTopListSparklineWindow(db, period)
+    : null;
+
+  const [imageMap, sparklineMap] = await Promise.all([
+    getImageAttachmentBatch(db, 'listening', 'albums', albumIds),
+    sparklineWindow
+      ? buildSparklinesForWindow(db, numericAlbumIds, sparklineWindow, 'album')
+      : Promise.resolve(undefined),
+  ]);
 
   return c.json({
     period,
-    data: items.map((item) => ({
-      rank: item.rank,
-      id: item.albumId,
-      name: item.albumName,
-      detail: item.artistName,
-      playcount: item.playcount,
-      image: imageMap.get(String(item.albumId)) ?? null,
-      url: item.albumUrl ?? '',
-      apple_music_url: item.albumAppleMusicUrl ?? null,
-    })),
+    data: items.map((item) => {
+      const sparkline = sparklineMap?.get(item.albumId);
+      return {
+        rank: item.rank,
+        id: item.albumId,
+        name: item.albumName,
+        detail: item.artistName,
+        playcount: item.playcount,
+        image: imageMap.get(String(item.albumId)) ?? null,
+        url: item.albumUrl ?? '',
+        apple_music_url: item.albumAppleMusicUrl ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
     pagination: paginate(page, limit, total),
   });
 });
@@ -1881,19 +2020,39 @@ listening.openapi(topTracksRoute, async (c) => {
     .limit(limit)
     .offset(offset);
 
+  const numericTrackIds = items.map((i) => i.trackId);
+  const includeSparklinesParam = c.req.query('include_sparklines');
+  const includeSparklines =
+    includeSparklinesParam === 'true' || includeSparklinesParam === '1';
+  const sparklineWindow = includeSparklines
+    ? await resolveTopListSparklineWindow(db, period)
+    : null;
+  const sparklineMap = sparklineWindow
+    ? await buildSparklinesForWindow(
+        db,
+        numericTrackIds,
+        sparklineWindow,
+        'track'
+      )
+    : undefined;
+
   return c.json({
     period,
-    data: items.map((item) => ({
-      rank: item.rank,
-      id: item.trackId,
-      name: item.trackName,
-      detail: item.artistName,
-      playcount: item.playcount,
-      image: null,
-      url: item.trackUrl ?? '',
-      apple_music_url: item.trackAppleMusicUrl ?? null,
-      preview_url: item.trackPreviewUrl ?? null,
-    })),
+    data: items.map((item) => {
+      const sparkline = sparklineMap?.get(item.trackId);
+      return {
+        rank: item.rank,
+        id: item.trackId,
+        name: item.trackName,
+        detail: item.artistName,
+        playcount: item.playcount,
+        image: null,
+        url: item.trackUrl ?? '',
+        apple_music_url: item.trackAppleMusicUrl ?? null,
+        preview_url: item.trackPreviewUrl ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
     pagination: paginate(page, limit, total),
   });
 });
@@ -2674,6 +2833,47 @@ listening.openapi(streaksRoute, async (c) => {
 });
 
 // GET /v1/listening/year/:year - Year-in-review for listening
+// GET /v1/listening/years
+listening.openapi(yearsRoute, async (c) => {
+  setCache(c, 'medium');
+  const db = createDb(c.env.DB);
+
+  // LEFT JOIN to lastfm_artists so we can return the top artist's name
+  // alongside its id; falls back to null if the artist row is missing
+  // (shouldn't happen in practice but the join handles it safely).
+  const rows = await db
+    .select({
+      year: lastfmYearlyStats.year,
+      scrobbles: lastfmYearlyStats.scrobbles,
+      uniqueArtists: lastfmYearlyStats.uniqueArtists,
+      uniqueAlbums: lastfmYearlyStats.uniqueAlbums,
+      uniqueTracks: lastfmYearlyStats.uniqueTracks,
+      topArtistId: lastfmYearlyStats.topArtistId,
+      topArtistName: lastfmArtists.name,
+    })
+    .from(lastfmYearlyStats)
+    .leftJoin(
+      lastfmArtists,
+      eq(lastfmYearlyStats.topArtistId, lastfmArtists.id)
+    )
+    .where(eq(lastfmYearlyStats.userId, 1))
+    .orderBy(desc(lastfmYearlyStats.year));
+
+  return c.json({
+    data: rows.map((r) => ({
+      year: r.year,
+      total_scrobbles: r.scrobbles,
+      unique_artists: r.uniqueArtists,
+      unique_albums: r.uniqueAlbums,
+      unique_tracks: r.uniqueTracks,
+      top_artist:
+        r.topArtistId != null && r.topArtistName != null
+          ? { id: r.topArtistId, name: r.topArtistName }
+          : null,
+    })),
+  });
+});
+
 listening.openapi(yearRoute, async (c) => {
   const db = createDb(c.env.DB);
   const currentYear = new Date().getFullYear();
@@ -2682,6 +2882,9 @@ listening.openapi(yearRoute, async (c) => {
   const monthParam = c.req.query('month')
     ? parseInt(c.req.query('month')!)
     : undefined;
+  const includeSparklinesParam = c.req.query('include_sparklines');
+  const includeSparklines =
+    includeSparklinesParam === 'true' || includeSparklinesParam === '1';
 
   if (isNaN(year) || year < 2000 || year > currentYear + 1) {
     return badRequest(c, 'Invalid year') as any;
@@ -2841,9 +3044,39 @@ listening.openapi(yearRoute, async (c) => {
   // Image attachments fan out in parallel after the top lists land.
   const artistIds = topArtists.map((a) => String(a.id));
   const albumIds = topAlbums.map((a) => String(a.id));
-  const [artistImageMap, albumImageMap] = await Promise.all([
+  const numericArtistIds = topArtists.map((a) => a.id);
+  const numericAlbumIds = topAlbums.map((a) => a.id);
+  const numericTrackIds = topTracks.map((t) => t.id);
+
+  const sparklineWindow = includeSparklines
+    ? monthParam
+      ? yearMonthToWindow(year, monthParam)
+      : yearToWindow(year)
+    : null;
+
+  const [
+    artistImageMap,
+    albumImageMap,
+    artistSparklineMap,
+    albumSparklineMap,
+    trackSparklineMap,
+  ] = await Promise.all([
     getImageAttachmentBatch(db, 'listening', 'artists', artistIds),
     getImageAttachmentBatch(db, 'listening', 'albums', albumIds),
+    sparklineWindow
+      ? buildSparklinesForWindow(
+          db,
+          numericArtistIds,
+          sparklineWindow,
+          'artist'
+        )
+      : Promise.resolve(undefined),
+    sparklineWindow
+      ? buildSparklinesForWindow(db, numericAlbumIds, sparklineWindow, 'album')
+      : Promise.resolve(undefined),
+    sparklineWindow
+      ? buildSparklinesForWindow(db, numericTrackIds, sparklineWindow, 'track')
+      : Promise.resolve(undefined),
   ]);
 
   return c.json({
@@ -2853,29 +3086,41 @@ listening.openapi(yearRoute, async (c) => {
     unique_artists: uniqueCounts.artists,
     unique_albums: uniqueCounts.albums,
     unique_tracks: uniqueCounts.tracks,
-    top_artists: topArtists.map((a) => ({
-      id: a.id,
-      name: a.name,
-      scrobbles: a.scrobbles,
-      apple_music_url: a.appleMusicUrl ?? null,
-      image: artistImageMap.get(String(a.id)) ?? null,
-    })),
-    top_albums: topAlbums.map((a) => ({
-      id: a.id,
-      name: a.name,
-      artist: a.artistName,
-      scrobbles: a.scrobbles,
-      apple_music_url: a.appleMusicUrl ?? null,
-      image: albumImageMap.get(String(a.id)) ?? null,
-    })),
-    top_tracks: topTracks.map((t) => ({
-      id: t.id,
-      name: t.name,
-      artist: t.artistName,
-      scrobbles: t.scrobbles,
-      apple_music_url: t.appleMusicUrl ?? null,
-      preview_url: t.previewUrl ?? null,
-    })),
+    top_artists: topArtists.map((a) => {
+      const sparkline = artistSparklineMap?.get(a.id);
+      return {
+        id: a.id,
+        name: a.name,
+        scrobbles: a.scrobbles,
+        apple_music_url: a.appleMusicUrl ?? null,
+        image: artistImageMap.get(String(a.id)) ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
+    top_albums: topAlbums.map((a) => {
+      const sparkline = albumSparklineMap?.get(a.id);
+      return {
+        id: a.id,
+        name: a.name,
+        artist: a.artistName,
+        scrobbles: a.scrobbles,
+        apple_music_url: a.appleMusicUrl ?? null,
+        image: albumImageMap.get(String(a.id)) ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
+    top_tracks: topTracks.map((t) => {
+      const sparkline = trackSparklineMap?.get(t.id);
+      return {
+        id: t.id,
+        name: t.name,
+        artist: t.artistName,
+        scrobbles: t.scrobbles,
+        apple_music_url: t.appleMusicUrl ?? null,
+        preview_url: t.previewUrl ?? null,
+        ...(sparkline ? { sparkline } : {}),
+      };
+    }),
     monthly: monthlyBreakdown.map((m) => ({
       month: m.month,
       scrobbles: m.scrobbles,
@@ -2910,18 +3155,83 @@ listening.openapi(genresRoute, async (c) => {
       dateFormat = `strftime('%Y-%m', ${lastfmScrobbles.scrobbledAt.name})`;
   }
 
+  const queryParams = c.req.query();
   const dateCondition = buildDateCondition(
     lastfmScrobbles.scrobbledAt,
-    c.req.query()
+    queryParams
   );
 
+  const compareTo = c.req.query('compare_to');
+  const compareCondition =
+    compareTo === 'previous_year'
+      ? buildDateCondition(
+          lastfmScrobbles.scrobbledAt,
+          shiftDateFiltersByYears(queryParams, -1)
+        )
+      : null;
+
+  const [data, compare] = await Promise.all([
+    aggregateGenres(db, dateFormat, dateCondition, genreLimit),
+    compareCondition
+      ? aggregateGenres(db, dateFormat, compareCondition, genreLimit)
+      : Promise.resolve(null),
+  ]);
+
+  return c.json({ data, ...(compare ? { compare } : {}) });
+});
+
+// Shift the `date`/`from`/`to` query params by N years (positive = forward,
+// negative = backward). Returns a new params object, leaving non-date keys
+// unchanged. Used by the genres endpoint's `compare_to=previous_year` flag
+// to reuse the same buildDateCondition path against a year-shifted window.
+function shiftDateFiltersByYears(
+  params: Record<string, string | undefined>,
+  years: number
+): Record<string, string | undefined> {
+  const shift = (iso: string | undefined): string | undefined => {
+    if (!iso) return iso;
+    // Accept either YYYY-MM-DD or full ISO 8601; preserve the time component
+    // when present so endpoints relying on hour-precision still align.
+    const datePart = iso.slice(0, 10);
+    const timePart = iso.length > 10 ? iso.slice(10) : '';
+    const [y, m, d] = datePart.split('-').map((s) => parseInt(s, 10));
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+      return iso;
+    }
+    const shiftedYear = y + years;
+    // Day-clamp for Feb 29 -> Feb 28 in non-leap target years.
+    const daysInTargetMonth = new Date(
+      Date.UTC(shiftedYear, m, 0)
+    ).getUTCDate();
+    const clampedDay = Math.min(d, daysInTargetMonth);
+    const yyyy = String(shiftedYear).padStart(4, '0');
+    const mm = String(m).padStart(2, '0');
+    const dd = String(clampedDay).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}${timePart}`;
+  };
+
+  return {
+    ...params,
+    date: shift(params.date),
+    from: shift(params.from),
+    to: shift(params.to),
+  };
+}
+
+async function aggregateGenres(
+  db: Database,
+  dateFormat: string,
+  dateCondition: ReturnType<typeof buildDateCondition>,
+  genreLimit: number
+): Promise<
+  Array<{ period: string; genres: Record<string, number>; total: number }>
+> {
   const conditions = [
     eq(lastfmTracks.isFiltered, 0),
     sql`${lastfmArtists.genre} IS NOT NULL`,
   ];
   if (dateCondition) conditions.push(dateCondition);
 
-  // Query: group by period + genre, count scrobbles
   const rows = await db
     .select({
       period: sql<string>`${sql.raw(dateFormat)}`.as('period'),
@@ -2935,7 +3245,6 @@ listening.openapi(genresRoute, async (c) => {
     .groupBy(sql.raw(dateFormat), lastfmArtists.genre)
     .orderBy(sql.raw(dateFormat), desc(sql`count(*)`));
 
-  // Aggregate: for each period, take top N genres, sum rest as "Other"
   const periodMap = new Map<
     string,
     { genres: Record<string, number>; total: number }
@@ -2952,8 +3261,7 @@ listening.openapi(genresRoute, async (c) => {
     entry.total += row.count;
   }
 
-  // Apply genre limit per period
-  const data = Array.from(periodMap.entries())
+  return Array.from(periodMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([period, { genres, total }]) => {
       const sorted = Object.entries(genres).sort(([, a], [, b]) => b - a);
@@ -2974,9 +3282,7 @@ listening.openapi(genresRoute, async (c) => {
 
       return { period, genres: topGenres, total };
     });
-
-  return c.json({ data });
-});
+}
 
 // POST /v1/admin/sync/listening -- moved to admin-sync.ts
 // Old path /v1/listening/admin/sync redirects via admin-sync.ts
