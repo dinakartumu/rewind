@@ -6,24 +6,26 @@ Phases ship independently — each delivers verifiable value (a passing test, an
 
 **The hard checkpoint is Phase 4.** Phases 5 and 6 are explicitly gated on Phase 4 outcomes; do not begin them without revisiting this tracker.
 
-## Phase 0: Baseline + coverage audit — pending
+## Phase 0: Baseline + coverage audit — DONE
 
 Goal: know what we're working with before we ship aggregates that could lie silently. ~half a day.
 
-### 0.1 — Coverage audit script
+Executed in-band rather than as a permanent script — the Python audit ran once against prod via `api.rewind.rest`, output captured to `coverage-baseline.md`. The audit forced two design changes (now reflected in DESIGN.md and README's Decisions table): `season` becomes optional with default = career, and the `sample_size_warning` boolean is dropped in favor of always-included raw `pa`/`bf`/`games`.
 
-- [ ] **0.1.1** `scripts/tools/audit-attending-coverage.ts` — for each (season, league, attended) bucket, count `attended_events` rows, count rows with at least one `attended_event_players` row, count rows with `event_data->>'home_score'` populated. Output a table to stdout.
-- [ ] **0.1.2** Run against prod (read-only). Capture output to `docs/projects/attending-deep-stats/coverage-baseline.md` so Phase 4 has a comparison anchor.
+### 0.1 — Coverage audit — DONE
 
-### 0.2 — Sample-size distribution
+- [x] **0.1.1** Audit ran against prod via `api.rewind.rest`. Per-season MLB box-score coverage table captured to `coverage-baseline.md`. **Result: 84% overall coverage.** 38 of 45 attended MLB games have `attended_event_players` rows. Recent seasons (2023–2026) hover 75–89%; one 2019 game has zero coverage.
+- [x] **0.1.2** Output committed to `docs/projects/attending-deep-stats/coverage-baseline.md`.
 
-- [ ] **0.2.1** Same script, second pass: for each (player_id, season) where the player has any `attended_event_players` row, compute total PAs (hitters) and total BFs (pitchers). Output a histogram so we can see how small "small" actually is.
-- [ ] **0.2.2** Use this to validate the `pa < 50` / `bf < 60` thresholds in Decisions; bump them in the README if the distribution suggests a different floor.
+### 0.2 — Sample-size distribution — DONE
 
-### 0.3 — Document current MCP behavior
+- [x] **0.2.1** Per-(player, season) PA + BF histograms captured to `coverage-baseline.md`. **Result**: 88.8% of (hitter, season) pairs are 1–10 PAs; 0% are over 50. 63.8% of (pitcher, season) pairs are 1–10 BFs; 1.3% are 61–120, 0% are over 120. Single-season slices are tiny.
+- [x] **0.2.2** **Validated thresholds were way too high.** Pivoted away from a boolean warning entirely (would always fire). Instead: response always includes `pa`/`bf`/`games`; tool description tells the model to cite them. `season` query param also flipped from required to optional, defaulting to career — that's where the meaningful per-player samples live (Cal Raleigh 130 PAs / 32 games; Kirby 238 BFs / 10 starts).
 
-- [ ] **0.3.1** Run each of the four target queries through Claude Desktop / Claude web today. Capture transcripts (or at minimum, the tool calls the model made and how many turns it took to land on an answer).
-- [ ] **0.3.2** Save to `docs/projects/attending-deep-stats/baseline-queries.md`. This is the before-photo for the Phase 4 checkpoint.
+### 0.3 — Document current MCP behavior — partial (user action)
+
+- [x] **0.3.1** Template captured to `baseline-queries.md` with the four target queries + a "bonus query" slot. **Action required from user**: run the queries through Claude Desktop / web / iOS and paste transcripts. Phase 1–3 do not block on this; Phase 4 checkpoint needs it.
+- [x] **0.3.2** `baseline-queries.md` committed.
 
 ## Phase 1: Tier 1 — filter and discovery ergonomics — pending
 

@@ -149,12 +149,12 @@ CSP allowlist for the game-card UI resource: `cdn.rewind.rest` (image-src + conn
 
 ## Open design questions, now with informed answers
 
-These were the design questions from the planning back-and-forth. Now that the data shapes are real:
+These were the design questions from the planning back-and-forth. Now that the data shapes are real and Phase 0 has produced the coverage / sample-size baseline (see [coverage-baseline.md](./coverage-baseline.md)):
 
-1. **`season` required vs default-current-year on `/players/:id/stats`** — keep required. The model can default to "current calendar year" in its own logic; the API stays explicit.
+1. **`season` required vs default-current-year on `/players/:id/stats`** — **changed: now optional, default = career across all attended games.** Original plan said required-and-explicit, but Phase 0's sample-size audit found that no hitter has > 50 PAs in a single season at attended games (Cal Raleigh max). Career-across-attended-games (Cal Raleigh 130 PAs in 32 games, Kirby 238 BFs in 10 starts) is where meaningful per-player aggregates live, and it matches how the user phrases queries ("Julio's average at games I've attended" — no year specified). When `season` is omitted, response carries `scope: "career"`. With `season=2025`, response carries `scope: "season", season: 2025`.
 2. **Non-MLB players: include `event_data` summary in `supported: false` response?** Yes — append `appearances` with each entry containing `event_id`, `event_date`, `event_data` summary (just `home_team`, `away_team`, scores, `my_team_won`). Cheap and useful.
 3. **Team filter for concerts** — match anywhere; substring is short enough that band-name false positives are rare in practice. If a real collision shows up, can scope by `category=sports` later.
-4. **Sample-size thresholds** — defer locking until Phase 0.2 produces the actual histogram. Defaults of `pa<50` / `bf<60` are placeholders.
+4. **Sample-size warning flag** — **changed: dropped entirely.** Phase 0 audit found 97% of (hitter, season) pairs are under 50 PAs and 98.7% of (pitcher, season) pairs are under 60 BFs — a boolean warning that always fires is signal noise. Pivot: response always includes raw `pa` (hitter) / `bf` (pitcher) and `games`; the tool description tells the model "single-season slices typically have small samples (max 50 PAs across the dataset). Always cite the sample size when responding." Model decides phrasing.
 5. **MCP tool naming** — `get_attended_player_stats`. Symmetric with existing `get_attended_event` / `get_attended_player`.
 6. **One tool vs flag on existing** — separate tool. Shape stability wins over tool-count creep concerns; revisit at Phase 4 if real usage shows the model defaulting to the wrong tool.
 
