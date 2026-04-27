@@ -805,15 +805,18 @@ const trackPlaysStyle: CSSProperties = {
 
 const albumsGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
-  gap: 10,
+  // Tighten album spacing — the 96px minmax + 10px gap was leaving large
+  // gutters at 720px, especially on a 5-album row.
+  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+  columnGap: 8,
+  rowGap: 12,
 };
 
 const albumTileStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 6,
-  padding: 4,
+  padding: 0,
   border: 'none',
   background: 'transparent',
   textAlign: 'left',
@@ -826,10 +829,12 @@ const albumNameStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
   lineHeight: 1.25,
-  display: '-webkit-box',
-  WebkitBoxOrient: 'vertical',
-  WebkitLineClamp: 2,
+  // 1-line clamp with ellipsis — long names like "SOUR (Video Version)"
+  // and soundtrack titles wrap to 2 lines and offset their tiles, breaking
+  // the grid alignment.
+  whiteSpace: 'nowrap',
   overflow: 'hidden',
+  textOverflow: 'ellipsis',
   color: 'var(--color-text-primary, inherit)',
 };
 

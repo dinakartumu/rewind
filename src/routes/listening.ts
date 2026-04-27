@@ -2689,17 +2689,32 @@ listening.openapi(artistDetailRoute, async (c) => {
     )
     .limit(1);
 
-  // Get top albums (exclude filtered)
+  // Get top albums (exclude filtered) — aggregate plays from scrobbles
+  // rather than the cached lastfm_albums.playcount, which can lag behind
+  // for albums that never appeared in user.getTopAlbums (deluxe / video
+  // editions, soundtracks the user listened to once, etc.). Matches the
+  // top_tracks approach below for consistency.
   const topAlbums = await db
     .select({
       id: lastfmAlbums.id,
       name: lastfmAlbums.name,
-      playcount: lastfmAlbums.playcount,
       appleMusicUrl: lastfmAlbums.appleMusicUrl,
+      playcount: sql<number>`count(${lastfmScrobbles.id})`,
     })
     .from(lastfmAlbums)
-    .where(and(eq(lastfmAlbums.artistId, id), eq(lastfmAlbums.isFiltered, 0)))
-    .orderBy(desc(lastfmAlbums.playcount))
+    .leftJoin(lastfmTracks, eq(lastfmTracks.albumId, lastfmAlbums.id))
+    .leftJoin(lastfmScrobbles, eq(lastfmScrobbles.trackId, lastfmTracks.id))
+    .where(
+      and(
+        eq(lastfmAlbums.artistId, id),
+        eq(lastfmAlbums.isFiltered, 0),
+        // Inner-filter on tracks too so a single filtered-out track doesn't
+        // skew an album's plays.
+        sql`(${lastfmTracks.isFiltered} = 0 OR ${lastfmTracks.isFiltered} IS NULL)`
+      )
+    )
+    .groupBy(lastfmAlbums.id)
+    .orderBy(desc(sql`count(${lastfmScrobbles.id})`))
     .limit(10);
 
   // Get top tracks (exclude filtered) — include album_id so we can join
