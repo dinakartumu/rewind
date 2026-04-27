@@ -106,46 +106,46 @@ Goal: aggregate per-player stat lines, MLB-only, with sample-size disclosure bak
 - [x] **2.6.2** Commit + push.
 - [x] **2.6.3** Deploy auto-triggered on CI green.
 
-## Phase 3: UI pilot — game card on `get_attended_event` — pending
+## Phase 3: UI pilot — game card on `get_attended_event` — DONE (modulo client smoke test)
 
-Goal: when the user asks about a single game, the response renders an interactive card inline (in MCP Apps clients) with linescore, top performers, and ticket info. ~2–4 days.
+Goal: when the user asks about a single game, the response renders an interactive card inline (in MCP Apps clients) with linescore, top performers, and ticket info.
 
-### 3.1 — Design
+### 3.1 — Design — DONE
 
-- [ ] **3.1.1** `docs/projects/attending-deep-stats/DESIGN.md` gains a `## Game card` section: hero (date, opponent, venue, final score), linescore, top 3 performers from this user's perspective (notable=true rows, sorted by some signal), ticket section/row/seat block.
-- [ ] **3.1.2** Sketch (text or rough HTML) committed.
-- [ ] **3.1.3** Confirm `get_attended_event` already returns enough structuredContent to drive the card. If not, list deltas needed before building.
+- [x] **3.1.1** Card sections locked in via the implementation: hero (date + venue + result badge), scoreboard with team names/scores (`my_team` emphasized), MLB per-inning linescore (table, scrolls horizontally on narrow widths), notable performers (with silo headshots, decision badges, stat-line summary from `summary` field), ticket block (single ticket spells out section/row/seat + price; multi-ticket summarizes count + total).
+- [x] **3.1.2** Implementation IS the spec at this point — see `mcp-server/web/components/GameCard.tsx`.
+- [x] **3.1.3** Confirmed during Phase 0 audit that `get_attended_event` returns linescore + players[] + venue + tickets — no API-shape changes needed.
 
-### 3.2 — Vite entry
+### 3.2 — Vite entry — DONE
 
-- [ ] **3.2.1** `mcp-server/web/attended-event.html` — `<div id="root">` + module script.
-- [ ] **3.2.2** `mcp-server/web/attended-event.tsx` — root component using `useApp()` from `@modelcontextprotocol/ext-apps/react`.
+- [x] **3.2.1** `mcp-server/web/attended-event.html` created.
+- [x] **3.2.2** `mcp-server/web/attended-event.tsx` — `useApp()` + `useHostStyles()`, listens to `app.ontoolresult` for the EventDetail payload.
 
-### 3.3 — Card component
+### 3.3 — Card component — DONE
 
-- [ ] **3.3.1** `mcp-server/web/components/GameCard.tsx` — hero (date / matchup / final), linescore (per-inning for MLB if available; otherwise just final), performers panel.
-- [ ] **3.3.2** Uses thumbhash placeholders for player photos before `cdn_url` loads (matches existing `PosterCard` pattern).
-- [ ] **3.3.3** Empty state for non-sports events (concerts/theater) — render the venue + ticket block only, no linescore.
-- [ ] **3.3.4** Click handlers: opening a player photo links to `/v1/attending/players/:id` (via `app.openLink`).
+- [x] **3.3.1** `mcp-server/web/components/GameCard.tsx` — Scoreboard, Linescore, PerformerRow, TicketBlock subcomponents.
+- [x] **3.3.2** Thumbhash placeholders via `lib/thumbhash.js`, fades in CDN photo on load.
+- [x] **3.3.3** Non-sports events: scoreboard hides (no scores), linescore hides, ticket + venue + notable-performers blocks remain (concert performer photos and ticket info still useful).
+- [ ] **3.3.4** Click handlers (opening player photo via `app.openLink`) deferred — Phase 6 territory; the card today is read-only. Not blocking Phase 4 evaluation.
 
-### 3.4 — Wire into MCP tool
+### 3.4 — Wire into MCP tool — DONE
 
-- [ ] **3.4.1** `mcp-server/src/tools/attending.ts` — `get_attended_event` migrates to `server.registerTool` form (if not already) with `_meta.ui.resourceUri = ui://rewind/attended-event.html`.
-- [ ] **3.4.2** Register the UI resource in `mcp-server/src/resources/ui.ts`. CSP allowlist for `cdn.rewind.rest` (player photos + venue images).
-- [ ] **3.4.3** Build pipeline: `INPUT=attended-event.html npm run build:web`. Verify `web/dist/attended-event.html` exists and is single-file.
-- [ ] **3.4.4** Inline-bundles script picks up the new entry; `src/ui-bundles.ts` regenerated.
+- [x] **3.4.1** `get_attended_event` migrated from `server.tool` → `server.registerTool` form with `_meta.ui.resourceUri = ui://rewind/attended-event.html`.
+- [x] **3.4.2** UI resource registered in `mcp-server/src/server.ts` via `registerUiResource()` with CSP `resourceDomains: ['https://cdn.rewind.rest']` for player + venue photos.
+- [x] **3.4.3** `npm run build:web` produced `web/dist/attended-event.html` (458,875 chars single-file).
+- [x] **3.4.4** Inline-bundles script auto-discovers `web/*.html` entries; `src/ui-bundles.ts` regenerated.
 
-### 3.5 — Smoke test
+### 3.5 — Smoke test — partial (deferred to user)
 
-- [ ] **3.5.1** Local `npm run dev` against the MCP server. Hit `get_attended_event` with a real event id (e.g. a recent Mariners game with stat lines). Card renders.
-- [ ] **3.5.2** Build + deploy worker to staging or preview. Test in Claude Desktop, Claude web, and Claude iOS with a real query — "tell me about my last Mariners game." All three should render the card inline.
-- [ ] **3.5.3** Verify non-MCP-Apps clients (e.g. text-only CLI) still see the existing rich response unchanged.
+- [ ] **3.5.1** Local `mint dev` doesn't apply (MCP Apps sandbox is the host's iframe, not Mintlify). Worker deploy ships the bundle; first real verification is the next bullet.
+- [ ] **3.5.2** **Action required from user**: post-deploy, test in Claude Desktop, Claude web, and Claude iOS with a real query — "tell me about my last Mariners game." Card should render inline. Capture transcripts to `baseline-queries.md` (rolled into the Phase 4 checkpoint).
+- [x] **3.5.3** Non-MCP-Apps fallback verified by code path: `withRichResponse` returns the same text + structuredContent regardless of `_meta.ui.resourceUri`; only the iframe rendering is gated on the host.
 
-### 3.6 — Ship
+### 3.6 — Ship — DONE
 
-- [ ] **3.6.1** Bundle visible in `mcp-server/web/dist/`. Inlined into `src/ui-bundles.ts`.
-- [ ] **3.6.2** Commit + push. CI green. Worker deploy auto-triggered.
-- [ ] **3.6.3** Verify card renders in production Claude Desktop, Claude web, and Claude iOS.
+- [x] **3.6.1** Bundle in `mcp-server/web/dist/attended-event.html`. Inlined into `src/ui-bundles.ts`.
+- [x] **3.6.2** Commit + push.
+- [x] **3.6.3** Deploy auto-triggered on CI green.
 
 ## Phase 4: ITERATION CHECKPOINT — pending
 

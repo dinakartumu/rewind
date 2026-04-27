@@ -186,7 +186,7 @@
     },
     {
       "name": "get_attended_event",
-      "description": "Get a single attended event in full detail, including venue, tickets, and per-player stat lines (for sports). Use this when the user asks \"who was on that team\" or \"what happened in that game\".",
+      "description": "Get a single attended event in full detail, including venue, tickets, and per-player stat lines (for sports). Use this when the user asks \"who was on that team,\" \"what happened in that game,\" or \"tell me about my last [team] game\". In MCP Apps hosts, renders an interactive game card with the linescore, top performers (with photos), and ticket info.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1319,6 +1319,12 @@
       "uri": "rewind://sync/status",
       "name": "sync-status",
       "description": "Current sync health and last sync times for each data domain"
+    },
+    {
+      "uri": "ui://rewind/attended-event.html",
+      "name": "Rewind -- Attended Event",
+      "description": "Interactive game card for a single attended event. Hero block with date / matchup / final score; per-inning linescore for MLB; notable performers with silo headshots and stat-line summaries; ticket section / row / seat / vendor block. Consumes get_attended_event structuredContent.",
+      "mimeType": "text/html;profile=mcp-app"
     },
     {
       "uri": "ui://rewind/attended-season.html",

@@ -27,7 +27,7 @@ Direct commits to `main`, one focused commit per phase (or per logical chunk wit
 | 0     | Baseline + coverage audit — DONE (forced 2 design changes; see [coverage-baseline.md](./coverage-baseline.md))                                                                     |
 | 1     | Tier 1: filter and discovery ergonomics — DONE (team / team_id on /events; name on /players; new `get_attended_players` MCP tool)                                                  |
 | 2     | Tier 2 pilot: `/players/:id/stats` endpoint (MLB-only) — DONE (career-by-default, hitter / pitcher / unsupported variants, IP outs-math, new `get_attended_player_stats` MCP tool) |
-| 3     | UI pilot: game card on `get_attended_event` — pending                                                                                                                              |
+| 3     | UI pilot: game card on `get_attended_event` — DONE (registered + bundled; live verification in real Claude clients is the user-action portion of the Phase 4 checkpoint)           |
 | 4     | **ITERATION CHECKPOINT** — review, document learnings, decide go/no-go                                                                                                             |
 | 5     | Tier 2 expansion: `/teams/:team_id/stats` — gated on Phase 4 outcome                                                                                                               |
 | 6     | UI expansion: player stats card + team season card — gated on Phase 4                                                                                                              |

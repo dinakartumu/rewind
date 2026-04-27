@@ -667,13 +667,25 @@ export function registerAttendingTools(
   );
 
   // get_attended_event ──────────────────────────────────────────────
-  server.tool(
+  // Uses server.registerTool so we can attach _meta.ui.resourceUri.
+  // MCP Apps hosts (Claude Desktop, Claude web, Claude iOS) render the
+  // game card inline via ui://rewind/attended-event.html; non-MCP-Apps
+  // clients fall back to the text + structuredContent response.
+  server.registerTool(
     'get_attended_event',
-    'Get a single attended event in full detail, including venue, tickets, and per-player stat lines (for sports). Use this when the user asks "who was on that team" or "what happened in that game".',
     {
-      id: z.number().int().describe('Event id.'),
+      title: 'Attended event',
+      description:
+        'Get a single attended event in full detail, including venue, tickets, and per-player stat lines (for sports). Use this when the user asks "who was on that team," "what happened in that game," or "tell me about my last [team] game". In MCP Apps hosts, renders an interactive game card with the linescore, top performers (with photos), and ticket info.',
+      inputSchema: {
+        id: z.number().int().describe('Event id.'),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+      _meta: {
+        ui: { resourceUri: 'ui://rewind/attended-event.html' },
+        'ui/resourceUri': 'ui://rewind/attended-event.html',
+      },
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
       withRichResponse(async () => {
         const data = await client.get<AttendedEventDetail>(
