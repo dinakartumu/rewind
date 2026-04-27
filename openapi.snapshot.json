@@ -3934,6 +3934,12 @@
                           "name": {
                             "type": "string"
                           },
+                          "genre": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "your_scrobble_count": {
                             "type": "number"
                           },
@@ -3945,6 +3951,7 @@
                         "required": [
                           "id",
                           "name",
+                          "genre",
                           "your_scrobble_count",
                           "similarity_score"
                         ]

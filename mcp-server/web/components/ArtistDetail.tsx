@@ -62,6 +62,7 @@ export type TopAlbum = {
 export type SimilarArtist = {
   id: number;
   name: string;
+  genre: string | null;
   your_scrobble_count: number;
   similarity_score: number;
   image: Image;
@@ -459,7 +460,10 @@ function SimilarArtists({
               radius={999}
               alt={s.name}
             />
-            <div style={similarNameStyle}>{s.name}</div>
+            <div style={similarTextColStyle}>
+              <div style={similarNameStyle}>{s.name}</div>
+              {s.genre && <div style={similarGenreStyle}>{s.genre}</div>}
+            </div>
             <div style={similarCountStyle}>
               {fmt(s.your_scrobble_count)} plays
             </div>
@@ -957,9 +961,15 @@ const similarRowItemStyle: CSSProperties = {
   gap: 10,
 };
 
-const similarNameStyle: CSSProperties = {
+const similarTextColStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+};
+
+const similarNameStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 500,
   lineHeight: 1.3,
@@ -967,6 +977,17 @@ const similarNameStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   color: 'var(--color-text-primary, inherit)',
+};
+
+const similarGenreStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 400,
+  lineHeight: 1.25,
+  color: 'var(--color-text-secondary, inherit)',
+  opacity: 0.7,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const similarCountStyle: CSSProperties = {

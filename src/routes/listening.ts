@@ -263,6 +263,7 @@ const NormalizedTagSchema = z.object({
 const SimilarArtistSchema = z.object({
   id: z.number(),
   name: z.string(),
+  genre: z.string().nullable(),
   your_scrobble_count: z.number(),
   similarity_score: z.number(),
   image: z.any().nullable(),
@@ -2818,6 +2819,7 @@ listening.openapi(artistDetailRoute, async (c) => {
       ? await db
           .select({
             id: lastfmArtists.id,
+            genre: lastfmArtists.genre,
             playcount: sql<number>`count(${lastfmScrobbles.id})`,
           })
           .from(lastfmArtists)
@@ -2837,19 +2839,26 @@ listening.openapi(artistDetailRoute, async (c) => {
           )
           .groupBy(lastfmArtists.id)
       : [];
-  const similarPlaycountById = new Map(
-    similarPlaycountRows.map((r) => [r.id, r.playcount ?? 0])
+  const similarMetaById = new Map(
+    similarPlaycountRows.map((r) => [
+      r.id,
+      { playcount: r.playcount ?? 0, genre: r.genre ?? null },
+    ])
   );
   const similar_artists = similarRaw
-    .filter((s) => similarPlaycountById.has(s.artist_id))
+    .filter((s) => similarMetaById.has(s.artist_id))
     .slice(0, 10)
-    .map((s) => ({
-      id: s.artist_id,
-      name: s.name,
-      your_scrobble_count: similarPlaycountById.get(s.artist_id) ?? 0,
-      similarity_score: s.similarity_score,
-      image: similarImageMap.get(String(s.artist_id)) ?? null,
-    }));
+    .map((s) => {
+      const meta = similarMetaById.get(s.artist_id);
+      return {
+        id: s.artist_id,
+        name: s.name,
+        genre: meta?.genre ?? null,
+        your_scrobble_count: meta?.playcount ?? 0,
+        similarity_score: s.similarity_score,
+        image: similarImageMap.get(String(s.artist_id)) ?? null,
+      };
+    });
 
   // Sparkline — overall window, yearly granularity. Falls back to null
   // when the artist has no scrobbles (shouldn't normally happen but the
