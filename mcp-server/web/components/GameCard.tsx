@@ -1,19 +1,13 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
+import { TeamLogo } from './TeamLogo.js';
+import type { Photo, Team } from './types.js';
 
 // Reuses the same shape conventions as SeasonGameCard. Kept self-contained
 // rather than imported so this card can evolve independently as the
 // inline-render needs diverge from the season-grid card.
 
-export type Photo = {
-  cdn_url?: string | null;
-  url?: string | null;
-  thumbhash?: string | null;
-  dominant_color?: string | null;
-  accent_color?: string | null;
-} | null;
-
-type Team = { id: number; name: string; abbreviation?: string };
+export type { Photo };
 
 export type LineScoreInning = {
   inning: number;
@@ -204,13 +198,21 @@ function TeamScore({
   emphasized: boolean;
   won: boolean;
 }) {
+  // Tint the team-name strip with the team's brand color when this is
+  // "your" team or the winning side. Falls back to plain text when no
+  // color seeded yet — see seedMlbTeams in the API service.
+  const tint = team.ui_tint_color ?? team.primary_color ?? null;
+  const useTint = tint && (emphasized || won);
+
   return (
     <div style={teamSlotStyle}>
+      <TeamLogo team={team} size={44} variant="auto" />
       <div
         style={{
           ...teamNameStyle,
           fontWeight: emphasized ? 600 : 500,
           opacity: emphasized ? 1 : 0.85,
+          color: useTint ? tint : undefined,
         }}
       >
         {team.name}
