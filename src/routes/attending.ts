@@ -28,6 +28,13 @@ import {
   type SeasonStatsResult,
 } from '../services/mlb-stats/client.js';
 import {
+  fetchPlayerCareer,
+  fetchPlayerSplits,
+  type CareerHistory,
+  type SeasonSplits,
+  type StatGroup,
+} from '../services/mlb-stats/career.js';
+import {
   attachTeamsToEventData,
   collectEventTeamPairs,
   getTeam,
@@ -970,6 +977,14 @@ const playerDetailRoute = createRoute({
           schema: PlayerSchema.extend({
             supported: z.boolean().openapi({ example: true }),
             season_stats: z.any().nullable(),
+            career: z.any().nullable().openapi({
+              description:
+                'Year-by-year batting (or pitching for pitchers) for this player from MLB Stats. KV-cached 24h. Null for non-MLB players, players missing `mlb_stats_id`, or upstream errors.',
+            }),
+            splits: z.any().nullable().openapi({
+              description:
+                'Current-season home/away/vs-LHP/vs-RHP splits. KV-cached 6h. Null when unavailable.',
+            }),
             attended_summary: z.any(),
             appearances: z.array(
               z.object({
@@ -1037,14 +1052,26 @@ attending.openapi(playerDetailRoute, async (c) => {
 
   // Live current-season stats. MLB-only; non-MLB players + players
   // missing mlb_stats_id get null. KV-cached 1h.
+  // Career + splits ride alongside on the same fetch so MCP/clients
+  // don't have to make a second round-trip for the athlete card. Each
+  // is independently KV-cached so the marginal cost on a warm cache
+  // is two extra reads.
   let season_stats: SeasonStatsResult | null = null;
+  let career: CareerHistory | null = null;
+  let splits: SeasonSplits | null = null;
   if (p.league === 'mlb' && p.mlbStatsId) {
     const currentSeason = new Date().getUTCFullYear();
-    season_stats = await fetchPlayerSeasonStats(
-      c.env,
-      p.mlbStatsId,
-      currentSeason
-    );
+    // The "right" group depends on whether they're a hitter or pitcher.
+    // primary_position 'P' is the only pitcher case; everything else
+    // (catcher, infield, outfield, DH) is a hitter. There's no harm in
+    // fetching the wrong group on edge cases — the response is a small
+    // empty splits[] when they don't have rows in that group.
+    const group: StatGroup = p.primaryPosition === 'P' ? 'pitching' : 'hitting';
+    [season_stats, career, splits] = await Promise.all([
+      fetchPlayerSeasonStats(c.env, p.mlbStatsId, currentSeason),
+      fetchPlayerCareer(c.env, p.mlbStatsId, group),
+      fetchPlayerSplits(c.env, p.mlbStatsId, currentSeason, group),
+    ]);
   }
 
   // "In games you attended" aggregate. Reuses the existing helper from
@@ -1072,6 +1099,8 @@ attending.openapi(playerDetailRoute, async (c) => {
       }),
       supported: p.league === 'mlb',
       season_stats,
+      career,
+      splits,
       attended_summary,
       appearances: appearances
         .filter((r) => r.attended_events != null)

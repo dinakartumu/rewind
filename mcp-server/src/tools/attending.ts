@@ -454,6 +454,22 @@ export function registerAttendingTools(
               hitter: Record<string, unknown> | null;
               pitcher: Record<string, unknown> | null;
             } | null;
+            career: {
+              group: 'hitting' | 'pitching';
+              seasons: Array<Record<string, unknown>>;
+              fetched_at: string;
+              cache_hit: boolean;
+            } | null;
+            splits: {
+              season: number;
+              group: 'hitting' | 'pitching';
+              home: Record<string, unknown> | null;
+              away: Record<string, unknown> | null;
+              vs_left: Record<string, unknown> | null;
+              vs_right: Record<string, unknown> | null;
+              fetched_at: string;
+              cache_hit: boolean;
+            } | null;
             attended_summary: {
               games_attended: number;
               games_with_box_score: number;
@@ -581,6 +597,8 @@ export function registerAttendingTools(
           },
           supported: data.supported,
           season_stats: data.season_stats,
+          career: data.career,
+          splits: data.splits,
           attended_summary: data.attended_summary,
           attended_appearances: data.appearances.slice(0, 10).map((a) => ({
             event_id: a.event_id,

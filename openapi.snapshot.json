@@ -20976,6 +20976,12 @@
                       "example": true
                     },
                     "season_stats": {},
+                    "career": {
+                      "description": "Year-by-year batting (or pitching for pitchers) for this player from MLB Stats. KV-cached 24h. Null for non-MLB players, players missing `mlb_stats_id`, or upstream errors."
+                    },
+                    "splits": {
+                      "description": "Current-season home/away/vs-LHP/vs-RHP splits. KV-cached 6h. Null when unavailable."
+                    },
                     "attended_summary": {},
                     "appearances": {
                       "type": "array",
