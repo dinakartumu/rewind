@@ -78,8 +78,10 @@ export type ArtistPayload = {
 
 const HERO_PORTRAIT_PX = 140;
 const PORTRAIT_TRANSFORM = `width=${HERO_PORTRAIT_PX * 2},height=${HERO_PORTRAIT_PX * 2},fit=cover,format=auto,quality=85`;
-const ALBUM_TILE_PX = 96;
-const ALBUM_TRANSFORM = `width=${ALBUM_TILE_PX * 2},height=${ALBUM_TILE_PX * 2},fit=cover,format=auto,quality=85`;
+// Album tiles render fluid (1fr in a 3-column grid → ~210px at 720px card
+// width). Request 480px source so retina 2x stays sharp at the typical
+// rendered size; Cloudflare Images caches the transform server-side.
+const ALBUM_TRANSFORM = `width=480,height=480,fit=cover,format=auto,quality=85`;
 const TRACK_THUMB_PX = 40;
 const TRACK_TRANSFORM = `width=${TRACK_THUMB_PX * 2},height=${TRACK_THUMB_PX * 2},fit=cover,format=auto,quality=85`;
 const SIMILAR_THUMB_PX = 36;
@@ -418,10 +420,9 @@ function TopAlbums({
             }}
             aria-label={`${a.name} — ${fmt(a.playcount)} plays`}
           >
-            <Thumbnail
+            <FluidThumbnail
               image={a.image}
               transform={ALBUM_TRANSFORM}
-              size={ALBUM_TILE_PX}
               radius={6}
               alt={a.name}
               fallbackBg={dominant}
@@ -447,17 +448,10 @@ function SimilarArtists({
 }) {
   return (
     <section style={sectionStyle}>
-      <h2 style={sectionHeadingStyle}>You also listen to</h2>
-      <div style={similarRowStyle}>
+      <h2 style={sectionHeadingStyle}>Similar artists you’ve played</h2>
+      <ol style={similarListStyle}>
         {similar.slice(0, 5).map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            // No URL on similar — these are local artist refs. Defer
-            // click-to-open until tools surface a URL for them.
-            style={similarChipStyle}
-            aria-label={`${s.name} — ${fmt(s.your_scrobble_count)} plays`}
-          >
+          <li key={s.id} style={similarRowItemStyle}>
             <Thumbnail
               image={s.image}
               transform={SIMILAR_TRANSFORM}
@@ -465,15 +459,13 @@ function SimilarArtists({
               radius={999}
               alt={s.name}
             />
-            <div style={similarTextStyle}>
-              <div style={similarNameStyle}>{s.name}</div>
-              <div style={similarCountStyle}>
-                {fmt(s.your_scrobble_count)} plays
-              </div>
+            <div style={similarNameStyle}>{s.name}</div>
+            <div style={similarCountStyle}>
+              {fmt(s.your_scrobble_count)} plays
             </div>
-          </button>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
@@ -507,6 +499,83 @@ function Footer({
           Last.fm
         </button>
       )}
+    </div>
+  );
+}
+
+function FluidThumbnail({
+  image,
+  transform,
+  radius,
+  alt,
+  fallbackBg,
+}: {
+  image: Image;
+  transform: string;
+  radius: number;
+  alt: string;
+  fallbackBg?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const src = buildSrc(image, transform);
+  const accent = image?.accent_color ?? fallbackBg ?? 'rgba(127,127,127,0.18)';
+  const dominant =
+    image?.dominant_color ?? fallbackBg ?? 'rgba(127,127,127,0.10)';
+
+  const baseStyle: CSSProperties = {
+    width: '100%',
+    aspectRatio: '1 / 1',
+    borderRadius: radius,
+    overflow: 'hidden',
+    position: 'relative',
+  };
+
+  if (!src) {
+    return (
+      <div
+        style={{
+          ...baseStyle,
+          background: `linear-gradient(135deg, ${dominant} 0%, ${accent} 100%)`,
+        }}
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <div style={{ ...baseStyle, background: dominant }}>
+      {src.placeholder && (
+        <img
+          src={src.placeholder}
+          alt=""
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: 'blur(8px)',
+            transform: 'scale(1.05)',
+            opacity: loaded ? 0 : 1,
+            transition: 'opacity 180ms ease',
+          }}
+        />
+      )}
+      <img
+        src={src.src}
+        alt={alt}
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 200ms ease',
+        }}
+      />
     </div>
   );
 }
@@ -828,7 +897,7 @@ const trackPlaysStyle: CSSProperties = {
 const albumsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 1fr)',
-  gap: 8,
+  gap: 14,
 };
 
 const albumTileStyle: CSSProperties = {
@@ -873,41 +942,40 @@ const albumPlaysStyle: CSSProperties = {
   lineHeight: 1.25,
 };
 
-const similarRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-};
-
-const similarChipStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '4px 10px 4px 4px',
-  borderRadius: 999,
-  border: '1px solid var(--color-border-tertiary, rgba(127,127,127,0.18))',
-  background: 'transparent',
-  font: 'inherit',
-  color: 'inherit',
-  cursor: 'default',
-};
-
-const similarTextStyle: CSSProperties = {
+const similarListStyle: CSSProperties = {
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
   display: 'flex',
   flexDirection: 'column',
-  gap: 0,
+  gap: 8,
+};
+
+const similarRowItemStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
 };
 
 const similarNameStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  lineHeight: 1.2,
+  flex: 1,
+  minWidth: 0,
+  fontSize: 14,
+  fontWeight: 500,
+  lineHeight: 1.3,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  color: 'var(--color-text-primary, inherit)',
 };
 
 const similarCountStyle: CSSProperties = {
-  fontSize: 10,
-  opacity: 0.55,
-  lineHeight: 1.2,
+  fontSize: 12,
+  fontWeight: 500,
+  fontVariantNumeric: 'tabular-nums',
+  color: 'var(--color-text-secondary, inherit)',
+  opacity: 0.7,
+  flexShrink: 0,
 };
 
 const footerStyle: CSSProperties = {

@@ -2708,17 +2708,19 @@ listening.openapi(artistDetailRoute, async (c) => {
       and(
         eq(lastfmAlbums.artistId, id),
         eq(lastfmAlbums.isFiltered, 0),
-        // Drop compilations / soundtracks (e.g. High School Musical, Hunger
-        // Games) from the artist card's "top albums" — these are guest
-        // appearances or contributed tracks, not first-party releases.
-        // is_compilation is set during sync against a Last.fm tag allowlist.
-        eq(lastfmAlbums.isCompilation, 0),
         // Inner-filter on tracks too so a single filtered-out track doesn't
         // skew an album's plays.
         sql`(${lastfmTracks.isFiltered} = 0 OR ${lastfmTracks.isFiltered} IS NULL)`
       )
     )
     .groupBy(lastfmAlbums.id)
+    // Require ≥ 2 distinct tracks scrobbled — drops one-track guest
+    // appearances, singles, and soundtracks where the user only listened
+    // to a single contributed song (e.g. Olivia Rodrigo's "All I Want"
+    // from the High School Musical soundtrack). is_compilation isn't
+    // reliably populated by the Last.fm sync so we use this listening
+    // signal instead.
+    .having(sql`count(distinct ${lastfmTracks.id}) >= 2`)
     .orderBy(desc(sql`count(${lastfmScrobbles.id})`))
     .limit(10);
 
