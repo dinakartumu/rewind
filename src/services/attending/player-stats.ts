@@ -22,6 +22,8 @@ import {
   attendedEventPlayers,
   players,
 } from '../../db/schema/attending.js';
+import type { TeamShape } from '../../lib/schemas/team.js';
+import { getTeam, loadTeams } from './team-loader.js';
 
 type BattingLine = {
   ab?: number;
@@ -61,7 +63,7 @@ export interface PlayerStatsHitter {
     id: number;
     full_name: string;
     primary_position: string | null;
-    primary_team_id: number | null;
+    primary_team: TeamShape | null;
   };
   games: number;
   games_with_box_score: number;
@@ -93,7 +95,7 @@ export interface PlayerStatsPitcher {
     id: number;
     full_name: string;
     primary_position: string | null;
-    primary_team_id: number | null;
+    primary_team: TeamShape | null;
   };
   games: number;
   games_with_box_score: number;
@@ -124,7 +126,7 @@ export interface PlayerStatsUnsupported {
     id: number;
     full_name: string;
     primary_position: string | null;
-    primary_team_id: number | null;
+    primary_team: TeamShape | null;
   };
   appearances: Array<{
     event_id: number;
@@ -194,11 +196,17 @@ export async function aggregatePlayerStats(
     .where(and(...conditions))
     .orderBy(attendedEvents.eventDate);
 
+  const teamMap =
+    player.primaryTeamId != null
+      ? await loadTeams(db, [
+          { league: player.league, leagueTeamId: player.primaryTeamId },
+        ])
+      : new Map();
   const playerSummary = {
     id: player.id,
     full_name: player.fullName,
     primary_position: player.primaryPosition,
-    primary_team_id: player.primaryTeamId,
+    primary_team: getTeam(teamMap, player.league, player.primaryTeamId),
   };
   const scope =
     season !== undefined ? ('season' as const) : ('career' as const);

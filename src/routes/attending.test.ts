@@ -224,7 +224,7 @@ describe('attending - Tier 1 filter additions', () => {
         data: Array<{
           full_name: string;
           primary_position: string | null;
-          primary_team_id: number | null;
+          primary_team: { id: number } | null;
         }>;
       };
       expect(body.data).toHaveLength(2);

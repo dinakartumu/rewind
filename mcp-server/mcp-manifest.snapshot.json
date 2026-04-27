@@ -312,7 +312,7 @@
     },
     {
       "name": "get_attended_players",
-      "description": "Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like \"Will Smith\" return multiple matches — disambiguate via the `primary_team_id` and `primary_position` on each result without a follow-up turn.",
+      "description": "Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like \"Will Smith\" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn.",
       "inputSchema": {
         "type": "object",
         "properties": {

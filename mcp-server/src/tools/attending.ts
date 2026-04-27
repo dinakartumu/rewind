@@ -32,6 +32,27 @@ type Venue = {
   capacity: number | null;
 } | null;
 
+// Mirrors src/lib/schemas/team.ts on the API side. The full Team object
+// is attached inline anywhere a team is referenced, so consumers never
+// need a follow-up call for logo / colors.
+type Team = {
+  id: number;
+  league: string;
+  abbreviation: string;
+  location: string | null;
+  name: string;
+  full_name: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
+  ui_tint_color: string | null;
+  logo_url: string | null;
+  logo_dark_url: string | null;
+  logo_light_url: string | null;
+  conference: string | null;
+  division: string | null;
+};
+
 type Player = {
   id: number;
   league: string;
@@ -44,7 +65,7 @@ type Player = {
   birth_country: string | null;
   bats: string | null;
   throws: string | null;
-  primary_team_id: number | null;
+  primary_team: Team | null;
   debut_date: string | null;
   photo_silo: Photo;
   photo_full: Photo;
@@ -52,7 +73,7 @@ type Player = {
 
 type Appearance = {
   player: Player;
-  team_id: number | null;
+  team: Team | null;
   is_home: boolean;
   batting_line: Record<string, unknown> | null;
   pitching_line: Record<string, unknown> | null;
@@ -317,7 +338,7 @@ export function registerAttendingTools(
   // the user having to know the integer id.
   server.tool(
     'get_attended_players',
-    'Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via the `primary_team_id` and `primary_position` on each result without a follow-up turn.',
+    'Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn.',
     {
       page: z
         .number()
@@ -377,7 +398,7 @@ export function registerAttendingTools(
         for (const p of data.data) {
           const pos = p.primary_position ? ` ${p.primary_position}` : '';
           const num = p.primary_number ? ` #${p.primary_number}` : '';
-          const team = p.primary_team_id ? ` team_id=${p.primary_team_id}` : '';
+          const team = p.primary_team ? ` ${p.primary_team.abbreviation}` : '';
           lines.push(
             `id=${p.id} ${p.full_name}${num}${pos} (${p.league}${team})`
           );
@@ -447,7 +468,7 @@ export function registerAttendingTools(
               event_id: number;
               event_date: string;
               title: string;
-              team_id: number | null;
+              team: Team | null;
               is_home: boolean;
               batting_line: Record<string, unknown> | null;
               pitching_line: Record<string, unknown> | null;
@@ -589,7 +610,7 @@ export function registerAttendingTools(
           id: number;
           full_name: string;
           primary_position: string | null;
-          primary_team_id: number | null;
+          primary_team: Team | null;
         };
         games: number;
         games_with_box_score: number;
@@ -632,7 +653,7 @@ export function registerAttendingTools(
           id: number;
           full_name: string;
           primary_position: string | null;
-          primary_team_id: number | null;
+          primary_team: Team | null;
         };
         appearances: Array<{
           event_id: number;

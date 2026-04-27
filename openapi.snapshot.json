@@ -400,6 +400,124 @@
           "accent_color"
         ]
       },
+      "Team": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 136
+          },
+          "league": {
+            "type": "string",
+            "example": "mlb"
+          },
+          "abbreviation": {
+            "type": "string",
+            "example": "SEA"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Seattle"
+          },
+          "name": {
+            "type": "string",
+            "example": "Mariners"
+          },
+          "full_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Seattle Mariners"
+          },
+          "primary_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "#0C2C56"
+          },
+          "secondary_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "#005C5C"
+          },
+          "tertiary_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": null
+          },
+          "ui_tint_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "#0C2C56"
+          },
+          "logo_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "https://www.mlbstatic.com/team-logos/136.svg"
+          },
+          "logo_dark_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "https://www.mlbstatic.com/team-logos/team-cap-on-dark/136.svg"
+          },
+          "logo_light_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "https://www.mlbstatic.com/team-logos/team-cap-on-light/136.svg"
+          },
+          "conference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "AL"
+          },
+          "division": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "AL West"
+          }
+        },
+        "required": [
+          "id",
+          "league",
+          "abbreviation",
+          "location",
+          "name",
+          "full_name",
+          "primary_color",
+          "secondary_color",
+          "tertiary_color",
+          "ui_tint_color",
+          "logo_url",
+          "logo_dark_url",
+          "logo_light_url",
+          "conference",
+          "division"
+        ]
+      },
       "ExportResponse": {
         "type": "object",
         "properties": {
@@ -1354,6 +1472,73 @@
           }
         }
       },
+      "AttendingSeedTeamsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "league": {
+            "type": "string",
+            "enum": [
+              "mlb"
+            ]
+          },
+          "scanned": {
+            "type": "integer"
+          },
+          "inserted": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "league_team_id": {
+                  "type": "integer"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "league_team_id",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "status",
+          "league",
+          "scanned",
+          "inserted",
+          "updated",
+          "failures"
+        ]
+      },
+      "AttendingSeedTeamsBody": {
+        "type": "object",
+        "properties": {
+          "skip_colors": {
+            "type": "boolean",
+            "default": false
+          },
+          "league_team_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
       "SyncCompletedResponse": {
         "type": "object",
         "properties": {
@@ -1755,25 +1940,6 @@
           "status",
           "items_synced",
           "skipped",
-          "timestamp"
-        ]
-      },
-      "MlbTeamsSyncResponse": {
-        "type": "object",
-        "properties": {
-          "inserted": {
-            "type": "integer"
-          },
-          "updated": {
-            "type": "integer"
-          },
-          "timestamp": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "inserted",
-          "updated",
           "timestamp"
         ]
       }
@@ -19346,12 +19512,8 @@
                                 ],
                                 "example": "R"
                               },
-                              "primary_team_id": {
-                                "type": [
-                                  "number",
-                                  "null"
-                                ],
-                                "example": 136
+                              "primary_team": {
+                                "$ref": "#/components/schemas/Team"
                               },
                               "debut_date": {
                                 "type": [
@@ -19449,17 +19611,14 @@
                               "birth_country",
                               "bats",
                               "throws",
-                              "primary_team_id",
+                              "primary_team",
                               "debut_date",
                               "photo_silo",
                               "photo_full"
                             ]
                           },
-                          "team_id": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
+                          "team": {
+                            "$ref": "#/components/schemas/Team"
                           },
                           "is_home": {
                             "type": "boolean"
@@ -19498,7 +19657,7 @@
                         },
                         "required": [
                           "player",
-                          "team_id",
+                          "team",
                           "is_home",
                           "batting_line",
                           "pitching_line",
@@ -20237,12 +20396,8 @@
                             ],
                             "example": "R"
                           },
-                          "primary_team_id": {
-                            "type": [
-                              "number",
-                              "null"
-                            ],
-                            "example": 136
+                          "primary_team": {
+                            "$ref": "#/components/schemas/Team"
                           },
                           "debut_date": {
                             "type": [
@@ -20340,7 +20495,7 @@
                           "birth_country",
                           "bats",
                           "throws",
-                          "primary_team_id",
+                          "primary_team",
                           "debut_date",
                           "photo_silo",
                           "photo_full"
@@ -20469,12 +20624,8 @@
                       ],
                       "example": "R"
                     },
-                    "primary_team_id": {
-                      "type": [
-                        "number",
-                        "null"
-                      ],
-                      "example": 136
+                    "primary_team": {
+                      "$ref": "#/components/schemas/Team"
                     },
                     "debut_date": {
                       "type": [
@@ -20563,43 +20714,6 @@
                       "type": "boolean",
                       "example": true
                     },
-                    "team": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "number"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "abbreviation": {
-                          "type": "string"
-                        },
-                        "league": {
-                          "type": "string",
-                          "enum": [
-                            "mlb"
-                          ]
-                        },
-                        "primary_color": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "logo": {}
-                      },
-                      "required": [
-                        "id",
-                        "name",
-                        "abbreviation",
-                        "league",
-                        "primary_color"
-                      ]
-                    },
                     "season_stats": {},
                     "attended_summary": {},
                     "appearances": {
@@ -20616,11 +20730,8 @@
                           "title": {
                             "type": "string"
                           },
-                          "team_id": {
-                            "type": [
-                              "number",
-                              "null"
-                            ]
+                          "team": {
+                            "$ref": "#/components/schemas/Team"
                           },
                           "is_home": {
                             "type": "boolean"
@@ -20653,7 +20764,7 @@
                           "event_id",
                           "event_date",
                           "title",
-                          "team_id",
+                          "team",
                           "is_home",
                           "batting_line",
                           "pitching_line",
@@ -20678,12 +20789,11 @@
                     "birth_country",
                     "bats",
                     "throws",
-                    "primary_team_id",
+                    "primary_team",
                     "debut_date",
                     "photo_silo",
                     "photo_full",
                     "supported",
-                    "team",
                     "appearances",
                     "appearance_count"
                   ]
@@ -20802,18 +20912,15 @@
                                 "null"
                               ]
                             },
-                            "primary_team_id": {
-                              "type": [
-                                "number",
-                                "null"
-                              ]
+                            "primary_team": {
+                              "$ref": "#/components/schemas/Team"
                             }
                           },
                           "required": [
                             "id",
                             "full_name",
                             "primary_position",
-                            "primary_team_id"
+                            "primary_team"
                           ]
                         },
                         "games": {
@@ -20953,18 +21060,15 @@
                                 "null"
                               ]
                             },
-                            "primary_team_id": {
-                              "type": [
-                                "number",
-                                "null"
-                              ]
+                            "primary_team": {
+                              "$ref": "#/components/schemas/Team"
                             }
                           },
                           "required": [
                             "id",
                             "full_name",
                             "primary_position",
-                            "primary_team_id"
+                            "primary_team"
                           ]
                         },
                         "games": {
@@ -21114,18 +21218,15 @@
                                 "null"
                               ]
                             },
-                            "primary_team_id": {
-                              "type": [
-                                "number",
-                                "null"
-                              ]
+                            "primary_team": {
+                              "$ref": "#/components/schemas/Team"
                             }
                           },
                           "required": [
                             "id",
                             "full_name",
                             "primary_position",
-                            "primary_team_id"
+                            "primary_team"
                           ]
                         },
                         "appearances": {
@@ -23810,6 +23911,59 @@
         }
       }
     },
+    "/v1/admin/attending/seed-teams": {
+      "post": {
+        "operationId": "adminAttendingSeedTeams",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Seed/refresh the teams reference table from upstream APIs",
+        "description": "Populates the `teams` table from MLB Stats API (roster, division, home venue) and ESPN site API (brand colors). Idempotent — uses ON CONFLICT(league, league_team_id), so re-running picks up roster changes and color tweaks without duplicating rows. Pass `skip_colors: true` to skip the ESPN round-trip on a fast refresh.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendingSeedTeamsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team seed completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendingSeedTeamsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/sync/listening": {
       "post": {
         "operationId": "adminSyncListening",
@@ -24352,49 +24506,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AppleMusicAlbumsResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/sync/mlb-teams": {
-      "post": {
-        "operationId": "adminSyncMlbTeams",
-        "x-hidden": true,
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Sync MLB teams",
-        "description": "Refresh the mlb_teams lookup table from MLB Stats API (sportId=1). Pulls all 30 active clubs with name/abbr/team_code; logos are not fetched here.",
-        "responses": {
-          "200": {
-            "description": "Teams synced",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MlbTeamsSyncResponse"
                 }
               }
             }
