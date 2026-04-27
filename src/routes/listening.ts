@@ -2800,20 +2800,35 @@ listening.openapi(artistDetailRoute, async (c) => {
     'artists',
     similarIds
   );
+  // Aggregate similar-artist plays from scrobbles, not lastfmArtists.playcount
+  // (the cached column is from Last.fm's user.getTopArtists which only ranks
+  // your top-N — artists below that show 0 in the cache even though you've
+  // scrobbled them, which is exactly the case for the long tail of similar
+  // artists like Harry Styles / Conan Gray relative to a heavy listen
+  // like Olivia Rodrigo).
   const similarPlaycountRows =
     similarRaw.length > 0
       ? await db
           .select({
             id: lastfmArtists.id,
-            playcount: lastfmArtists.playcount,
+            playcount: sql<number>`count(${lastfmScrobbles.id})`,
           })
           .from(lastfmArtists)
+          .leftJoin(lastfmTracks, eq(lastfmTracks.artistId, lastfmArtists.id))
+          .leftJoin(
+            lastfmScrobbles,
+            eq(lastfmScrobbles.trackId, lastfmTracks.id)
+          )
           .where(
-            inArray(
-              lastfmArtists.id,
-              similarRaw.map((s) => s.artist_id)
+            and(
+              inArray(
+                lastfmArtists.id,
+                similarRaw.map((s) => s.artist_id)
+              ),
+              sql`(${lastfmTracks.isFiltered} = 0 OR ${lastfmTracks.isFiltered} IS NULL)`
             )
           )
+          .groupBy(lastfmArtists.id)
       : [];
   const similarPlaycountById = new Map(
     similarPlaycountRows.map((r) => [r.id, r.playcount ?? 0])
