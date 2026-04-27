@@ -1178,4 +1178,75 @@ adminAttending.openapi(mergeSportsDuplicatesRoute, async (c) => {
   }
 });
 
+// ─── POST /v1/admin/attending/seed-teams ────────────────────────────
+
+const SeedTeamsBody = z
+  .object({
+    skip_colors: z.boolean().optional().default(false),
+    league_team_ids: z.array(z.number().int()).optional(),
+  })
+  .openapi('AttendingSeedTeamsBody');
+
+const SeedTeamsResponse = z
+  .object({
+    status: z.literal('completed'),
+    league: z.literal('mlb'),
+    scanned: z.number().int(),
+    inserted: z.number().int(),
+    updated: z.number().int(),
+    failures: z.array(
+      z.object({
+        league_team_id: z.number().int(),
+        reason: z.string(),
+      })
+    ),
+  })
+  .openapi('AttendingSeedTeamsResponse');
+
+const seedTeamsRoute = createRoute({
+  method: 'post',
+  path: '/admin/attending/seed-teams',
+  operationId: 'adminAttendingSeedTeams',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary: 'Seed/refresh the teams reference table from upstream APIs',
+  description:
+    'Populates the `teams` table from MLB Stats API (roster, division, home venue) and ESPN site API (brand colors). Idempotent — uses ON CONFLICT(league, league_team_id), so re-running picks up roster changes and color tweaks without duplicating rows. Pass `skip_colors: true` to skip the ESPN round-trip on a fast refresh.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: SeedTeamsBody } },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Team seed completed',
+      content: {
+        'application/json': { schema: SeedTeamsResponse },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminAttending.openapi(seedTeamsRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  type Opts = { skip_colors?: boolean; league_team_ids?: number[] };
+  const body: Opts = await c.req.json<Opts>().catch(() => ({}) as Opts);
+
+  try {
+    const { seedMlbTeams } =
+      await import('../services/attending/seed-teams.js');
+    const result = await seedMlbTeams(db, {
+      skipColors: body.skip_colors ?? false,
+      leagueTeamIds: body.league_team_ids,
+    });
+    return c.json({ status: 'completed' as const, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ERROR] POST /admin/attending/seed-teams: ${message}`);
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
 export default adminAttending;

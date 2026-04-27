@@ -41,6 +41,66 @@ export const venues = sqliteTable(
   ]
 );
 
+// Teams: globally shared reference data for sports leagues. No user_id —
+// a team is a brand/roster entity that exists independent of viewers.
+// Per-user data (which games were attended, which players seen) lives
+// on attended_events + attended_event_players, both of which join via
+// the league-native team id (e.g. 136 for the Mariners in MLB) that
+// `players.primaryTeamId` and `attendedEvents.eventData.home_team.id`
+// already store. Joins go through (league, league_team_id), not teams.id.
+//
+// Logos: hot-linked from upstream by default (`logoUrl`). For MLB this
+// is mlbstatic.com SVG. `logoKey` is reserved for the future case where
+// we mirror through the image pipeline. Light/dark variants exist
+// because some primary logos render poorly on the off-theme background.
+//
+// Colors: brand colors from ESPN (`primaryColor`, `secondaryColor`).
+// `uiTintColor` is curated separately because ESPN's primary isn't
+// always the right value against card backgrounds — default to primary,
+// hand-override per team when contrast is wrong.
+export const teams = sqliteTable(
+  'teams',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    league: text('league').notNull(), // 'mlb', 'nfl', 'nba', 'mls'
+    leagueTeamId: integer('league_team_id').notNull(),
+    abbreviation: text('abbreviation').notNull(),
+    location: text('location'),
+    name: text('name').notNull(),
+    fullName: text('full_name'),
+    primaryColor: text('primary_color'),
+    secondaryColor: text('secondary_color'),
+    tertiaryColor: text('tertiary_color'),
+    uiTintColor: text('ui_tint_color'),
+    logoUrl: text('logo_url'),
+    logoDarkUrl: text('logo_dark_url'),
+    logoLightUrl: text('logo_light_url'),
+    logoKey: text('logo_key'),
+    conference: text('conference'),
+    division: text('division'),
+    homeVenueId: integer('home_venue_id').references(() => venues.id),
+    externalIds: text('external_ids'), // JSON: { espn_id, sportradar_id, ... }
+    aliases: text('aliases'), // JSON: ["Cleveland Indians"]
+    foundedYear: integer('founded_year'),
+    createdAt: text('created_at')
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex('idx_teams_league_native_id').on(
+      table.league,
+      table.leagueTeamId
+    ),
+    uniqueIndex('idx_teams_league_abbr').on(table.league, table.abbreviation),
+    index('idx_teams_league').on(table.league),
+    index('idx_teams_division').on(table.conference, table.division),
+    index('idx_teams_home_venue').on(table.homeVenueId),
+  ]
+);
+
 // Performers: musical artists, comedians, theater companies, speakers.
 // `lastfmArtistId` is the cross-domain link to listening — populated by
 // enrichment when a concert performer matches a known scrobbled artist.

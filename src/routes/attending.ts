@@ -15,10 +15,18 @@ import { getImageAttachmentBatch } from '../lib/images.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import { errorResponses, PaginationMeta } from '../lib/schemas/common.js';
+import { Team } from '../lib/schemas/team.js';
 import {
   aggregatePlayerStats,
   PlayerNotFoundError,
 } from '../services/attending/player-stats.js';
+import {
+  attachTeamsToEventData,
+  collectEventTeamPairs,
+  getTeam,
+  loadTeams,
+  type TeamPair,
+} from '../services/attending/team-loader.js';
 
 const attending = createOpenAPIApp();
 
@@ -121,7 +129,11 @@ const PlayerSchema = z.object({
   birth_country: z.string().nullable().openapi({ example: 'USA' }),
   bats: z.string().nullable().openapi({ example: 'B' }),
   throws: z.string().nullable().openapi({ example: 'R' }),
-  primary_team_id: z.number().nullable().openapi({ example: 136 }),
+  // Full team object (logo + colors inline) when seeded; null when the
+  // player's team isn't in the teams reference table yet. Use
+  // `primary_team.id` (league-native int) for filtering and
+  // `primary_team.abbreviation` for display in disambiguation contexts.
+  primary_team: Team.nullable(),
   debut_date: z.string().nullable().openapi({ example: '2021-07-11' }),
   photo_silo: PlayerPhotoSchema.nullable(),
   photo_full: PlayerPhotoSchema.nullable(),
@@ -129,7 +141,10 @@ const PlayerSchema = z.object({
 
 const AppearanceSchema = z.object({
   player: PlayerSchema,
-  team_id: z.number().nullable(),
+  // Full team for the side this player played on in this game. Reflects
+  // the in-game team, not necessarily the player's current primary team
+  // (handles mid-season trades — `team` may differ from `player.primary_team`).
+  team: Team.nullable(),
   is_home: z.boolean(),
   batting_line: z.record(z.string(), z.any()).nullable(),
   pitching_line: z.record(z.string(), z.any()).nullable(),
@@ -293,9 +308,22 @@ attending.openapi(eventsRoute, async (c) => {
     ticketsByEvent.set(t.eventId, existing);
   }
 
-  const data = rows.map((r) => {
+  const parsedEvents = rows.map((r) => ({
+    row: r,
+    eventData: parseJson<Record<string, unknown>>(r.attended_events.eventData),
+  }));
+
+  // Batch-load every team referenced across the page in one round trip.
+  const teamPairs = collectEventTeamPairs(
+    parsedEvents.map((p) => ({ eventData: p.eventData }))
+  );
+  const teamMap = await loadTeams(db, teamPairs);
+
+  const data = parsedEvents.map(({ row: r, eventData }) => {
     const e = r.attended_events;
     const v = r.venues;
+    const league =
+      typeof eventData?.league === 'string' ? eventData.league : null;
     return {
       id: e.id,
       category: e.category,
@@ -307,7 +335,7 @@ attending.openapi(eventsRoute, async (c) => {
       series_id: e.seriesId,
       external_id: e.externalId,
       external_source: e.externalSource,
-      event_data: parseJson<Record<string, unknown>>(e.eventData),
+      event_data: attachTeamsToEventData(league, eventData, teamMap),
       notes: e.notes,
       attended: e.attended === 1,
       venue: v
@@ -408,6 +436,26 @@ attending.openapi(eventDetailRoute, async (c) => {
     getImageAttachmentBatch(db, 'attending', 'player_full', playerIdStrings),
   ]);
 
+  const eventData = parseJson<Record<string, unknown>>(e.eventData);
+  const league =
+    typeof eventData?.league === 'string' ? eventData.league : null;
+
+  // Collect all team pairs needed for this event:
+  //   - home_team / away_team from event_data
+  //   - per-appearance team_id (the in-game team for each player) and
+  //     the player's primary_team_id (current team, may differ post-trade).
+  const teamPairs: TeamPair[] = collectEventTeamPairs([{ eventData }]);
+  for (const r of appearanceRows) {
+    const p = r.players;
+    const a = r.attended_event_players;
+    if (p && league) {
+      if (a.teamId != null) teamPairs.push({ league, leagueTeamId: a.teamId });
+      if (p.primaryTeamId != null)
+        teamPairs.push({ league: p.league, leagueTeamId: p.primaryTeamId });
+    }
+  }
+  const teamMap = await loadTeams(db, teamPairs);
+
   setCache(c, 'short');
   return c.json(
     {
@@ -421,7 +469,7 @@ attending.openapi(eventDetailRoute, async (c) => {
       series_id: e.seriesId,
       external_id: e.externalId,
       external_source: e.externalSource,
-      event_data: parseJson<Record<string, unknown>>(e.eventData),
+      event_data: attachTeamsToEventData(league, eventData, teamMap),
       notes: e.notes,
       attended: e.attended === 1,
       venue: v
@@ -467,12 +515,12 @@ attending.openapi(eventDetailRoute, async (c) => {
               birth_country: p.birthCountry,
               bats: p.bats,
               throws: p.throws,
-              primary_team_id: p.primaryTeamId,
+              primary_team: getTeam(teamMap, p.league, p.primaryTeamId),
               debut_date: p.debutDate,
               photo_silo: siloMap.get(eid) ?? null,
               photo_full: fullMap.get(eid) ?? null,
             },
-            team_id: a.teamId,
+            team: getTeam(teamMap, league, a.teamId),
             is_home: a.isHome === 1,
             batting_line: parseJson<Record<string, unknown>>(a.battingLine),
             pitching_line: parseJson<Record<string, unknown>>(a.pitchingLine),
@@ -549,12 +597,22 @@ attending.openapi(seasonRoute, async (c) => {
     )
     .orderBy(asc(attendedEvents.eventDate));
 
+  const parsed = rows.map((r) => ({
+    row: r,
+    eventData: parseJson<Record<string, unknown>>(r.attended_events.eventData),
+  }));
+
+  const teamPairs = collectEventTeamPairs(
+    parsed.map((p) => ({ eventData: p.eventData }))
+  );
+  const teamMap = await loadTeams(db, teamPairs);
+
   let wins = 0;
   let losses = 0;
-  const data = rows.map((r) => {
+  const data = parsed.map(({ row: r, eventData: ed }) => {
     const e = r.attended_events;
     const v = r.venues;
-    const ed = parseJson<Record<string, unknown>>(e.eventData);
+    const evLeague = typeof ed?.league === 'string' ? ed.league : league;
     // Only count W/L for games actually attended. Lets the
     // season-shorthand "all_home" pattern with exceptions report
     // your attended record (6-0) rather than the team's record (6-1).
@@ -573,7 +631,7 @@ attending.openapi(seasonRoute, async (c) => {
       series_id: e.seriesId,
       external_id: e.externalId,
       external_source: e.externalSource,
-      event_data: ed,
+      event_data: attachTeamsToEventData(evLeague, ed, teamMap),
       notes: e.notes,
       attended: e.attended === 1,
       venue: v
@@ -812,6 +870,11 @@ attending.openapi(playersListRoute, async (c) => {
     getImageAttachmentBatch(db, 'attending', 'player_full', playerIds),
   ]);
 
+  const teamPairs = rows
+    .filter((p) => p.primaryTeamId != null)
+    .map((p) => ({ league: p.league, leagueTeamId: p.primaryTeamId! }));
+  const teamMap = await loadTeams(db, teamPairs);
+
   setCache(c, 'medium');
   return c.json(
     {
@@ -827,7 +890,7 @@ attending.openapi(playersListRoute, async (c) => {
         birth_country: p.birthCountry,
         bats: p.bats,
         throws: p.throws,
-        primary_team_id: p.primaryTeamId,
+        primary_team: getTeam(teamMap, p.league, p.primaryTeamId),
         debut_date: p.debutDate,
         photo_silo: siloMap.get(String(p.id)) ?? null,
         photo_full: fullMap.get(String(p.id)) ?? null,
@@ -867,7 +930,7 @@ const playerDetailRoute = createRoute({
                 event_id: z.number(),
                 event_date: z.string(),
                 title: z.string(),
-                team_id: z.number().nullable(),
+                team: Team.nullable(),
                 is_home: z.boolean(),
                 batting_line: z.record(z.string(), z.any()).nullable(),
                 pitching_line: z.record(z.string(), z.any()).nullable(),
@@ -910,6 +973,20 @@ attending.openapi(playerDetailRoute, async (c) => {
     .where(eq(attendedEventPlayers.playerId, id))
     .orderBy(desc(attendedEvents.eventDate));
 
+  // Per-appearance teams (the team this player played for in each game)
+  // plus the player's primary team — load them all in one round trip.
+  const teamPairs: TeamPair[] = [];
+  if (p.primaryTeamId != null) {
+    teamPairs.push({ league: p.league, leagueTeamId: p.primaryTeamId });
+  }
+  for (const r of appearances) {
+    const a = r.attended_event_players;
+    if (a.teamId != null) {
+      teamPairs.push({ league: p.league, leagueTeamId: a.teamId });
+    }
+  }
+  const teamMap = await loadTeams(db, teamPairs);
+
   setCache(c, 'medium');
   return c.json(
     {
@@ -924,7 +1001,7 @@ attending.openapi(playerDetailRoute, async (c) => {
       birth_country: p.birthCountry,
       bats: p.bats,
       throws: p.throws,
-      primary_team_id: p.primaryTeamId,
+      primary_team: getTeam(teamMap, p.league, p.primaryTeamId),
       debut_date: p.debutDate,
       photo_silo: siloMap.get(eid) ?? null,
       photo_full: fullMap.get(eid) ?? null,
@@ -937,7 +1014,7 @@ attending.openapi(playerDetailRoute, async (c) => {
             event_id: ev.id,
             event_date: ev.eventDate,
             title: ev.title,
-            team_id: a.teamId,
+            team: getTeam(teamMap, p.league, a.teamId),
             is_home: a.isHome === 1,
             batting_line: parseJson<Record<string, unknown>>(a.battingLine),
             pitching_line: parseJson<Record<string, unknown>>(a.pitchingLine),
@@ -956,7 +1033,7 @@ const PlayerSummarySchema = z.object({
   id: z.number(),
   full_name: z.string(),
   primary_position: z.string().nullable(),
-  primary_team_id: z.number().nullable(),
+  primary_team: Team.nullable(),
 });
 
 const HitterStatsSchema = z.object({
