@@ -217,7 +217,7 @@
       "rank": 1,
       "id": 20,
       "name": "GUTS",
-      "playcount": 60,
+      "playcount": 615,
       "apple_music_url": "https://music.apple.com/us/album/vampire/1736994853?i=1736995100&uo=4",
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -230,7 +230,7 @@
       "rank": 2,
       "id": 21,
       "name": "SOUR",
-      "playcount": 49,
+      "playcount": 376,
       "apple_music_url": "https://music.apple.com/us/album/1-step-forward-3-steps-back/1560734944?i=1560735846&uo=4",
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -241,22 +241,9 @@
     },
     {
       "rank": 3,
-      "id": 10864,
-      "name": "SOUR (Video Version)",
-      "playcount": 0,
-      "apple_music_url": "https://music.apple.com/us/album/traitor/1582277315?i=1582277647&uo=4",
-      "image": {
-        "cdn_url": "https://cdn.rewind.rest/listening/albums/10864/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
-        "thumbhash": "4xYGLwL+MY50indppahodnd4dlBnCXQF",
-        "dominant_color": "#867ec3",
-        "accent_color": "#36302d"
-      }
-    },
-    {
-      "rank": 4,
       "id": 11827,
       "name": "GUTS (spilled)",
-      "playcount": 0,
+      "playcount": 41,
       "apple_music_url": "https://music.apple.com/us/album/vampire/1736994915?i=1736995376&uo=4",
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/albums/11827/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -266,10 +253,10 @@
       }
     },
     {
-      "rank": 5,
+      "rank": 4,
       "id": 11841,
       "name": "High School Musical: The Musical: The Series (Music from the Disney+ Original Series)",
-      "playcount": 0,
+      "playcount": 7,
       "apple_music_url": "https://music.apple.com/us/album/all-i-want/1485659112?i=1485659134&uo=4",
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/albums/11841/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -277,13 +264,26 @@
         "dominant_color": "#fdfdfc",
         "accent_color": "#241615"
       }
+    },
+    {
+      "rank": 5,
+      "id": 11845,
+      "name": "The Hunger Games: The Ballad of Songbirds & Snakes (Music From & Inspired By)",
+      "playcount": 6,
+      "apple_music_url": "https://music.apple.com/us/album/cant-catch-me-now-from-the-hunger-games-the/1714727603?i=1714727613&uo=4",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/11845/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "DDkKFwIIZ4eJZ4eSeneYeHd3h6AoCIoB",
+        "dominant_color": "#120502",
+        "accent_color": "#451f0a"
+      }
     }
   ],
   "similar_artists": [
     {
       "id": 471,
       "name": "Sabrina Carpenter",
-      "your_scrobble_count": 22,
+      "your_scrobble_count": 1242,
       "similarity_score": 1,
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/artists/471/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -295,7 +295,7 @@
     {
       "id": 92,
       "name": "Taylor Swift",
-      "your_scrobble_count": 2254,
+      "your_scrobble_count": 3336,
       "similarity_score": 0.941089,
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/artists/92/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -307,7 +307,7 @@
     {
       "id": 95,
       "name": "Chappell Roan",
-      "your_scrobble_count": 8,
+      "your_scrobble_count": 330,
       "similarity_score": 0.732114,
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/artists/95/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -319,7 +319,7 @@
     {
       "id": 587,
       "name": "Harry Styles",
-      "your_scrobble_count": 0,
+      "your_scrobble_count": 12,
       "similarity_score": 0.683593,
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/artists/587/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
@@ -331,7 +331,7 @@
     {
       "id": 613,
       "name": "Conan Gray",
-      "your_scrobble_count": 0,
+      "your_scrobble_count": 6,
       "similarity_score": 0.664487,
       "image": {
         "cdn_url": "https://cdn.rewind.rest/listening/artists/613/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
