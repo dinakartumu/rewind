@@ -1,0 +1,1776 @@
+{
+  "league": "mlb",
+  "season": 2025,
+  "attended_count": 12,
+  "wins": 9,
+  "losses": 3,
+  "data": [
+    {
+      "id": 39,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-03-30",
+      "event_datetime": "2025-03-30T13:15:00-07:00",
+      "title": "Seattle Mariners vs Athletics",
+      "subtitle": "Mariners 2, Athletics 1",
+      "series_id": null,
+      "external_id": "778513",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 133,
+          "name": "Athletics"
+        },
+        "home_score": 2,
+        "away_score": 1,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 2,
+        "opponent_score": 1,
+        "attendance": 27696,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "59",
+          "wind": "2 mph, R To L"
+        },
+        "duration_minutes": 123,
+        "first_pitch": "2025-03-30T20:11:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 693433,
+          "away_id": 676664
+        },
+        "decisions": {
+          "winner_id": 693433,
+          "loser_id": 676664,
+          "save_id": 662253
+        },
+        "boxscore_enriched_at": "2026-04-27T16:25:52.775Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 40,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-04-09",
+      "event_datetime": "2025-04-09T13:10:00-07:00",
+      "title": "Seattle Mariners vs Houston Astros",
+      "subtitle": "Mariners 7, Astros 6",
+      "series_id": null,
+      "external_id": "778383",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 117,
+          "name": "Houston Astros"
+        },
+        "home_score": 7,
+        "away_score": 6,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 7,
+        "opponent_score": 6,
+        "attendance": 20556,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "52",
+          "wind": "1 mph, Out To LF"
+        },
+        "duration_minutes": 193,
+        "first_pitch": "2025-04-09T20:10:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 3,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 4,
+            "away_runs": 1,
+            "home_hits": 2,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 3,
+            "away_runs": 1,
+            "home_hits": 3,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 622379,
+          "away_id": 686613
+        },
+        "decisions": {
+          "winner_id": 596271,
+          "loser_id": 650556,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:25:59.486Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 41,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-04-25",
+      "event_datetime": "2025-04-25T18:40:00-07:00",
+      "title": "Seattle Mariners vs Miami Marlins",
+      "subtitle": "Mariners 4, Marlins 8",
+      "series_id": null,
+      "external_id": "778175",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 146,
+          "name": "Miami Marlins"
+        },
+        "home_score": 4,
+        "away_score": 8,
+        "my_team": "home",
+        "my_team_won": false,
+        "my_team_score": 4,
+        "opponent_score": 8,
+        "attendance": 29753,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "67",
+          "wind": "12 mph, In From LF"
+        },
+        "duration_minutes": 143,
+        "first_pitch": "2025-04-26T01:40:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 6,
+            "home_hits": 0,
+            "away_hits": 5,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 3,
+            "away_runs": 0,
+            "home_hits": 4,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 2,
+            "home_hits": 1,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 669302,
+          "away_id": 615698
+        },
+        "decisions": {
+          "winner_id": 615698,
+          "loser_id": 596271,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:06.818Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 42,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-04-30",
+      "event_datetime": "2025-04-30T13:10:00-07:00",
+      "title": "Seattle Mariners vs Los Angeles Angels",
+      "subtitle": "Mariners 9, Angels 3",
+      "series_id": null,
+      "external_id": "778104",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 108,
+          "name": "Los Angeles Angels"
+        },
+        "home_score": 9,
+        "away_score": 3,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 9,
+        "opponent_score": 3,
+        "attendance": 16229,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "56",
+          "wind": "6 mph, L To R"
+        },
+        "duration_minutes": 161,
+        "first_pitch": "2025-04-30T20:10:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 1,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 2,
+            "home_errors": 1,
+            "away_errors": 2
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 6,
+            "away_runs": 0,
+            "home_hits": 7,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 676106,
+          "away_id": 542881
+        },
+        "decisions": {
+          "winner_id": 668984,
+          "loser_id": 672282,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:13.987Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 43,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-05-31",
+      "event_datetime": "2025-05-31T16:15:00-07:00",
+      "title": "Seattle Mariners vs Minnesota Twins",
+      "subtitle": "Mariners 5, Twins 4",
+      "series_id": null,
+      "external_id": "777695",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 142,
+          "name": "Minnesota Twins"
+        },
+        "home_score": 5,
+        "away_score": 4,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 5,
+        "opponent_score": 4,
+        "attendance": 37457,
+        "weather": {
+          "condition": "Roof Closed",
+          "temp": "57",
+          "wind": "0 mph, None"
+        },
+        "duration_minutes": 226,
+        "first_pitch": "2025-05-31T23:16:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 3,
+            "home_hits": 1,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 2,
+            "away_hits": 2,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 10,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 11,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 682243,
+          "away_id": 641927
+        },
+        "decisions": {
+          "winner_id": 676092,
+          "loser_id": 663485,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:21.168Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 44,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-06-14",
+      "event_datetime": "2025-06-14T18:40:00-07:00",
+      "title": "Seattle Mariners vs Cleveland Guardians",
+      "subtitle": "Mariners 4, Guardians 3",
+      "series_id": null,
+      "external_id": "777507",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 114,
+          "name": "Cleveland Guardians"
+        },
+        "home_score": 4,
+        "away_score": 3,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 4,
+        "opponent_score": 3,
+        "attendance": 32211,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "67",
+          "wind": "7 mph, L To R"
+        },
+        "duration_minutes": 179,
+        "first_pitch": "2025-06-15T01:41:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 669923,
+          "away_id": 676440
+        },
+        "decisions": {
+          "winner_id": 663804,
+          "loser_id": 661403,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:28.445Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 45,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-07-23",
+      "event_datetime": "2025-07-23T12:40:00-07:00",
+      "title": "Seattle Mariners vs Milwaukee Brewers",
+      "subtitle": "Mariners 2, Brewers 10",
+      "series_id": null,
+      "external_id": "777024",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 158,
+          "name": "Milwaukee Brewers"
+        },
+        "home_score": 2,
+        "away_score": 10,
+        "my_team": "home",
+        "my_team_won": false,
+        "my_team_score": 2,
+        "opponent_score": 10,
+        "attendance": 41449,
+        "weather": {
+          "condition": "Sunny",
+          "temp": "73",
+          "wind": "3 mph, Out To CF"
+        },
+        "duration_minutes": 146,
+        "first_pitch": "2025-07-23T19:41:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 2,
+            "away_runs": 2,
+            "home_hits": 3,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 3,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 3,
+            "home_hits": 1,
+            "away_hits": 4,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 622491,
+          "away_id": 682990
+        },
+        "decisions": {
+          "winner_id": 682990,
+          "loser_id": 622491,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:35.408Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 59,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-08-08",
+      "event_datetime": "08-08T18:40",
+      "title": "Seattle Mariners vs Tampa Bay Rays",
+      "subtitle": "Mariners 3, Rays 2",
+      "series_id": null,
+      "external_id": "776824",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 139,
+          "name": "Tampa Bay Rays"
+        },
+        "home_score": 3,
+        "away_score": 2,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 3,
+        "opponent_score": 2,
+        "attendance": 39780,
+        "weather": {
+          "condition": "Overcast",
+          "temp": "74",
+          "wind": "8 mph, L To R"
+        },
+        "duration_minutes": 123,
+        "first_pitch": "2025-08-09T01:41:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 3,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 622491,
+          "away_id": 656876
+        },
+        "decisions": {
+          "winner_id": 672841,
+          "loser_id": 643377,
+          "save_id": 666374
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:42.639Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 48,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-08-22",
+      "event_datetime": "2025-08-22T19:10:00-07:00",
+      "title": "Seattle Mariners vs Athletics",
+      "subtitle": "Mariners 3, Athletics 2",
+      "series_id": null,
+      "external_id": "776638",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 133,
+          "name": "Athletics"
+        },
+        "home_score": 3,
+        "away_score": 2,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 3,
+        "opponent_score": 2,
+        "attendance": 36958,
+        "weather": {
+          "condition": "Clear",
+          "temp": "81",
+          "wind": "6 mph, L To R"
+        },
+        "duration_minutes": 138,
+        "first_pitch": "2025-08-23T02:11:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 1,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 3,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 693433,
+          "away_id": 806960
+        },
+        "decisions": {
+          "winner_id": 693433,
+          "loser_id": 665660,
+          "save_id": 662253
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:49.610Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 49,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-08-23",
+      "event_datetime": "2025-08-23T18:40:00-07:00",
+      "title": "Seattle Mariners vs Athletics",
+      "subtitle": "Mariners 1, Athletics 2",
+      "series_id": null,
+      "external_id": "776620",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 133,
+          "name": "Athletics"
+        },
+        "home_score": 1,
+        "away_score": 2,
+        "my_team": "home",
+        "my_team_won": false,
+        "my_team_score": 1,
+        "opponent_score": 2,
+        "attendance": 36524,
+        "weather": {
+          "condition": "Partly Cloudy",
+          "temp": "84",
+          "wind": "7 mph, L To R"
+        },
+        "duration_minutes": 165,
+        "first_pitch": "2025-08-24T01:42:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 10,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 669923,
+          "away_id": 605488
+        },
+        "decisions": {
+          "winner_id": 621053,
+          "loser_id": 657571,
+          "save_id": 663687
+        },
+        "boxscore_enriched_at": "2026-04-27T16:26:56.460Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 94,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-09-14",
+      "event_datetime": "2025-09-14T13:10",
+      "title": "Seattle Mariners vs Los Angeles Angels",
+      "subtitle": "Mariners 11, Angels 2",
+      "series_id": null,
+      "external_id": "776317",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 108,
+          "name": "Los Angeles Angels"
+        },
+        "home_score": 11,
+        "away_score": 2,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 11,
+        "opponent_score": 2,
+        "attendance": 42513,
+        "weather": {
+          "condition": "Cloudy",
+          "temp": "65",
+          "wind": "5 mph, R To L"
+        },
+        "duration_minutes": 156,
+        "first_pitch": "2025-09-14T20:12:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 3,
+            "away_runs": 0,
+            "home_hits": 4,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 6,
+            "away_runs": 0,
+            "home_hits": 6,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 2,
+            "away_hits": 2,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 1,
+            "home_hits": 1,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 1
+          },
+          {
+            "inning": 8,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 669923,
+          "away_id": 543294
+        },
+        "decisions": {
+          "winner_id": 669923,
+          "loser_id": 543294,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:27:03.690Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    },
+    {
+      "id": 55,
+      "category": "sports",
+      "event_type": "mlb_game",
+      "event_date": "2025-09-24",
+      "event_datetime": "2025-09-24T18:40:00-07:00",
+      "title": "Seattle Mariners vs Colorado Rockies",
+      "subtitle": "Mariners 9, Rockies 2",
+      "series_id": null,
+      "external_id": "776194",
+      "external_source": "mlb_stats_api",
+      "event_data": {
+        "league": "mlb",
+        "season": 2025,
+        "game_type": "R",
+        "home_team": {
+          "id": 136,
+          "name": "Seattle Mariners"
+        },
+        "away_team": {
+          "id": 115,
+          "name": "Colorado Rockies"
+        },
+        "home_score": 9,
+        "away_score": 2,
+        "my_team": "home",
+        "my_team_won": true,
+        "my_team_score": 9,
+        "opponent_score": 2,
+        "attendance": 42883,
+        "weather": {
+          "condition": "Clear",
+          "temp": "68",
+          "wind": "5 mph, L To R"
+        },
+        "duration_minutes": 145,
+        "first_pitch": "2025-09-25T01:40:00.000Z",
+        "linescore": [
+          {
+            "inning": 1,
+            "home_runs": 3,
+            "away_runs": 0,
+            "home_hits": 3,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 2,
+            "home_runs": 2,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 3,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 4,
+            "home_runs": 2,
+            "away_runs": 1,
+            "home_hits": 2,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 1
+          },
+          {
+            "inning": 5,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 0,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 6,
+            "home_runs": 0,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 7,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 2,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 8,
+            "home_runs": 1,
+            "away_runs": 0,
+            "home_hits": 1,
+            "away_hits": 0,
+            "home_errors": 0,
+            "away_errors": 0
+          },
+          {
+            "inning": 9,
+            "home_runs": null,
+            "away_runs": 1,
+            "home_hits": 0,
+            "away_hits": 1,
+            "home_errors": 0,
+            "away_errors": 0
+          }
+        ],
+        "starting_pitchers": {
+          "home_id": 622491,
+          "away_id": 685299
+        },
+        "decisions": {
+          "winner_id": 622491,
+          "loser_id": 685299,
+          "save_id": null
+        },
+        "boxscore_enriched_at": "2026-04-27T16:27:12.153Z"
+      },
+      "notes": null,
+      "attended": true,
+      "venue": {
+        "id": 1,
+        "name": "T-Mobile Park",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "US",
+        "latitude": 47.5914,
+        "longitude": -122.3325,
+        "capacity": 47929
+      },
+      "tickets": []
+    }
+  ]
+}

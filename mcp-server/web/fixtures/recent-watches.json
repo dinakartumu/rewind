@@ -1,0 +1,244 @@
+{
+  "items": [
+    {
+      "movie": {
+        "id": 710,
+        "title": "I'm Chevy Chase and You're Not",
+        "year": 2025,
+        "director": "Marina Zenovich",
+        "directors": ["Marina Zenovich"],
+        "genres": ["Documentary"],
+        "duration_min": 97,
+        "rating": null,
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/710/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "6hcODwT2Z4ediIdyd7p3SIh6uIC1CWkN",
+          "dominant_color": "#e2e5eb",
+          "accent_color": "#2a223b"
+        },
+        "imdb_id": "tt36956674",
+        "tmdb_id": 1584780,
+        "tmdb_rating": 7.1,
+        "tagline": null,
+        "summary": "From his Saturday Night Live beginnings to a string of classic comedies, Chevy Chase has always had huge comedic range. He is also a complex and contradictory human being. Featuring revealing interviews with those closest to him, this documentary digs into the talent, flaws, and humanity that shaped an icon."
+      },
+      "watched_at": "2026-04-17T06:27:57.222Z",
+      "source": "plex",
+      "user_rating": null,
+      "percent_complete": 100,
+      "rewatch": false,
+      "review": null,
+      "review_url": null
+    },
+    {
+      "movie": {
+        "id": 707,
+        "title": "Isle of Dogs",
+        "year": 2018,
+        "director": "Wes Anderson",
+        "directors": ["Wes Anderson"],
+        "genres": ["Comedy", "Adventure", "Animation"],
+        "duration_min": 101,
+        "rating": null,
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/707/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bSgSFwb3d2h2eIl5hraIiHiKh4CICIYK",
+          "dominant_color": "#f5f5f5",
+          "accent_color": "#f5f5f5"
+        },
+        "imdb_id": "tt5104604",
+        "tmdb_id": 399174,
+        "tmdb_rating": 7.8,
+        "tagline": "Loyalty has a scent. And it smells like rebellion.",
+        "summary": "In the future, an outbreak of canine flu leads the mayor of a Japanese city to banish all dogs to an island used as a garbage dump. The outcasts must soon embark on an epic journey when a 12-year-old boy arrives on the island to find his beloved pet."
+      },
+      "watched_at": "2026-04-09T05:01:14.308Z",
+      "source": "plex",
+      "user_rating": 4,
+      "percent_complete": 100,
+      "rewatch": true,
+      "review": "It's so fun to watch Wes work with puppetry. His live action films already blur the lines between real and make-believe so closely that these actually always end up feeling stylistically so close together.",
+      "review_url": "https://letterboxd.com/patdugan/film/isle-of-dogs-2018/"
+    },
+    {
+      "movie": {
+        "id": 706,
+        "title": "The Drama",
+        "year": 2026,
+        "director": "Kristoffer Borgli",
+        "directors": ["Kristoffer Borgli"],
+        "genres": ["Romance", "Comedy", "Drama"],
+        "duration_min": 105,
+        "rating": "R",
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/706/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=2",
+          "thumbhash": "lygKHwZtVXpyeIh/h0eIt3d1+IUYX4oB",
+          "dominant_color": "#252830",
+          "accent_color": "#5d3526"
+        },
+        "imdb_id": "tt33071426",
+        "tmdb_id": 1325734,
+        "tmdb_rating": 6.917,
+        "tagline": "Witness the wedding of the year.",
+        "summary": "A happily engaged couple is put to the test when an unexpected turn sends their wedding week off the rails."
+      },
+      "watched_at": "2026-04-06T12:00:00.000Z",
+      "source": "letterboxd",
+      "user_rating": 4,
+      "percent_complete": null,
+      "rewatch": false,
+      "review": "I lost track of the number of times I realized my mouth was hanging open and I had to forcibly close my jaw.",
+      "review_url": "https://letterboxd.com/patdugan/film/the-drama/"
+    },
+    {
+      "movie": {
+        "id": 209,
+        "title": "Jackass: The Movie",
+        "year": 2002,
+        "director": "Jeff Tremaine",
+        "directors": ["Jeff Tremaine"],
+        "genres": ["Comedy", "Action", "Documentary"],
+        "duration_min": 85,
+        "rating": "R",
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/209/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HQgODwS4inlvmXiWdceJx3aWqvqYmp8K",
+          "dominant_color": "#101110",
+          "accent_color": "#dfd5cd"
+        },
+        "imdb_id": "tt0322802",
+        "tmdb_id": 9012,
+        "tmdb_rating": 6.312,
+        "tagline": "Do not attempt this at home.",
+        "summary": "Johnny Knoxville and his band of maniacs perform a variety of stunts and gross-out gags on the big screen for the first time. They wander around Japan in panda outfits, wreak havoc on a once civilized golf course, they even do stunts involving LIVE alligators, and so on."
+      },
+      "watched_at": "2026-04-02T21:20:29.374Z",
+      "source": "plex",
+      "user_rating": null,
+      "percent_complete": 100,
+      "rewatch": false,
+      "review": null,
+      "review_url": null
+    },
+    {
+      "movie": {
+        "id": 209,
+        "title": "Jackass: The Movie",
+        "year": 2002,
+        "director": "Jeff Tremaine",
+        "directors": ["Jeff Tremaine"],
+        "genres": ["Comedy", "Action", "Documentary"],
+        "duration_min": 85,
+        "rating": "R",
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/209/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HQgODwS4inlvmXiWdceJx3aWqvqYmp8K",
+          "dominant_color": "#101110",
+          "accent_color": "#dfd5cd"
+        },
+        "imdb_id": "tt0322802",
+        "tmdb_id": 9012,
+        "tmdb_rating": 6.312,
+        "tagline": "Do not attempt this at home.",
+        "summary": "Johnny Knoxville and his band of maniacs perform a variety of stunts and gross-out gags on the big screen for the first time. They wander around Japan in panda outfits, wreak havoc on a once civilized golf course, they even do stunts involving LIVE alligators, and so on."
+      },
+      "watched_at": "2026-04-02T21:20:27.000Z",
+      "source": "plex",
+      "user_rating": null,
+      "percent_complete": 100,
+      "rewatch": false,
+      "review": null,
+      "review_url": null
+    },
+    {
+      "movie": {
+        "id": 296,
+        "title": "Goldfinger",
+        "year": 1964,
+        "director": "Guy Hamilton",
+        "directors": ["Guy Hamilton"],
+        "genres": ["Action", "Thriller", "Adventure"],
+        "duration_min": 110,
+        "rating": "PG",
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/296/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "WxgODwL7p8aJiWhclUeWuJhzvTX6H5IM",
+          "dominant_color": "#181516",
+          "accent_color": "#846551"
+        },
+        "imdb_id": "tt0058150",
+        "tmdb_id": 658,
+        "tmdb_rating": 7.4,
+        "tagline": "Everything he touches turns into excitement!",
+        "summary": "Special agent 007 comes face to face with one of the most notorious villains of all time, and now he must outwit and outgun the powerful tycoon to prevent him from cashing in on a devious scheme to raid Fort Knox -- and obliterate the world's economy."
+      },
+      "watched_at": "2026-03-31T19:48:36.242Z",
+      "source": "plex",
+      "user_rating": 4,
+      "percent_complete": 100,
+      "rewatch": false,
+      "review": "Clearly the best of the original Bond films but my god, the sexism is just completely wild.",
+      "review_url": "https://letterboxd.com/patdugan/film/goldfinger/"
+    },
+    {
+      "movie": {
+        "id": 705,
+        "title": "Is This Thing On?",
+        "year": 2025,
+        "director": "Bradley Cooper",
+        "directors": ["Bradley Cooper"],
+        "genres": ["Comedy", "Drama"],
+        "duration_min": 121,
+        "rating": null,
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/705/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "1EgKHQhWeHl4qmjXV3CIZ5NvW/m3",
+          "dominant_color": "#231916",
+          "accent_color": "#5a271d"
+        },
+        "imdb_id": "tt28083456",
+        "tmdb_id": 1140498,
+        "tmdb_rating": 6.511,
+        "tagline": null,
+        "summary": "As their marriage quietly unravels, Alex faces middle age and an impending divorce, seeking new purpose in the New York comedy scene while Tess confronts the sacrifices she made for their family—forcing them to navigate co-parenting, identity, and whether love can take a new form."
+      },
+      "watched_at": "2026-03-30T05:37:35.787Z",
+      "source": "plex",
+      "user_rating": 3.5,
+      "percent_complete": 100,
+      "rewatch": false,
+      "review": "Arnett always plays this type of role so well. Ending took me a bit by surprise but very well executed.",
+      "review_url": "https://letterboxd.com/patdugan/film/is-this-thing-on-2025/"
+    },
+    {
+      "movie": {
+        "id": 704,
+        "title": "Project Hail Mary",
+        "year": 2026,
+        "director": "Phil Lord",
+        "directors": ["Phil Lord", "Christopher Miller"],
+        "genres": ["Science Fiction", "Adventure"],
+        "duration_min": 157,
+        "rating": "PG-13",
+        "image": {
+          "cdn_url": "https://cdn.rewind.rest/watching/movies/704/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "1OcFFwQFSYxDqXZ1WSmoZXlcWQp1tmAG",
+          "dominant_color": "#132c33",
+          "accent_color": "#635f53"
+        },
+        "imdb_id": "tt12042730",
+        "tmdb_id": 687163,
+        "tmdb_rating": 8.166,
+        "tagline": "Believe in the Hail Mary.",
+        "summary": "Science teacher Ryland Grace wakes up on a spaceship light years from home with no recollection of who he is or how he got there. As his memory returns, he begins to uncover his mission: solve the riddle of the mysterious substance causing the sun to die out. He must call on his scientific knowledge and unorthodox ideas to save everything on Earth from extinction… but an unexpected friendship means he may not have to do it alone."
+      },
+      "watched_at": "2026-03-29T12:00:00.000Z",
+      "source": "letterboxd",
+      "user_rating": 4.5,
+      "percent_complete": null,
+      "rewatch": false,
+      "review": "When Ryan switched light spectrums on the spacewalk above Tau Ceti I legit elevated right out my seat.",
+      "review_url": "https://letterboxd.com/patdugan/film/project-hail-mary/"
+    }
+  ]
+}

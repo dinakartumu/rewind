@@ -1,0 +1,235 @@
+{
+  "period": "1month",
+  "data": [
+    {
+      "rank": 1,
+      "id": 130,
+      "name": "Beastie Boys",
+      "detail": "",
+      "playcount": 200,
+      "genre": "Hip-Hop",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/130/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "XwcKDwLGx4lvhXaNh0WIuHh4SflGZXgA",
+        "dominant_color": "#1f1938",
+        "accent_color": "#62596d"
+      },
+      "url": "https://www.last.fm/music/Beastie+Boys",
+      "apple_music_url": "https://music.apple.com/us/artist/beastie-boys/1971863?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          45, 29, 12, 25, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0
+        ]
+      }
+    },
+    {
+      "rank": 2,
+      "id": 92,
+      "name": "Taylor Swift",
+      "detail": "",
+      "playcount": 90,
+      "genre": "Country",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/92/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "FRcKHwSYZ4dllXd/hUaHd3mJt4A5j5YI",
+        "dominant_color": "#615592",
+        "accent_color": "#100d15"
+      },
+      "url": "https://www.last.fm/music/Taylor+Swift",
+      "apple_music_url": "https://music.apple.com/us/artist/taylor-swift/159260351?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          38, 53, 4, 0, 0
+        ]
+      }
+    },
+    {
+      "rank": 3,
+      "id": 37,
+      "name": "Olivia Rodrigo",
+      "detail": "",
+      "playcount": 52,
+      "genre": "Pop",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/37/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "h0gKFwQHtWloiHh1ioeIdod4KPV3UV8I",
+        "dominant_color": "#390201",
+        "accent_color": "#512f3d"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo",
+      "apple_music_url": "https://music.apple.com/us/artist/olivia-rodrigo/979458609?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 1, 1, 0, 0, 6, 3, 15, 0, 0, 0, 0,
+          1, 0, 0, 0, 0
+        ]
+      }
+    },
+    {
+      "rank": 4,
+      "id": 483,
+      "name": "Billie Eilish",
+      "detail": "",
+      "playcount": 30,
+      "genre": "Pop",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/483/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "0PgJHwJMhXW/ZGeFZ3eHKaZzmPR6UFIC",
+        "dominant_color": "#494e34",
+        "accent_color": "#262d1b"
+      },
+      "url": "https://www.last.fm/music/Billie+Eilish",
+      "apple_music_url": "https://music.apple.com/us/artist/billie-eilish/1065981054?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 18, 12, 0
+        ]
+      }
+    },
+    {
+      "rank": 5,
+      "id": 636,
+      "name": "Radiohead",
+      "detail": "",
+      "playcount": 23,
+      "genre": "Rock",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/636/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "TQgGBwCTeZZ/eHeNZ7h4h3iG+bWrBa0M",
+        "dominant_color": "#241e16",
+        "accent_color": "#655c54"
+      },
+      "url": "https://www.last.fm/music/Radiohead",
+      "apple_music_url": "https://music.apple.com/us/artist/radiohead/657515?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 20, 3
+        ]
+      }
+    },
+    {
+      "rank": 6,
+      "id": 471,
+      "name": "Sabrina Carpenter",
+      "detail": "",
+      "playcount": 22,
+      "genre": "Pop",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/471/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "GQgKBwBAmnhLeIecW6h3qIiWJjDqAIcO",
+        "dominant_color": "#827b79",
+        "accent_color": "#c6c2c2"
+      },
+      "url": "https://www.last.fm/music/Sabrina+Carpenter",
+      "apple_music_url": "https://music.apple.com/us/artist/sabrina-carpenter/390647681?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0
+        ]
+      }
+    },
+    {
+      "rank": 7,
+      "id": 867,
+      "name": "Bruno Mars",
+      "detail": "",
+      "playcount": 21,
+      "genre": "Pop",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/867/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "0jgKFwQAbXiDeYhxe5mHd4l5NyAYBnQA",
+        "dominant_color": "#080706",
+        "accent_color": "#9e6c46"
+      },
+      "url": "https://www.last.fm/music/Bruno+Mars",
+      "apple_music_url": "https://music.apple.com/us/artist/bruno-mars/278873078?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 12, 9
+        ]
+      }
+    },
+    {
+      "rank": 8,
+      "id": 709,
+      "name": "Silk Sonic",
+      "detail": "",
+      "playcount": 18,
+      "genre": "Soul",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/709/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "WkkODwI3Z3iQd4d2d6hoZ4l3iIC7B8MK",
+        "dominant_color": "#d7aa91",
+        "accent_color": "#b37356"
+      },
+      "url": "https://www.last.fm/music/Silk+Sonic",
+      "apple_music_url": "https://music.apple.com/us/artist/silk-sonic/1556097160?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 7, 0, 0, 7, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0
+        ]
+      }
+    },
+    {
+      "rank": 9,
+      "id": 2405,
+      "name": "Gorillaz",
+      "detail": "",
+      "playcount": 10,
+      "genre": "Electronic",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/2405/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "6/cRDwL3uIiLd3d6hqd3h3eJeAPrBrAG",
+        "dominant_color": "#ffffff",
+        "accent_color": "#ffffff"
+      },
+      "url": "https://www.last.fm/music/Gorillaz",
+      "apple_music_url": "https://music.apple.com/us/artist/gorillaz/567072?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 16
+        ]
+      }
+    },
+    {
+      "rank": 10,
+      "id": 5725,
+      "name": "Sweatson Klank",
+      "detail": "",
+      "playcount": 10,
+      "genre": "Electronic",
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/artists/5725/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "HggOFwRKl3egmHlsaGeIZ4h5Z7BYA3kF",
+        "dominant_color": "#6b7871",
+        "accent_color": "#cececf"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/artist/sweatson-klank/449808401?uo=4",
+      "sparkline": {
+        "granularity": "day",
+        "points": [
+          0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "period": "1month",
+  "data": [
+    {
+      "rank": 1,
+      "id": 227,
+      "name": "Lover",
+      "detail": "Taylor Swift",
+      "playcount": 49,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/227/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "8icGFwT3VpdohHl4hVqWaHZ3GV8U+CoB",
+        "dominant_color": "#f5d1dc",
+        "accent_color": "#95b3cd"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/me-feat-brendon-urie-of-panic-at-the-disco/1468058165?i=1468058706&uo=4"
+    },
+    {
+      "rank": 2,
+      "id": 172,
+      "name": "Paul’s Boutique",
+      "detail": "Beastie Boys",
+      "playcount": 39,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/172/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "DggGBwD+R5a5l6uKlxdmdqq0Rab5aasP",
+        "dominant_color": "#13181d",
+        "accent_color": "#353537"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/to-all-the-girls/721276795?i=721277050&uo=4"
+    },
+    {
+      "rank": 3,
+      "id": 371,
+      "name": "Check Your Head",
+      "detail": "Beastie Boys",
+      "playcount": 36,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/371/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "FggODwJpiGifd3iGdjV3d4Znh3cIdnYA",
+        "dominant_color": "#010101",
+        "accent_color": "#f4f3f0"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/the-blue-nun-remastered-2009/724303425?i=724304062&uo=4"
+    },
+    {
+      "rank": 4,
+      "id": 171,
+      "name": "Hello Nasty",
+      "detail": "Beastie Boys",
+      "playcount": 31,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/171/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "JRoKFwIZZ1hmd3hwkoZoNmh4xvMJKpwA",
+        "dominant_color": "#f0d872",
+        "accent_color": "#b8af88"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/unite/721224205?i=721224514&uo=4"
+    },
+    {
+      "rank": 5,
+      "id": 170,
+      "name": "Ill Communication",
+      "detail": "Beastie Boys",
+      "playcount": 31,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/170/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "JAgKBwBJpYdeZZUvxnh6Zrijytv497cO",
+        "dominant_color": "#ece9e4",
+        "accent_color": "#bdb7b0"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/the-scoop/724943000?i=724944265&uo=4"
+    },
+    {
+      "rank": 6,
+      "id": 20,
+      "name": "GUTS",
+      "detail": "Olivia Rodrigo",
+      "playcount": 28,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/vampire/1736994853?i=1736995100&uo=4"
+    },
+    {
+      "rank": 7,
+      "id": 214,
+      "name": "Midnights",
+      "detail": "Taylor Swift",
+      "playcount": 26,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/214/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "ZSgODwTNenVfdodrZ5hniHiFBiM6MaAE",
+        "dominant_color": "#e9e8e2",
+        "accent_color": "#3e202e"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/snow-on-the-beach-feat-lana-del-rey/1650859878?i=1650859889&uo=4"
+    },
+    {
+      "rank": 8,
+      "id": 21,
+      "name": "SOUR",
+      "detail": "Olivia Rodrigo",
+      "playcount": 24,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/1-step-forward-3-steps-back/1560734944?i=1560735846&uo=4"
+    },
+    {
+      "rank": 9,
+      "id": 631,
+      "name": "Licensed to Ill",
+      "detail": "Beastie Boys",
+      "playcount": 21,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/631/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "7wgKDwCHmHeld4ivhWeEeJZ8ZWn6tp8M",
+        "dominant_color": "#e4dabd",
+        "accent_color": "#a59b87"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/shes-crafty/1440912031?i=1440912347&uo=4"
+    },
+    {
+      "rank": 10,
+      "id": 12478,
+      "name": "The Romantic",
+      "detail": "Bruno Mars",
+      "playcount": 21,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/12478/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "MQgGBwCnB8iVmHd2g61omFh1BwAAAAAA",
+        "dominant_color": "#f7f7f7",
+        "accent_color": "#8a8a8a"
+      },
+      "url": "",
+      "apple_music_url": "https://music.apple.com/us/album/nothing-left/1866732792?i=1866733081&uo=4"
+    }
+  ]
+}

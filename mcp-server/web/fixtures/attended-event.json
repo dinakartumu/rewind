@@ -1,0 +1,2597 @@
+{
+  "id": 55,
+  "category": "sports",
+  "event_type": "mlb_game",
+  "event_date": "2025-09-24",
+  "event_datetime": "2025-09-24T18:40:00-07:00",
+  "title": "Seattle Mariners vs Colorado Rockies",
+  "subtitle": "Mariners 9, Rockies 2",
+  "series_id": null,
+  "external_id": "776194",
+  "external_source": "mlb_stats_api",
+  "event_data": {
+    "league": "mlb",
+    "season": 2025,
+    "game_type": "R",
+    "home_team": {
+      "id": 136,
+      "name": "Seattle Mariners"
+    },
+    "away_team": {
+      "id": 115,
+      "name": "Colorado Rockies"
+    },
+    "home_score": 9,
+    "away_score": 2,
+    "my_team": "home",
+    "my_team_won": true,
+    "my_team_score": 9,
+    "opponent_score": 2,
+    "attendance": 42883,
+    "weather": {
+      "condition": "Clear",
+      "temp": "68",
+      "wind": "5 mph, L To R"
+    },
+    "duration_minutes": 145,
+    "first_pitch": "2025-09-25T01:40:00.000Z",
+    "linescore": [
+      {
+        "inning": 1,
+        "home_runs": 3,
+        "away_runs": 0,
+        "home_hits": 3,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 2,
+        "home_runs": 2,
+        "away_runs": 0,
+        "home_hits": 2,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 3,
+        "home_runs": 0,
+        "away_runs": 0,
+        "home_hits": 2,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 4,
+        "home_runs": 2,
+        "away_runs": 1,
+        "home_hits": 2,
+        "away_hits": 1,
+        "home_errors": 0,
+        "away_errors": 1
+      },
+      {
+        "inning": 5,
+        "home_runs": 0,
+        "away_runs": 0,
+        "home_hits": 0,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 6,
+        "home_runs": 0,
+        "away_runs": 0,
+        "home_hits": 2,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 7,
+        "home_runs": 1,
+        "away_runs": 0,
+        "home_hits": 2,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 8,
+        "home_runs": 1,
+        "away_runs": 0,
+        "home_hits": 1,
+        "away_hits": 0,
+        "home_errors": 0,
+        "away_errors": 0
+      },
+      {
+        "inning": 9,
+        "home_runs": null,
+        "away_runs": 1,
+        "home_hits": 0,
+        "away_hits": 1,
+        "home_errors": 0,
+        "away_errors": 0
+      }
+    ],
+    "starting_pitchers": {
+      "home_id": 622491,
+      "away_id": 685299
+    },
+    "decisions": {
+      "winner_id": 622491,
+      "loser_id": 685299,
+      "save_id": null
+    },
+    "boxscore_enriched_at": "2026-04-27T16:27:12.153Z"
+  },
+  "notes": null,
+  "attended": true,
+  "venue": {
+    "id": 1,
+    "name": "T-Mobile Park",
+    "city": "Seattle",
+    "state": "WA",
+    "country": "US",
+    "latitude": 47.5914,
+    "longitude": -122.3325,
+    "capacity": 47929
+  },
+  "tickets": [],
+  "players": [
+    {
+      "player": {
+        "id": 121,
+        "league": "mlb",
+        "mlb_stats_id": 647304,
+        "espn_id": "35066",
+        "full_name": "Josh Naylor",
+        "primary_position": "1B",
+        "primary_number": "12",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/121/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "IDmKDQJHiIZwi4d5yFaBYCUICIeGeIZodw==",
+          "dominant_color": "#e0a780",
+          "accent_color": "#20232b"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/121/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ahiKFQQ3yGdwiXx4qDeKcKMICKhwdolLaA==",
+          "dominant_color": "#e3eaf3",
+          "accent_color": "#ddb198"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 0,
+        "h": 1,
+        "rbi": 1,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 1,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 1,
+        "left_on_base": 0,
+        "summary": "1-4 | RBI, SB"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 189,
+        "league": "mlb",
+        "mlb_stats_id": 645302,
+        "espn_id": "35042",
+        "full_name": "Victor Robles",
+        "primary_position": "CF",
+        "primary_number": "10",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/189/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "2iiGDQJHiIdwi4lY2GeAcAYHB4iHeIdodw==",
+          "dominant_color": "#242a32",
+          "accent_color": "#c2916c"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/189/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ZxiKFQI3x1iAiX1XuDeJcJQHCKeCd3lKdw==",
+          "dominant_color": "#eef2f8",
+          "accent_color": "#ba8560"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 3,
+        "r": 2,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 1,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 1,
+        "pa": 4,
+        "total_bases": 0,
+        "left_on_base": 1,
+        "summary": "0-3 | HBP, K, 2 R"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 122,
+        "league": "mlb",
+        "mlb_stats_id": 702284,
+        "espn_id": "5080641",
+        "full_name": "Cole Young",
+        "primary_position": "2B",
+        "primary_number": "2",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/122/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "5TiKDQJHeJdwjIaJt2eBcBcIB4iHeIZodw==",
+          "dominant_color": "#e5b398",
+          "accent_color": "#1a222a"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/122/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "rCiKFQQ3uHaAinqJx0eJcJQHB6iDh3lKiA==",
+          "dominant_color": "#ecbea4",
+          "accent_color": "#f2f4f9"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 124,
+        "league": "mlb",
+        "mlb_stats_id": 668227,
+        "espn_id": "36488",
+        "full_name": "Randy Arozarena",
+        "primary_position": "LF",
+        "primary_number": "56",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/124/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "WhiKDQJHmGdwi41Ft1eIcIYICId2iHdoaA==",
+          "dominant_color": "#1a1a1b",
+          "accent_color": "#a88063"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/124/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "JRiKDQI32FeAeH9WqDeLcLQICKhxd4lKeA==",
+          "dominant_color": "#f0f3f9",
+          "accent_color": "#222428"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 0,
+        "h": 1,
+        "rbi": 1,
+        "bb": 0,
+        "k": 3,
+        "hr": 0,
+        "doubles": 1,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 5,
+        "total_bases": 2,
+        "left_on_base": 2,
+        "summary": "1-4 | 2B, 3 K, RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 125,
+        "league": "mlb",
+        "mlb_stats_id": 641487,
+        "espn_id": "33210",
+        "full_name": "J.P. Crawford",
+        "primary_position": "SS",
+        "primary_number": "3",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/125/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "nRiGFQJHiHZxmokJ+Gh4gHYIB4iGiId4Zw==",
+          "dominant_color": "#1c1e21",
+          "accent_color": "#deaa8a"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/125/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ZxiKFQI36GaAh343yEeLgKQIB6iBh4lKdw==",
+          "dominant_color": "#eef2f8",
+          "accent_color": "#cf9878"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 1,
+        "rbi": 0,
+        "bb": 0,
+        "k": 1,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 1,
+        "left_on_base": 2,
+        "summary": "1-4 | K, R"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 774,
+        "league": "mlb",
+        "mlb_stats_id": 592426,
+        "espn_id": "31749",
+        "full_name": "Luke Jackson",
+        "primary_position": "P",
+        "primary_number": "77",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/774/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "nDiKDQJGiHdwjIaZx2h1gFcIB5iHeIdoeA==",
+          "dominant_color": "#111017",
+          "accent_color": "#d1a591"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/774/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ZyiKFQI3t2iAiXtoyEh5gIQHCJeEd3lJiA==",
+          "dominant_color": "#f2f5fc",
+          "accent_color": "#c39684"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "1.0",
+        "h": 1,
+        "r": 1,
+        "er": 1,
+        "bb": 1,
+        "k": 1,
+        "hr": 0,
+        "pitches": 23,
+        "strikes": 14,
+        "era": null,
+        "batters_faced": 5,
+        "summary": "1.0 IP, ER, K, BB"
+      },
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 127,
+        "league": "mlb",
+        "mlb_stats_id": 668984,
+        "espn_id": "4346117",
+        "full_name": "Casey Legumina",
+        "primary_position": "P",
+        "primary_number": "64",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/127/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "5EiGDQJGZ8iAjHa5uGeCcDYIB5iHeIZodw==",
+          "dominant_color": "#edc7b6",
+          "accent_color": "#e3a98f"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/127/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bCiKFQQ3uHdwioqIx0eKcKQICKhyd4k6iA==",
+          "dominant_color": "#ebb79f",
+          "accent_color": "#ecf0f7"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 128,
+        "league": "mlb",
+        "mlb_stats_id": 686527,
+        "espn_id": "4345621",
+        "full_name": "Dominic Canzone",
+        "primary_position": "DH",
+        "primary_number": "8",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/128/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "JDmKDQJHZ6dwjHZ5uGhygEYHCIeHeHZodw==",
+          "dominant_color": "#d2a48a",
+          "accent_color": "#212326"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/128/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ayiKFQQ3t3eAinqJuDd7gLQHB5iCh3k6iA==",
+          "dominant_color": "#e7ecf5",
+          "accent_color": "#d4a28a"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 3,
+        "rbi": 0,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 1,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 4,
+        "left_on_base": 0,
+        "summary": "3-4 | 2B, R"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 129,
+        "league": "mlb",
+        "mlb_stats_id": 663728,
+        "espn_id": "41292",
+        "full_name": "Cal Raleigh",
+        "primary_position": "C",
+        "primary_number": "29",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/129/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "oTiGFQRHiHdwi3VryGeGcGYICId3eIdodw==",
+          "dominant_color": "#dfa693",
+          "accent_color": "#1d242e"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/129/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "LBiKFQQ3yFhweXtouEeKcKQICKhxd4pKaA==",
+          "dominant_color": "#eef1f7",
+          "accent_color": "#eab2a2"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 5,
+        "r": 2,
+        "h": 3,
+        "rbi": 4,
+        "bb": 0,
+        "k": 0,
+        "hr": 2,
+        "doubles": 1,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 5,
+        "total_bases": 10,
+        "left_on_base": 2,
+        "summary": "3-5 | 2 HR, 2B, 4 RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 737,
+        "league": "mlb",
+        "mlb_stats_id": 657571,
+        "espn_id": "41017",
+        "full_name": "Caleb Ferguson",
+        "primary_position": "P",
+        "primary_number": "43",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/737/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "X3mGBQJGeJVwjHiY2IeDgPi4CJeHeHZodw==",
+          "dominant_color": "#ce9b7b",
+          "accent_color": "#93644b"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/737/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "J1mKDQQ2uGZwin13yCeNcPRIB6h0eIhKhw==",
+          "dominant_color": "#f0f4fb",
+          "accent_color": "#e4bba2"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "0.2",
+        "h": 0,
+        "r": 0,
+        "er": 0,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "pitches": 10,
+        "strikes": 5,
+        "era": null,
+        "batters_faced": 2,
+        "summary": "0.2 IP, 0 ER, 0 K, 0 BB"
+      },
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 132,
+        "league": "mlb",
+        "mlb_stats_id": 666374,
+        "espn_id": "4894467",
+        "full_name": "Matt Brash",
+        "primary_position": "P",
+        "primary_number": "47",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/132/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4yiKDQJGeIeAjHZ5t2hxcCcHB5iHeIdodw==",
+          "dominant_color": "#1c2229",
+          "accent_color": "#efd4c4"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/132/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "axiKFQI3t2eAinp5uEh6gJQHB6iCh3pKdw==",
+          "dominant_color": "#ecf0f6",
+          "accent_color": "#edc6b0"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 133,
+        "league": "mlb",
+        "mlb_stats_id": 669302,
+        "espn_id": "41221",
+        "full_name": "Logan Gilbert",
+        "primary_position": "P",
+        "primary_number": "36",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/133/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "JUmKDQJHaLdwjHaJqGhwgBYHCId3iHZoeA==",
+          "dominant_color": "#e7b09c",
+          "accent_color": "#1e242a"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/133/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bCiKFQQ2t2eAiXuJx0eKgKQHB6iCh3k6iA==",
+          "dominant_color": "#ebeef5",
+          "accent_color": "#edbba8"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 134,
+        "league": "mlb",
+        "mlb_stats_id": 693433,
+        "espn_id": "4629089",
+        "full_name": "Bryan Woo",
+        "primary_position": "P",
+        "primary_number": "22",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/134/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4DiKDQJHaMZwjXeJt2iAggYYCIeHeHZ4eA==",
+          "dominant_color": "#d49e8c",
+          "accent_color": "#0c0d16"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/134/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "aiiKFQI2qHeAent3uDeJcJQIB6iCiHlKiA==",
+          "dominant_color": "#eaecf9",
+          "accent_color": "#ecbfb2"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 775,
+        "league": "mlb",
+        "mlb_stats_id": 695670,
+        "espn_id": "4872682",
+        "full_name": "Harry Ford",
+        "primary_position": "C",
+        "primary_number": "5",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/775/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "F3mGBQJGaLdziXln9wyolPfIB5iHeHZoeA==",
+          "dominant_color": "#754239",
+          "accent_color": "#1d1012"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/775/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "o0iKDQQ32FeAiH5HyBiPgPI4B6iDh4lJhw==",
+          "dominant_color": "#eae9fa",
+          "accent_color": "#bc7d6e"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 0,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 0,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-0"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 136,
+        "league": "mlb",
+        "mlb_stats_id": 622491,
+        "espn_id": "35124",
+        "full_name": "Luis Castillo",
+        "primary_position": "P",
+        "primary_number": "58",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/136/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4TiKDQJGiIeAfHdp12eEcEYICJeHeHdodw==",
+          "dominant_color": "#e5a98b",
+          "accent_color": "#1d2229"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/136/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ayiKFQQ3x2eAeXtoqDeKcKQIB6iBhopKdw==",
+          "dominant_color": "#ecf0f8",
+          "accent_color": "#ecad8f"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "7.1",
+        "h": 1,
+        "r": 1,
+        "er": 1,
+        "bb": 0,
+        "k": 10,
+        "hr": 1,
+        "pitches": 93,
+        "strikes": 66,
+        "era": null,
+        "batters_faced": 23,
+        "summary": "7.1 IP, ER, 10 K, 0 BB"
+      },
+      "fielding_line": null,
+      "decision": "W",
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 138,
+        "league": "mlb",
+        "mlb_stats_id": 669923,
+        "espn_id": "42406",
+        "full_name": "George Kirby",
+        "primary_position": "P",
+        "primary_number": "68",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/138/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "JUmKDQJGaKdwjIWJuHeAcBcICIeHeHZodw==",
+          "dominant_color": "#e1a991",
+          "accent_color": "#20252d"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/138/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bSiKFQQ2uGdwiouIyDeKcKQIB6hyd4k6hw==",
+          "dominant_color": "#ebf0f7",
+          "accent_color": "#edbfaa"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 139,
+        "league": "mlb",
+        "mlb_stats_id": 662253,
+        "espn_id": "40939",
+        "full_name": "Andrés Muñoz",
+        "primary_position": "P",
+        "primary_number": "75",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/139/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3ziGDQJHh4eAe3hJyFd0cFYHCIeHeHdodw==",
+          "dominant_color": "#1d2026",
+          "accent_color": "#e3aa8d"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/139/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bBiKFQQ3x1eAeX1nqDeLcKMHB6iAh4pLZw==",
+          "dominant_color": "#eff3fa",
+          "accent_color": "#e6aa8d"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 179,
+        "league": "mlb",
+        "mlb_stats_id": 553993,
+        "espn_id": "32367",
+        "full_name": "Eugenio Suárez",
+        "primary_position": "3B",
+        "primary_number": "28",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/179/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "XWmGBQJGiXVwjHpX1zuPlPb4B5iHeIdodw==",
+          "dominant_color": "#d6b297",
+          "accent_color": "#7a5d47"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/179/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "6UiKDQQ3yFdwiX1XuBl/gPNnCKeCd3pKhw==",
+          "dominant_color": "#f2f5fd",
+          "accent_color": "#cd9975"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 1,
+        "rbi": 1,
+        "bb": 0,
+        "k": 2,
+        "hr": 1,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 4,
+        "left_on_base": 1,
+        "summary": "1-4 | HR, 2 K, RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 140,
+        "league": "mlb",
+        "mlb_stats_id": 641598,
+        "espn_id": "33667",
+        "full_name": "Mitch Garver",
+        "primary_position": "C",
+        "primary_number": "18",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/140/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3DiKDQJGeKZwjXaJyGdzcDcHCJeHeHdoeA==",
+          "dominant_color": "#141115",
+          "accent_color": "#c99982"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/140/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "aSiKFQI2x1eAinx3uEh7gKQHB6eBh3pKdw==",
+          "dominant_color": "#f0f0f5",
+          "accent_color": "#cba08c"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 141,
+        "league": "mlb",
+        "mlb_stats_id": 642100,
+        "espn_id": "40327",
+        "full_name": "Gabe Speier",
+        "primary_position": "P",
+        "primary_number": "55",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/141/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "5DiKDQRHd6dwjHV6t2d0cEcHCIeHeHZoeA==",
+          "dominant_color": "#d2a083",
+          "accent_color": "#efcfbe"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/141/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "bCiKFQQ3t3iAenpouEeKcKQICKdyd4lKeA==",
+          "dominant_color": "#ecf0f8",
+          "accent_color": "#ebb59d"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 142,
+        "league": "mlb",
+        "mlb_stats_id": 660844,
+        "espn_id": "40858",
+        "full_name": "Leo Rivas",
+        "primary_position": "3B",
+        "primary_number": "76",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/142/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "IUmKFQRHeIZwnIaJt2dzcDYHB4iHeIdodw==",
+          "dominant_color": "#d89f7d",
+          "accent_color": "#161b23"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/142/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qiiKFQQ3uGdwiXt4yEeKcJQHCJeCd4lKdw==",
+          "dominant_color": "#ecf0f7",
+          "accent_color": "#e7ab89"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 0,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 0,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-0"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 143,
+        "league": "mlb",
+        "mlb_stats_id": 677594,
+        "espn_id": "41044",
+        "full_name": "Julio Rodríguez",
+        "primary_position": "CF",
+        "primary_number": "44",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/143/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HkmGDQJGiHdwjHh4x2hzgDYHCIeHeHZodw==",
+          "dominant_color": "#a47656",
+          "accent_color": "#d39975"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/143/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qCiKFQQ2uFeAen1nyEeKcKQIB6hziIlKhw==",
+          "dominant_color": "#ebeff7",
+          "accent_color": "#d39671"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 2,
+        "rbi": 1,
+        "bb": 1,
+        "k": 0,
+        "hr": 1,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 5,
+        "total_bases": 5,
+        "left_on_base": 1,
+        "summary": "2-4 | HR, BB, RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 306,
+        "league": "mlb",
+        "mlb_stats_id": 682243,
+        "espn_id": "4654313",
+        "full_name": "Bryce Miller",
+        "primary_position": "P",
+        "primary_number": "50",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/306/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4ziGDQJHWNdwjYRqt2dxcBYHCIeHeHZ4eA==",
+          "dominant_color": "#1f1f23",
+          "accent_color": "#e7b59e"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/306/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ayiKFQQ3t4eAiXtpyEd6gKQHB6iCh3lKiA==",
+          "dominant_color": "#eceff6",
+          "accent_color": "#f0c3b0"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 144,
+        "league": "mlb",
+        "mlb_stats_id": 660825,
+        "espn_id": "41939",
+        "full_name": "Eduard Bazardo",
+        "primary_position": "P",
+        "primary_number": "83",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/144/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3SiGFQJHmGeAenpIx1h4gIYHCIeGeHZ4Zw==",
+          "dominant_color": "#c8916a",
+          "accent_color": "#1d2023"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/144/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ahiKFQI32FeAeH5mpzeLgLMIF5iAh4lbZw==",
+          "dominant_color": "#eef1f6",
+          "accent_color": "#ce956e"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 454,
+        "league": "mlb",
+        "mlb_stats_id": 593871,
+        "espn_id": "32525",
+        "full_name": "Jorge Polanco",
+        "primary_position": "DH",
+        "primary_number": "7",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/454/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "GkiGFQJGmGdwi4tnp2hzcGUHCJeGeHdodw==",
+          "dominant_color": "#b96d54",
+          "accent_color": "#1a1b6c"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/454/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "5ieKFQQ3yFeAiX1mqEeIcLMIB6iBh4pKdw==",
+          "dominant_color": "#d6dbf5",
+          "accent_color": "#bd7966"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 2,
+        "rbi": 1,
+        "bb": 0,
+        "k": 1,
+        "hr": 1,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 5,
+        "left_on_base": 2,
+        "summary": "2-4 | HR, K, RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 145,
+        "league": "mlb",
+        "mlb_stats_id": 670042,
+        "espn_id": "40422",
+        "full_name": "Luke Raley",
+        "primary_position": "RF",
+        "primary_number": "20",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/145/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "6DiGDQJHiIdwjHZKqGd1cFYHCIeHeIdodw==",
+          "dominant_color": "#f4c1b0",
+          "accent_color": "#cda591"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/145/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "cBiGFQQ3x2iAiXtouDeLcLMHB6eAd3pKdw==",
+          "dominant_color": "#ecf0f7",
+          "accent_color": "#f0bead"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 146,
+        "league": "mlb",
+        "mlb_stats_id": 676106,
+        "espn_id": "4297897",
+        "full_name": "Emerson Hancock",
+        "primary_position": "P",
+        "primary_number": "26",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/146/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "5EiKDQJGeKZwjXWKt2dxcAYXCJeHeHdodw==",
+          "dominant_color": "#f2c4b8",
+          "accent_color": "#d6a28f"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/146/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ayiKFQQ2qHaAinp5xzeKcJQIB6iDh3lJhw==",
+          "dominant_color": "#f1bfb2",
+          "accent_color": "#eaeff8"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 239,
+        "league": "mlb",
+        "mlb_stats_id": 672841,
+        "espn_id": "42504",
+        "full_name": "Carlos Vargas",
+        "primary_position": "P",
+        "primary_number": "54",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 136,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/239/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "XUmGFQJHWMiAfYaJ12eAcgYoB4iHeIZ4dw==",
+          "dominant_color": "#e3ad83",
+          "accent_color": "#be875b"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/239/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "6DiKFQQ3uHeAiXxoyCeJcIMIB5iDh3lKhw==",
+          "dominant_color": "#eff2f8",
+          "accent_color": "#e7af83"
+        }
+      },
+      "team_id": 136,
+      "is_home": true,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 790,
+        "league": "mlb",
+        "mlb_stats_id": 663372,
+        "espn_id": "4019484",
+        "full_name": "Ryan Feltner",
+        "primary_position": "P",
+        "primary_number": "18",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/790/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3ziKDQJGeIdwjHeYuGeAYAYYB5iHeIdodw==",
+          "dominant_color": "#dfbeab",
+          "accent_color": "#c5957b"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/790/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qSiOFQI3t2eAinp4pzh5cJMHB6iDdnpJhw==",
+          "dominant_color": "#eeeff3",
+          "accent_color": "#d9b4a3"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 538,
+        "league": "mlb",
+        "mlb_stats_id": 666160,
+        "espn_id": "36181",
+        "full_name": "Mickey Moniak",
+        "primary_position": "CF",
+        "primary_number": "16",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 108,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/538/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HkmKDQJGeIdwjHeZuGdwcQYXB5eHeHdoeA==",
+          "dominant_color": "#cf9880",
+          "accent_color": "#171513"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/538/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pjiOFQRHuGeAinppuCh4cIMHB5eEh3lJhw==",
+          "dominant_color": "#e5e4ec",
+          "accent_color": "#c38972"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 4,
+        "r": 0,
+        "h": 1,
+        "rbi": 0,
+        "bb": 0,
+        "k": 2,
+        "hr": 0,
+        "doubles": 1,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 2,
+        "left_on_base": 0,
+        "summary": "1-4 | 2B, 2 K"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 791,
+        "league": "mlb",
+        "mlb_stats_id": 680767,
+        "espn_id": "4722599",
+        "full_name": "Victor Vodnik",
+        "primary_position": "P",
+        "primary_number": "38",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/791/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3jiKDQJHeJdwjIeJx2eAYQYIB4iHeIZoeA==",
+          "dominant_color": "#c4937a",
+          "accent_color": "#dcb8a5"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/791/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qCiKFQI3uGdwint4uDeKcKMHCJeCd3lKdw==",
+          "dominant_color": "#d2a68e",
+          "accent_color": "#e7e8ed"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 792,
+        "league": "mlb",
+        "mlb_stats_id": 685326,
+        "espn_id": "4415654",
+        "full_name": "McCade Brown",
+        "primary_position": "P",
+        "primary_number": "51",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/792/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4EiKDQJGeJdwjXaZuHdwcgcXCJeHeIZodw==",
+          "dominant_color": "#d09c8b",
+          "accent_color": "#171613"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/792/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qDiKDQJGqGdwi3p4yEd5cIQHCKeEd3lJhw==",
+          "dominant_color": "#e9e8ef",
+          "accent_color": "#dfb3a4"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 793,
+        "league": "mlb",
+        "mlb_stats_id": 623474,
+        "espn_id": "36093",
+        "full_name": "Jimmy Herget",
+        "primary_position": "P",
+        "primary_number": "44",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/793/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3EiGDQJGiIZwjHaZuGhxgBYHCJd3iIdoeA==",
+          "dominant_color": "#b07961",
+          "accent_color": "#191716"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/793/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "piiKFQQ3yFdweYtot0h6gKQHCKhzh4lKiA==",
+          "dominant_color": "#f1f3f5",
+          "accent_color": "#cb9881"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 794,
+        "league": "mlb",
+        "mlb_stats_id": 682653,
+        "espn_id": "4917759",
+        "full_name": "Warming Bernabel",
+        "primary_position": "1B",
+        "primary_number": "25",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/794/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "2miGBQJGeJdziYpX92ePe/fIB4iHeIZodw==",
+          "dominant_color": "#a16d64",
+          "accent_color": "#d1a49c"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/794/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ZRiKDQI22FZwiH5GuCh8gMMHB6iBh3pKdw==",
+          "dominant_color": "#ebf4fb",
+          "accent_color": "#b58568"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 3,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-3"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 157,
+        "league": "mlb",
+        "mlb_stats_id": 608566,
+        "espn_id": "34874",
+        "full_name": "Germán Márquez",
+        "primary_position": "P",
+        "primary_number": "48",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/157/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "FjmGBQJHplmAeolY+Algg0UHCIeHeHdoeA==",
+          "dominant_color": "#c08358",
+          "accent_color": "#281e1a"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/157/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "YxiKDQI310iAeX5mpxh9gMIHB6eAhopKZw==",
+          "dominant_color": "#dddee0",
+          "accent_color": "#28221f"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 795,
+        "league": "mlb",
+        "mlb_stats_id": 690924,
+        "espn_id": "5000931",
+        "full_name": "Braxton Fulford",
+        "primary_position": "C",
+        "primary_number": "37",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/795/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3jiKDQJGeJZwjId4x2eCcCYIB5iHeHZodw==",
+          "dominant_color": "#d8a892",
+          "accent_color": "#181614"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/795/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "aCiKDQI2uGdwinxnuDh6gKQHCKeCd3lKhw==",
+          "dominant_color": "#e3e2ea",
+          "accent_color": "#d4a594"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 796,
+        "league": "mlb",
+        "mlb_stats_id": 607536,
+        "espn_id": "33839",
+        "full_name": "Kyle Freeland",
+        "primary_position": "P",
+        "primary_number": "21",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/796/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HEmGDQJGeJZwjHWJyHdwcgcXCIeHeIZodw==",
+          "dominant_color": "#181716",
+          "accent_color": "#c58e75"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/796/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pziKDQI2uFdwinxnyDh5gJMHCKeDd3lKhw==",
+          "dominant_color": "#e9e9ee",
+          "accent_color": "#d7ac9a"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 229,
+        "league": "mlb",
+        "mlb_stats_id": 671289,
+        "espn_id": "40958",
+        "full_name": "Tyler Freeman",
+        "primary_position": "RF",
+        "primary_number": "2",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/229/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HEmKDQJGeIZwjHeIx2eAcgYIB5iHeHZodw==",
+          "dominant_color": "#ca9a7e",
+          "accent_color": "#161513"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/229/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pyiKFQI2uFeAenx3uDeKcKQIB6iCh4lKhw==",
+          "dominant_color": "#ebecef",
+          "accent_color": "#ce9e83"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 797,
+        "league": "mlb",
+        "mlb_stats_id": 675848,
+        "espn_id": "5185107",
+        "full_name": "Juan Mejia",
+        "primary_position": "P",
+        "primary_number": "47",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/797/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "F0mGDQJGiHVwm3iJt0hycBQHB5iHeHdodw==",
+          "dominant_color": "#ab6d50",
+          "accent_color": "#824f3f"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/797/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pSiKFQQ3yFaAiX1ntzh6gKMHBqiBh3pKdw==",
+          "dominant_color": "#eaebf0",
+          "accent_color": "#ac6b4c"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 798,
+        "league": "mlb",
+        "mlb_stats_id": 692585,
+        "espn_id": "4917793",
+        "full_name": "Yanquiel Fernández",
+        "primary_position": "RF",
+        "primary_number": "35",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/798/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "10iGFQRGl3eAenhq6GeIcHYICIeHeHdodw==",
+          "dominant_color": "#141316",
+          "accent_color": "#9e5d3c"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/798/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pyiKFQQ32FdwiX5mqDeLcLMICKdwd4pKZw==",
+          "dominant_color": "#f4f3f4",
+          "accent_color": "#bc7856"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 3,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 2,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-3 | 2 K"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 799,
+        "league": "mlb",
+        "mlb_stats_id": 690022,
+        "espn_id": "5196606",
+        "full_name": "Ryan Ritter",
+        "primary_position": "SS",
+        "primary_number": "8",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/799/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "GUmGDQJHeJaAfHeZuGhwgwYnCId3iIZoeA==",
+          "dominant_color": "#c18463",
+          "accent_color": "#171716"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/799/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pCiKFQQ3uGeAenxot0eJcJQIB5hzh4lJiA==",
+          "dominant_color": "#c68867",
+          "accent_color": "#ebecf0"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 800,
+        "league": "mlb",
+        "mlb_stats_id": 688760,
+        "espn_id": "4976999",
+        "full_name": "Blaine Crim",
+        "primary_position": "DH",
+        "primary_number": "16",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/800/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "4EiKDQJGiHZwjHiIt2eCcBYIB5iHiHdodw==",
+          "dominant_color": "#d7a79b",
+          "accent_color": "#1a1918"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/800/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "aiiKDQI3uGaAenuHuDeKcKQIB6iCh3lKdw==",
+          "dominant_color": "#f1f2f4",
+          "accent_color": "#daa99c"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 4,
+        "r": 1,
+        "h": 1,
+        "rbi": 1,
+        "bb": 0,
+        "k": 2,
+        "hr": 1,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 4,
+        "left_on_base": 1,
+        "summary": "1-4 | HR, 2 K, RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 801,
+        "league": "mlb",
+        "mlb_stats_id": 696100,
+        "espn_id": "4416591",
+        "full_name": "Hunter Goodman",
+        "primary_position": "C",
+        "primary_number": "15",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/801/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3DiGDQJHaKZwjHWa2GdwcgYXB4iHeHZoeA==",
+          "dominant_color": "#d9ac97",
+          "accent_color": "#191817"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/801/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "piiKFQQ3yGaAiXtpx0h6gJQHB5iDh3lKhw==",
+          "dominant_color": "#d7a68f",
+          "accent_color": "#f1f2f5"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 4,
+        "r": 0,
+        "h": 0,
+        "rbi": 1,
+        "bb": 0,
+        "k": 0,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 4,
+        "total_bases": 0,
+        "left_on_base": 1,
+        "summary": "0-4 | RBI"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 379,
+        "league": "mlb",
+        "mlb_stats_id": 571657,
+        "espn_id": "33287",
+        "full_name": "Kyle Farmer",
+        "primary_position": "2B",
+        "primary_number": "6",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/379/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "XmmGDQJHd5hwjHd5yGhwgDcHCIeHeHdodw==",
+          "dominant_color": "#eca986",
+          "accent_color": "#1c181d"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/379/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "p0iGBQAjtyhwjYHbpwh9huBnB6eJdYKahw==",
+          "dominant_color": "#e5e5f5",
+          "accent_color": "#c77e5b"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 802,
+        "league": "mlb",
+        "mlb_stats_id": 687134,
+        "espn_id": "4720860",
+        "full_name": "Bradley Blalock",
+        "primary_position": "P",
+        "primary_number": "64",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/802/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "IEmKDQJHd4iAfIaZt3eAcwcYB4iHeHZodw==",
+          "dominant_color": "#e2b69d",
+          "accent_color": "#1e1c19"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/802/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qyiKDQQ2t1eAinyIyDeJcJMHB6iCd3lKhw==",
+          "dominant_color": "#f5f9fa",
+          "accent_color": "#deaf96"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 803,
+        "league": "mlb",
+        "mlb_stats_id": 688642,
+        "espn_id": "5207459",
+        "full_name": "Zach Agnos",
+        "primary_position": "P",
+        "primary_number": "36",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/803/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3jiKDQJHiHZwi3mIp2eFcFYIB4iHeIdodw==",
+          "dominant_color": "#c6977a",
+          "accent_color": "#181715"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/803/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "aCiKFQI3uGdwinx3qDeLcKQIB5iBd4lKdw==",
+          "dominant_color": "#edeef0",
+          "accent_color": "#c79576"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 804,
+        "league": "mlb",
+        "mlb_stats_id": 687597,
+        "espn_id": "4619460",
+        "full_name": "Jordan Beck",
+        "primary_position": "LF",
+        "primary_number": "27",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/804/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HkmGDQJHaaVwjHaJx2iAcwYoCId3iIZ4dw==",
+          "dominant_color": "#c28a6f",
+          "accent_color": "#dbaa92"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/804/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qDiKFQI3uGdwinxntzeKcKMICJdyh4lKiA==",
+          "dominant_color": "#d19b82",
+          "accent_color": "#e8e8ed"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 3,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 2,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-3 | 2 K"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 805,
+        "league": "mlb",
+        "mlb_stats_id": 685299,
+        "espn_id": "4415658",
+        "full_name": "Tanner Gordon",
+        "primary_position": "P",
+        "primary_number": "29",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/805/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "30iGDQJGaKZwjXWKyHeAcgcoB5iHeIZodw==",
+          "dominant_color": "#be8d78",
+          "accent_color": "#ddb1a0"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/805/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pziKFQI2qHdwi3poyEh5cJQHB6eEd3lJhw==",
+          "dominant_color": "#dbb0a2",
+          "accent_color": "#ebedf1"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "3.1",
+        "h": 8,
+        "r": 7,
+        "er": 5,
+        "bb": 0,
+        "k": 3,
+        "hr": 3,
+        "pitches": 70,
+        "strikes": 52,
+        "era": null,
+        "batters_faced": 19,
+        "summary": "3.1 IP, 5 ER, 3 K, 0 BB"
+      },
+      "fielding_line": null,
+      "decision": "L",
+      "notable": true
+    },
+    {
+      "player": {
+        "id": 806,
+        "league": "mlb",
+        "mlb_stats_id": 686668,
+        "espn_id": "42462",
+        "full_name": "Brenton Doyle",
+        "primary_position": "CF",
+        "primary_number": "9",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/806/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "3TiKDQJGeJZwjXaI2HdwcBcIB5iHeIZodw==",
+          "dominant_color": "#d3ac98",
+          "accent_color": "#a57b66"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/806/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "piiKDQJGqGeAi3touEd6cJQHB6iEh3lJiA==",
+          "dominant_color": "#d3b7af",
+          "accent_color": "#e4e4e9"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 807,
+        "league": "mlb",
+        "mlb_stats_id": 678662,
+        "espn_id": "4905919",
+        "full_name": "Ezequiel Tovar",
+        "primary_position": "SS",
+        "primary_number": "14",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/807/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "FkmGDQJGeJZwjHap2HhwhAdHCJd3iHZoeA==",
+          "dominant_color": "#ad7154",
+          "accent_color": "#201d1a"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/807/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "oziKFQI3yFdweXxnxzh5gJMIB6hzh4lKiA==",
+          "dominant_color": "#e8e9ee",
+          "accent_color": "#c18364"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 3,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 1,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-3 | K"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 507,
+        "league": "mlb",
+        "mlb_stats_id": 606115,
+        "espn_id": "32530",
+        "full_name": "Orlando Arcia",
+        "primary_position": "2B",
+        "primary_number": "11",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/507/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "WlmGDQJHl2iAe3h52GhxgCUHCIeHeHdodw==",
+          "dominant_color": "#cb8557",
+          "accent_color": "#221d1f"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/507/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pziKHQQ3x1iAeX1nuDh6cLMIB6iBh3pKdw==",
+          "dominant_color": "#e9eaf7",
+          "accent_color": "#d49063"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 2,
+        "r": 1,
+        "h": 0,
+        "rbi": 0,
+        "bb": 1,
+        "k": 1,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-2 | BB, K, R"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 808,
+        "league": "mlb",
+        "mlb_stats_id": 683627,
+        "espn_id": "5016983",
+        "full_name": "Anthony Molina",
+        "primary_position": "P",
+        "primary_number": "43",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/808/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "G0mGDQJGh4hwm4WK6Gd0cFcHCJeHeHZodw==",
+          "dominant_color": "#d4916d",
+          "accent_color": "#15171e"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/808/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "qSiKFQQ310hwiY1nuDiLgLQHCKdxd3pKdw==",
+          "dominant_color": "#f7f7f8",
+          "accent_color": "#de9b76"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 809,
+        "league": "mlb",
+        "mlb_stats_id": 683409,
+        "espn_id": "5185106",
+        "full_name": "Angel Chivilli",
+        "primary_position": "P",
+        "primary_number": "57",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/809/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "kDiGDQJGWOeBe3eJ+GdwgwY3CJeHeIZodw==",
+          "dominant_color": "#754e3d",
+          "accent_color": "#4c342c"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/809/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "YyiKDQI22EdwiI5WyDeKcKMICKhxd4o6eA==",
+          "dominant_color": "#f0eef0",
+          "accent_color": "#a66c55"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "2.0",
+        "h": 3,
+        "r": 2,
+        "er": 2,
+        "bb": 0,
+        "k": 1,
+        "hr": 2,
+        "pitches": 30,
+        "strikes": 20,
+        "era": null,
+        "batters_faced": 9,
+        "summary": "2.0 IP, 2 ER, K, 0 BB"
+      },
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 810,
+        "league": "mlb",
+        "mlb_stats_id": 622608,
+        "espn_id": "33750",
+        "full_name": "Antonio Senzatela",
+        "primary_position": "P",
+        "primary_number": "49",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/810/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "2DiGDQJGmVZwi3h52GeCcCYICJd3eIdodw==",
+          "dominant_color": "#bf876a",
+          "accent_color": "#191816"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/810/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "ZSiKFQI32EdwiX1nuDeLcKQHCKdxd3pKeA==",
+          "dominant_color": "#dedee7",
+          "accent_color": "#c68e72"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": {
+        "ip": "2.2",
+        "h": 3,
+        "r": 0,
+        "er": 0,
+        "bb": 1,
+        "k": 4,
+        "hr": 0,
+        "pitches": 51,
+        "strikes": 34,
+        "era": null,
+        "batters_faced": 11,
+        "summary": "2.2 IP, 0 ER, 4 K, BB"
+      },
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 811,
+        "league": "mlb",
+        "mlb_stats_id": 677955,
+        "espn_id": "4414362",
+        "full_name": "Jaden Hill",
+        "primary_position": "P",
+        "primary_number": "0",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/811/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "1TiGDQJGiHZwi3d56FhxcAUHCJeHeIdodw==",
+          "dominant_color": "#171614",
+          "accent_color": "#825641"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/811/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "YyiKFQI3yFdwiX1XuDeLcKMHB6hzh4pJdw==",
+          "dominant_color": "#ecedf2",
+          "accent_color": "#b27c62"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 812,
+        "league": "mlb",
+        "mlb_stats_id": 691720,
+        "espn_id": "5203102",
+        "full_name": "Kyle Karros",
+        "primary_position": "3B",
+        "primary_number": "12",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/812/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "HEmGDQJGabVwjXZ5yGhwhAYnCJeHiHZ4dw==",
+          "dominant_color": "#d4a087",
+          "accent_color": "#171513"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/812/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pTiKDQJHuGaAintYuCh5gJMHB5iEh3lJiA==",
+          "dominant_color": "#d4a28d",
+          "accent_color": "#e9eaee"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": {
+        "ab": 3,
+        "r": 0,
+        "h": 0,
+        "rbi": 0,
+        "bb": 0,
+        "k": 1,
+        "hr": 0,
+        "doubles": 0,
+        "triples": 0,
+        "sb": 0,
+        "hbp": 0,
+        "pa": 3,
+        "total_bases": 0,
+        "left_on_base": 0,
+        "summary": "0-3 | K"
+      },
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    },
+    {
+      "player": {
+        "id": 813,
+        "league": "mlb",
+        "mlb_stats_id": 678821,
+        "espn_id": "5221476",
+        "full_name": "Luis Peralta",
+        "primary_position": "P",
+        "primary_number": "41",
+        "birth_date": null,
+        "birth_country": null,
+        "bats": null,
+        "throws": null,
+        "primary_team_id": 115,
+        "debut_date": null,
+        "photo_silo": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_silo/813/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "GUmGDQJGiYZwjIeJ12eAcQYYCJd3iIdodw==",
+          "dominant_color": "#bc7d5e",
+          "accent_color": "#7f5445"
+        },
+        "photo_full": {
+          "cdn_url": "https://cdn.rewind.rest/attending/player_full/813/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+          "thumbhash": "pTiKFQQ2yFdwiY1nyDeKcJMICKdyd4lKhw==",
+          "dominant_color": "#e2e1e9",
+          "accent_color": "#ad7054"
+        }
+      },
+      "team_id": 115,
+      "is_home": false,
+      "batting_line": null,
+      "pitching_line": null,
+      "fielding_line": null,
+      "decision": null,
+      "notable": false
+    }
+  ]
+}
