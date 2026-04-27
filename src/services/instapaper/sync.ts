@@ -3,7 +3,7 @@
  * Syncs bookmarks, highlights, and metadata from Instapaper into D1.
  */
 
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, gte } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { readingItems, readingHighlights } from '../../db/schema/reading.js';
 import { syncRuns } from '../../db/schema/system.js';
@@ -607,6 +607,66 @@ export async function syncReading(
           });
         }
       }
+    }
+
+    // ─── Untitled-sweep ──────────────────────────────────────────────
+    // Instapaper accepts an iOS share immediately but extracts page
+    // metadata server-side over the following minutes. If our 6h cron
+    // lands in that window we capture the partial state and store
+    // title="Untitled" via the transformBookmark fallback. The bookmark
+    // hash on Instapaper's side does not always change when their
+    // backend later fills in metadata, so the next regular delta sync
+    // (which uses `have=…` to skip unchanged hashes) misses the update.
+    //
+    // Targeted force-refresh: any reading_items row with title="Untitled"
+    // saved within the last 7 days gets re-fetched. Older Untitleds are
+    // left alone — extraction genuinely failed (paywalled scrape,
+    // deleted page) and Instapaper won't have anything new for us.
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const staleUntitled = await db
+      .select({ sourceId: readingItems.sourceId })
+      .from(readingItems)
+      .where(
+        and(
+          eq(readingItems.source, 'instapaper'),
+          eq(readingItems.userId, 1),
+          eq(readingItems.title, 'Untitled'),
+          gte(readingItems.savedAt, sevenDaysAgo)
+        )
+      );
+
+    if (staleUntitled.length > 0) {
+      const staleSourceIds = new Set(
+        staleUntitled
+          .map((r) => r.sourceId)
+          .filter((s): s is string => s !== null)
+      );
+      console.log(
+        `[SYNC] Untitled-sweep: ${staleSourceIds.size} stale articles within 7d; force-refreshing`
+      );
+      let healed = 0;
+      for (const folderId of ['unread', 'starred', 'archive']) {
+        // Force-fetch without the delta `have` filter so Instapaper returns
+        // current metadata for bookmarks whose hash didn't change but whose
+        // title finally resolved server-side.
+        const fresh = await client.listBookmarks({
+          folderId,
+          limit: 200,
+        });
+        for (const bookmark of fresh.bookmarks) {
+          if (!staleSourceIds.has(String(bookmark.bookmark_id))) continue;
+          const newTitle = bookmark.title?.trim();
+          if (!newTitle || newTitle === 'Untitled') continue;
+          await upsertBookmark(db, bookmark, folderId);
+          healed++;
+        }
+      }
+      console.log(
+        `[SYNC] Untitled-sweep: ${healed} of ${staleSourceIds.size} titles healed`
+      );
+      itemsSynced += healed;
     }
 
     // Post-sync: feed + search
