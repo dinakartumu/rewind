@@ -85,14 +85,14 @@ src/services/attending/
 The existing `enrich-boxscore.ts` orchestrator is the natural extension point. Today it calls `mlb-boxscore.ts` for `event_type === 'mlb_game'`; the new shape dispatches by `event_type`:
 
 ```text
-event_type           -> client
-mlb_game             -> mlb-boxscore.ts          (already exists)
-nfl_game             -> nfl-boxscore.ts          (Phase 1)
-nba_game             -> nba-boxscore.ts          (Phase 3)
-wnba_game            -> wnba-boxscore.ts         (Phase 3)
-mls_game             -> mls-boxscore.ts          (Phase 5)
-ncaaf_game           -> ncaaf-boxscore.ts        (Phase 4)
-ncaab_game           -> ncaab-boxscore.ts        (Phase 4)
+event_type           -> client                   (lands in)
+mlb_game             -> mlb-boxscore.ts          already exists
+ncaaf_game           -> ncaaf-boxscore.ts        Phase 1   (70 attended)
+nfl_game             -> nfl-boxscore.ts          Phase 3   (9 attended)
+nba_game             -> nba-boxscore.ts          Phase 3   (0 attended today; ship for future-proof)
+wnba_game            -> wnba-boxscore.ts         Phase 3   (3 attended)
+ncaab_game           -> ncaab-boxscore.ts        Phase 4   (1 attended)
+mls_game             -> mls-boxscore.ts          Phase 4   (0 attended; skip option)
 ```
 
 ### Stat-line JSON shape per league
