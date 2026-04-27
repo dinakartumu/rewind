@@ -1141,6 +1141,219 @@
           }
         }
       },
+      "AttendingNormalizeSportsTitlesResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "scanned": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "skipped_no_event_data": {
+            "type": "integer"
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "event_date": {
+                  "type": "string"
+                },
+                "old_title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "new_title": {
+                  "type": "string"
+                },
+                "new_subtitle": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "event_date",
+                "old_title",
+                "new_title",
+                "new_subtitle"
+              ]
+            }
+          }
+        },
+        "required": [
+          "status",
+          "dry_run",
+          "scanned",
+          "updated",
+          "skipped_no_event_data",
+          "samples"
+        ]
+      },
+      "AttendingNormalizeSportsTitlesBody": {
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 1000
+          }
+        }
+      },
+      "AttendingPruneJunkVenuesResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "junk_venues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "events_repointed": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "events_repointed"
+              ]
+            }
+          },
+          "events_repointed": {
+            "type": "integer"
+          },
+          "events_orphaned": {
+            "type": "integer"
+          },
+          "venues_deleted": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "dry_run",
+          "junk_venues",
+          "events_repointed",
+          "events_orphaned",
+          "venues_deleted"
+        ]
+      },
+      "AttendingPruneJunkVenuesBody": {
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AttendingMergeSportsDuplicatesResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "pairs_found": {
+            "type": "integer"
+          },
+          "pairs_merged": {
+            "type": "integer"
+          },
+          "events_deleted": {
+            "type": "integer"
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "enriched_id": {
+                  "type": "integer"
+                },
+                "junk_id": {
+                  "type": "integer"
+                },
+                "event_date": {
+                  "type": "string"
+                },
+                "junk_title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "enriched_id",
+                "junk_id",
+                "event_date",
+                "junk_title"
+              ]
+            }
+          }
+        },
+        "required": [
+          "status",
+          "dry_run",
+          "pairs_found",
+          "pairs_merged",
+          "events_deleted",
+          "pairs"
+        ]
+      },
+      "AttendingMergeSportsDuplicatesBody": {
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "SyncCompletedResponse": {
         "type": "object",
         "properties": {
@@ -23079,6 +23292,165 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AttendingBackfillFeedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/attending/normalize-sports-titles": {
+      "post": {
+        "operationId": "adminAttendingNormalizeSportsTitles",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Regenerate sports event titles + subtitles from canonical event_data",
+        "description": "For every attended sports event with a canonical match (mlb_stats_api / espn), regenerate the title as `<Home> vs <Away>` and the subtitle as `<HomeShort> N, <AwayShort> M` from event_data.home_team / event_data.away_team / event_data.home_score / event_data.away_score. Skips events with no event_data. Pass dry_run to preview the diff before applying.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendingNormalizeSportsTitlesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Normalization completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendingNormalizeSportsTitlesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/attending/prune-junk-venues": {
+      "post": {
+        "operationId": "adminAttendingPruneJunkVenues",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete venue rows whose name looks like email body noise",
+        "description": "Identifies venues that look like email body fragments (HTML, ticketing instructions, bare street addresses, etc.) via the same heuristic that resolveVenue now rejects up-front. For events pointing at a junk venue: re-resolve to the canonical home venue when we know who played (Mariners → T-Mobile Park, Huskies → Husky Stadium, etc.); otherwise NULL the venue_id. Then hard-delete the junk row.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendingPruneJunkVenuesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prune completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendingPruneJunkVenuesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/attending/merge-sports-duplicates": {
+      "post": {
+        "operationId": "adminAttendingMergeSportsDuplicates",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Collapse unenriched sports event duplicates onto their enriched twin",
+        "description": "Finds pairs of attended_events on the same (event_date, event_type) where one row has external_source set (canonical match) and another does not. Migrates tickets, performers, sources, and player appearances onto the enriched row, then hard-deletes the unenriched duplicate.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendingMergeSportsDuplicatesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merge completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendingMergeSportsDuplicatesResponse"
                 }
               }
             }

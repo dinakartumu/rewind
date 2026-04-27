@@ -39,6 +39,19 @@ export async function resolveVenue(
   // Take just the venue name (first line / segment before comma).
   const venueOnly = extractVenueName(cleanName);
 
+  // Reject obviously-not-a-venue inputs before they pollute the venues
+  // table. Email parsers occasionally hand us body fragments
+  // ("Please note: This email is not your ticket.", `<td align="left"`),
+  // and the calendar extractor sometimes hands us street addresses from
+  // unrelated meetings that hit the allowlist. We'd rather fail loudly
+  // and fall back to enriched-side venue (e.g. MLB Stats `venue.name`)
+  // than auto-create a junk row.
+  if (looksLikeJunkVenue(venueOnly)) {
+    throw new Error(
+      `resolveVenue: input does not look like a venue: ${venueOnly.slice(0, 80)}`
+    );
+  }
+
   // Direct name match (case-insensitive)
   const allVenues = await db.select().from(venues).where(eq(venues.userId, 1));
   const cmp = venueOnly.toLowerCase();
@@ -112,6 +125,48 @@ export function extractVenueName(raw: string): string {
     cutAt = commaIdx;
   }
   return cutAt >= 0 ? raw.slice(0, cutAt).trim() : raw.trim();
+}
+
+/**
+ * Heuristic gate to keep the `venues` table clean.
+ *
+ * Returns true when the input looks like an email body fragment, raw
+ * HTML, a generic ticketing instruction, a bare street address, or
+ * other non-venue text. False positives here are recoverable (the row
+ * just doesn't get auto-created and the caller falls back to a sports
+ * match's canonical venue), so the bar is "obviously not a venue."
+ */
+export function looksLikeJunkVenue(name: string): boolean {
+  if (!name || name.length < 2) return true;
+  // Anything over ~80 chars is almost certainly an email body excerpt.
+  if (name.length > 80) return true;
+  // HTML tags or attributes.
+  if (/<[a-z][^>]*$|<\/?[a-z]+|style="|class="|src="/i.test(name)) return true;
+  // Sentences ending with a period are language, not place names.
+  // (Real venues don't end in periods: "T-Mobile Park", "Greek Theatre",
+  // "Lumen Field". The seed list confirms this.)
+  if (/[.!?]\s*$/.test(name)) return true;
+  // Email-confirmation noise keywords. The `s?` plural suffix and the
+  // `\b` word-boundary at the start let us catch both "ticket" and
+  // "tickets", "transfer" and "transfers", etc.
+  if (
+    /\b(tickets?|emails?|orders?|transfers?|refunds?|reservations?|please respond|please note|electronic|do not reply|delivery|claim(ed)?)\b/i.test(
+      name
+    )
+  ) {
+    return true;
+  }
+  // Bare street addresses ("760 Market St", "1015 Folsom St",
+  // "300 Occidental Ave S"). Match the street-type token mid-string,
+  // allowing for a trailing directional ("S", "N", "Suite 12", etc.).
+  if (
+    /^\d+\s+[A-Z][a-z]+(\s+[A-Z][a-z]+)*\s+(St|Ave|Av|Blvd|Rd|Way|Ln|Dr|Ct|Pl|Pkwy|Hwy|Street|Avenue|Boulevard|Road|Lane|Drive)\.?\b/i.test(
+      name
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function parseAliases(json: string | null): string[] {

@@ -316,6 +316,11 @@ export async function enrichCandidate(
   let confidence = venueConfidence;
   const attachedPerformers: Array<{ performer_id: number; role: string }> = [];
 
+  // Title/subtitle defaults — overridden below when we have a canonical
+  // sports match.
+  let canonicalTitle: string | null = null;
+  let canonicalSubtitle: string | null = null;
+
   if (category === 'sports') {
     const { match, myTeamSide } = await enrichSports(
       event_type,
@@ -337,6 +342,12 @@ export async function enrichCandidate(
         away_score: match.away_score,
         ...perspective,
       };
+      // Canonical title from the match. Trumps whatever the calendar
+      // entry / email parser handed us — the source text is "Mariners
+      // game with Brad" or "Ticket: ..." noise that nobody wants to
+      // see in the UI when we already know the actual matchup.
+      canonicalTitle = formatSportsTitle(match);
+      canonicalSubtitle = formatSportsSubtitle(match);
     } else {
       // Sports event with no match — keep low confidence so review
       // surfaces it.
@@ -369,8 +380,8 @@ export async function enrichCandidate(
     event_type,
     event_date: input.event_date,
     event_datetime: input.event_datetime,
-    title: input.title ?? '(untitled)',
-    subtitle: null,
+    title: canonicalTitle ?? input.title ?? '(untitled)',
+    subtitle: canonicalSubtitle,
     venue_id: venueId,
     external_id: externalId,
     external_source: externalSource,
@@ -379,4 +390,34 @@ export async function enrichCandidate(
     performers: attachedPerformers,
     match_notes: notes,
   };
+}
+
+/**
+ * Canonical "<Home> vs <Away>" string for an attended sports event.
+ * Used as the event title in place of whatever the source (calendar
+ * entry, email subject) provided.
+ */
+export function formatSportsTitle(match: SportsGameMatch): string {
+  return `${match.home_team.name} vs ${match.away_team.name}`;
+}
+
+/**
+ * Score line for the subtitle slot. Returns null pre-game (scores not
+ * available yet); the post-game form is "<HomeShort> N, <AwayShort> M".
+ *
+ * Short names use the last word of each team name — "Seattle Mariners"
+ * → "Mariners", "Los Angeles Angels" → "Angels". Good enough for the
+ * card and the `/v1/feed` subtitle slot. Falls back to full names for
+ * single-word teams ("Athletics").
+ */
+export function formatSportsSubtitle(match: SportsGameMatch): string | null {
+  if (match.home_score == null || match.away_score == null) return null;
+  const homeShort = lastWord(match.home_team.name);
+  const awayShort = lastWord(match.away_team.name);
+  return `${homeShort} ${match.home_score}, ${awayShort} ${match.away_score}`;
+}
+
+function lastWord(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? name;
 }
