@@ -17,6 +17,8 @@
     "build": "tsc",
     "build:web": "node scripts/inline-bundles.mjs",
     "dev": "tsc --watch",
+    "dev:workbench": "vite --config web-workbench/vite.config.ts",
+    "fixtures:seed": "node scripts/seed-fixtures.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
