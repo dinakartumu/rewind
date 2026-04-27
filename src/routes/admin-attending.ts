@@ -947,4 +947,235 @@ adminAttending.openapi(backfillFeedRoute, async (c) => {
   }
 });
 
+// ─── POST /v1/admin/attending/normalize-sports-titles ───────────────
+
+const NormalizeSportsTitlesBody = z
+  .object({
+    dry_run: z.boolean().optional().default(false),
+    limit: z.number().int().min(1).max(2000).optional().default(1000),
+  })
+  .openapi('AttendingNormalizeSportsTitlesBody');
+
+const NormalizeSportsTitlesResponse = z
+  .object({
+    status: z.literal('completed'),
+    dry_run: z.boolean(),
+    scanned: z.number().int(),
+    updated: z.number().int(),
+    skipped_no_event_data: z.number().int(),
+    samples: z.array(
+      z.object({
+        id: z.number().int(),
+        event_date: z.string(),
+        old_title: z.string().nullable(),
+        new_title: z.string(),
+        new_subtitle: z.string().nullable(),
+      })
+    ),
+  })
+  .openapi('AttendingNormalizeSportsTitlesResponse');
+
+const normalizeSportsTitlesRoute = createRoute({
+  method: 'post',
+  path: '/admin/attending/normalize-sports-titles',
+  operationId: 'adminAttendingNormalizeSportsTitles',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary:
+    'Regenerate sports event titles + subtitles from canonical event_data',
+  description:
+    'For every attended sports event with a canonical match (mlb_stats_api / espn), regenerate the title as `<Home> vs <Away>` and the subtitle as `<HomeShort> N, <AwayShort> M` from event_data.home_team / event_data.away_team / event_data.home_score / event_data.away_score. Skips events with no event_data. Pass dry_run to preview the diff before applying.',
+  request: {
+    body: {
+      content: {
+        'application/json': { schema: NormalizeSportsTitlesBody },
+      },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Normalization completed',
+      content: {
+        'application/json': { schema: NormalizeSportsTitlesResponse },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminAttending.openapi(normalizeSportsTitlesRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  type Opts = { dry_run?: boolean; limit?: number };
+  const body: Opts = await c.req.json<Opts>().catch(() => ({}) as Opts);
+
+  try {
+    const { normalizeSportsTitles } =
+      await import('../services/attending/normalize-sports.js');
+    const result = await normalizeSportsTitles(db, {
+      dryRun: body.dry_run ?? false,
+      limit: body.limit ?? 1000,
+    });
+    return c.json({
+      status: 'completed' as const,
+      dry_run: body.dry_run ?? false,
+      ...result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(
+      `[ERROR] POST /admin/attending/normalize-sports-titles: ${message}`
+    );
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
+// ─── POST /v1/admin/attending/prune-junk-venues ─────────────────────
+
+const PruneJunkVenuesBody = z
+  .object({ dry_run: z.boolean().optional().default(false) })
+  .openapi('AttendingPruneJunkVenuesBody');
+
+const PruneJunkVenuesResponse = z
+  .object({
+    status: z.literal('completed'),
+    dry_run: z.boolean(),
+    junk_venues: z.array(
+      z.object({
+        id: z.number().int(),
+        name: z.string(),
+        events_repointed: z.number().int(),
+      })
+    ),
+    events_repointed: z.number().int(),
+    events_orphaned: z.number().int(),
+    venues_deleted: z.number().int(),
+  })
+  .openapi('AttendingPruneJunkVenuesResponse');
+
+const pruneJunkVenuesRoute = createRoute({
+  method: 'post',
+  path: '/admin/attending/prune-junk-venues',
+  operationId: 'adminAttendingPruneJunkVenues',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary: 'Delete venue rows whose name looks like email body noise',
+  description:
+    'Identifies venues that look like email body fragments (HTML, ticketing instructions, bare street addresses, etc.) via the same heuristic that resolveVenue now rejects up-front. For events pointing at a junk venue: re-resolve to the canonical home venue when we know who played (Mariners → T-Mobile Park, Huskies → Husky Stadium, etc.); otherwise NULL the venue_id. Then hard-delete the junk row.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: PruneJunkVenuesBody } },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Prune completed',
+      content: {
+        'application/json': { schema: PruneJunkVenuesResponse },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminAttending.openapi(pruneJunkVenuesRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  type Opts = { dry_run?: boolean };
+  const body: Opts = await c.req.json<Opts>().catch(() => ({}) as Opts);
+
+  try {
+    const { pruneJunkVenues } =
+      await import('../services/attending/normalize-sports.js');
+    const result = await pruneJunkVenues(db, {
+      dryRun: body.dry_run ?? false,
+    });
+    return c.json({
+      status: 'completed' as const,
+      dry_run: body.dry_run ?? false,
+      ...result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ERROR] POST /admin/attending/prune-junk-venues: ${message}`);
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
+// ─── POST /v1/admin/attending/merge-sports-duplicates ───────────────
+
+const MergeSportsDuplicatesBody = z
+  .object({ dry_run: z.boolean().optional().default(false) })
+  .openapi('AttendingMergeSportsDuplicatesBody');
+
+const MergeSportsDuplicatesResponse = z
+  .object({
+    status: z.literal('completed'),
+    dry_run: z.boolean(),
+    pairs_found: z.number().int(),
+    pairs_merged: z.number().int(),
+    events_deleted: z.number().int(),
+    pairs: z.array(
+      z.object({
+        enriched_id: z.number().int(),
+        junk_id: z.number().int(),
+        event_date: z.string(),
+        junk_title: z.string().nullable(),
+      })
+    ),
+  })
+  .openapi('AttendingMergeSportsDuplicatesResponse');
+
+const mergeSportsDuplicatesRoute = createRoute({
+  method: 'post',
+  path: '/admin/attending/merge-sports-duplicates',
+  operationId: 'adminAttendingMergeSportsDuplicates',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary:
+    'Collapse unenriched sports event duplicates onto their enriched twin',
+  description:
+    'Finds pairs of attended_events on the same (event_date, event_type) where one row has external_source set (canonical match) and another does not. Migrates tickets, performers, sources, and player appearances onto the enriched row, then hard-deletes the unenriched duplicate.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: MergeSportsDuplicatesBody } },
+      required: false,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Merge completed',
+      content: {
+        'application/json': { schema: MergeSportsDuplicatesResponse },
+      },
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminAttending.openapi(mergeSportsDuplicatesRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  type Opts = { dry_run?: boolean };
+  const body: Opts = await c.req.json<Opts>().catch(() => ({}) as Opts);
+
+  try {
+    const { mergeSportsDuplicates } =
+      await import('../services/attending/normalize-sports.js');
+    const result = await mergeSportsDuplicates(db, {
+      dryRun: body.dry_run ?? false,
+    });
+    return c.json({
+      status: 'completed' as const,
+      dry_run: body.dry_run ?? false,
+      ...result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(
+      `[ERROR] POST /admin/attending/merge-sports-duplicates: ${message}`
+    );
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
 export default adminAttending;

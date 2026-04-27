@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { extractVenueName, resolveVenue, resolvePerformer } from './match.js';
+import {
+  extractVenueName,
+  looksLikeJunkVenue,
+  resolveVenue,
+  resolvePerformer,
+} from './match.js';
 
 // In-memory venue store mimicking the seeded D1 row shape.
 function makeVenuesStub(
@@ -290,5 +295,52 @@ describe('resolvePerformer', () => {
   it('throws on empty name', async () => {
     const db = makePerformerDbStub({});
     await expect(resolvePerformer('', null, db as never)).rejects.toThrow();
+  });
+});
+
+describe('looksLikeJunkVenue', () => {
+  it.each([
+    // Email body excerpts pulled from prod venues table
+    'Please note: This email is not your ticket.',
+    'Ticket Transfer Instructions',
+    'Please Respond',
+    "(If you're having trouble finding the email",
+    'Some electronic transfers are time sensitive and must be claimed within 48 hours',
+    'Order Placed',
+    'You can monitor the progress of this order here .',
+    'You are guaranteed to receive your tickets before the event.',
+    // HTML fragments
+    '<td align="left" style="padding-r',
+    '<img alt="" src="https://image.email.ticketmaster.com/lib/foo',
+    '<td align="left"',
+    // Bare street addresses
+    '760 Market St',
+    '1015 Folsom St',
+    '414 Brannan Street',
+    '300 Occidental Ave S',
+    // Empty
+    '',
+    'a',
+  ])('rejects %j', (input) => {
+    expect(looksLikeJunkVenue(input)).toBe(true);
+  });
+
+  it.each([
+    'T-Mobile Park',
+    'Climate Pledge Arena',
+    'Lumen Field',
+    'Husky Stadium',
+    'Greek Theatre - U.C. Berkeley',
+    'Stanford Stadium',
+    "Levi's Stadium",
+    'Allegiant Stadium',
+    'Fox Theater - Oakland',
+    'Showbox SoDo',
+    'Showbox at the Market',
+    'The Crocodile',
+    'Memorial Stadium - CA',
+    'Paramount Theatre',
+  ])('accepts real venue %j', (input) => {
+    expect(looksLikeJunkVenue(input)).toBe(false);
   });
 });

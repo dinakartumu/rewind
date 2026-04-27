@@ -103,6 +103,17 @@ export async function loadCanonicalEvent(
     // Merge: only fill nulls / overwrite when candidate has
     // strictly-better info. Drizzle UPDATE with sql expressions for
     // COALESCE-style updates.
+    //
+    // Title/subtitle policy: for sports events that resolved to an
+    // external match (mlb_stats_api / espn), the canonical "Home vs
+    // Away" + "Home N, Away M" overrides whatever's stored — those
+    // fields are derived data, not user-edited prose, and the source
+    // versions ("Mariners game with Brad", "Ticket: ...") are pure
+    // noise we want to wipe. For everything else (concerts, arts,
+    // unmatched sports), preserve existing in case the user hand-
+    // edited it.
+    const isCanonicalSports =
+      canonical.category === 'sports' && canonical.external_source != null;
     await db
       .update(attendedEvents)
       .set({
@@ -117,8 +128,12 @@ export async function loadCanonicalEvent(
           Object.keys(canonical.event_data).length > 0
             ? JSON.stringify(canonical.event_data)
             : sql`${attendedEvents.eventData}`,
-        // Don't overwrite title/subtitle/notes — user may have
-        // hand-edited those.
+        ...(isCanonicalSports
+          ? {
+              title: canonical.title,
+              subtitle: canonical.subtitle,
+            }
+          : {}),
         updatedAt: now,
       })
       .where(eq(attendedEvents.id, existing.id));
