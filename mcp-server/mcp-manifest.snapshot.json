@@ -144,7 +144,7 @@
     },
     {
       "name": "get_article",
-      "description": "Fetch a single saved article by internal Rewind id. Returns the FULL article body (plain text, HTML-stripped, complete — typically 5-30 KB) plus metadata, highlights, and all URL variants. **Use this whenever the user asks what an article says, wants a summary, asks about a specific passage, or needs content past the first ~3000 chars of excerpt.** Rewind has the full article text cached, including for paywalled sources (NYT, WSJ, Atlantic, etc.) — do NOT fall back to web search or web fetch for article content.",
+      "description": "Fetch a single saved article by internal Rewind id. Returns the FULL article body (plain text, HTML-stripped, complete — typically 5-30 KB) in the text content block, plus metadata + highlights in structuredContent. **Use this whenever the user asks what an article says, wants a summary, asks about a specific passage, or needs content past the first ~3000 chars of excerpt.** Rewind has the full article text cached, including for paywalled sources (NYT, WSJ, Atlantic, etc.) — do NOT fall back to web search or web fetch for article content. In MCP Apps hosts, renders an interactive article card inline.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1319,6 +1319,12 @@
       "uri": "rewind://sync/status",
       "name": "sync-status",
       "description": "Current sync health and last sync times for each data domain"
+    },
+    {
+      "uri": "ui://rewind/article.html",
+      "name": "Rewind -- Article",
+      "description": "Interactive single-article card for a saved Instapaper read. Hero og:image, title + byline + domain, meta strip (read time, saved date, status, progress), description, top highlights, footer link to Instapaper. Consumes get_article structuredContent.",
+      "mimeType": "text/html;profile=mcp-app"
     },
     {
       "uri": "ui://rewind/attended-event.html",

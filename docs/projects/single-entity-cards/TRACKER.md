@@ -40,49 +40,49 @@ Goal: KV namespace bound, existing tools audited for `_meta.ui.resourceUri` cons
 - [ ] **0.5.1** Single commit: docs + KV binding + Env type + audit findings. Subject: `single-entity-cards Phase 0: foundation (KV + audit)`.
 - [ ] **0.5.2** Push. Deploy auto-triggers; verify the KV binding is live in production via `wrangler kv key list --binding REWIND_CACHE` (will be empty, that's fine).
 
-## Phase 1: Article card — pending
+## Phase 1: Article card — DONE (modulo client smoke test)
 
 Goal: `get_article` renders an inline card in Claude Desktop / iOS. Body trimmed from `structuredContent`. ~1 day.
 
-### 1.1 — `get_article` `structuredContent` trim
+### 1.1 — `get_article` `structuredContent` trim — DONE
 
-- [ ] **1.1.1** In `src/routes/reading.ts`, the article detail handler — drop `content` and `bodyExcerpt` from the response (or move them under a separate `body` key not included in MCP `structuredContent`). Confirm `get_article` MCP tool still has access for prose generation.
-- [ ] **1.1.2** Add `highlight_count` to the response (cheap COUNT query). Cap returned `highlights` at 5.
-- [ ] **1.1.3** Update tests in `src/routes/reading.test.ts` for the new shape.
+- [x] **1.1.1** Trim done in the MCP tool layer (`mcp-server/src/tools/reading.ts`), not the backend route. Backend route stays stable for non-MCP consumers (docs site, API users); the MCP tool selectively rebuilds `structuredContent` to omit `content` and `excerpt`. Body still rendered into the text content block where the model reads it.
+- [x] **1.1.2** Highlights capped at 5 in `structuredContent`; `highlight_count` carries the total. Total comes from the existing `highlights.length` (no new COUNT query needed — backend already returns the full array).
+- [x] **1.1.3** No backend route changes → no `src/routes/reading.test.ts` updates needed.
 
-### 1.2 — Vite entry
+### 1.2 — Vite entry — DONE
 
-- [ ] **1.2.1** `mcp-server/web/article.html` — entry HTML (mirror `recent-reads.html`).
-- [ ] **1.2.2** `mcp-server/web/article.tsx` — root component, `useApp()` + `useHostStyles()`, listens to `app.ontoolresult` for the article payload.
+- [x] **1.2.1** `mcp-server/web/article.html` created.
+- [x] **1.2.2** `mcp-server/web/article.tsx` created — `useApp()` + `useHostStyles()`, listens for ArticlePayload via `app.ontoolresult`.
 
-### 1.3 — Card component
+### 1.3 — Card component — DONE
 
-- [ ] **1.3.1** `mcp-server/web/components/ArticleCard.tsx` — Hero, MetaStrip, Description, HighlightsPanel, Footer subcomponents.
-- [ ] **1.3.2** Hero uses og:image with thumbhash placeholder, dominant_color background fallback when image is null.
-- [ ] **1.3.3** Footer link uses `instapaper_app_url` if present (iOS), else `instapaper_url`.
-- [ ] **1.3.4** Status badge: 'unread' (neutral), 'read' (subdued), 'archived' (subdued italic), 'starred' (accent).
+- [x] **1.3.1** `mcp-server/web/components/ArticleDetail.tsx` (named to avoid colliding with the existing `ArticleCard.tsx` used by `recent-reads`). Subcomponents: Hero, Byline, StatusPill, ProgressBar, HighlightsPanel, Footer.
+- [x] **1.3.2** Hero uses og:image with thumbhash blur fade-in (200ms), `dominant_color → accent_color` linear-gradient fallback with first-letter monogram when image is null.
+- [x] **1.3.3** Footer prefers `instapaper_app_url` (iOS deep-link); falls back to `instapaper_url`. Secondary "Read on source" button opens the original URL.
+- [x] **1.3.4** StatusPill tones: `unread` (neutral), `read` (subdued), `archived` (subdued italic), `starred` (accent gold), `reading` (accent blue with progress bar shown when 0 < progress < 1).
 
-### 1.4 — Fixtures
+### 1.4 — Fixtures — DONE
 
-- [ ] **1.4.1** `mcp-server/web/article.fixtures.ts` — at least 4 fixtures: typical article with image, article without image, archived article, article with no highlights.
-- [ ] **1.4.2** Verify all fixtures render correctly in MCP Inspector.
+- [x] **1.4.1** `mcp-server/web/article.fixtures.ts` ships 4 fixtures: `default` (full-featured archived Simpsons essay with 4 highlights + 2 implied additional), `no-image` (plain unread, no hero), `in-progress` (status=reading with 0.42 progress + progress bar), `archived-no-highlights` (read article, no highlights, no og:image url but has thumbhash + colors).
+- [ ] **1.4.2** Verify all fixtures render correctly in MCP Inspector — **action required from user** during smoke test.
 
-### 1.5 — Wire into MCP tool
+### 1.5 — Wire into MCP tool — DONE
 
-- [ ] **1.5.1** `mcp-server/src/tools/reading.ts` — migrate `get_article` from `server.tool` → `server.registerTool` form with `_meta.ui.resourceUri = ui://rewind/article.html`.
-- [ ] **1.5.2** UI resource registered in `mcp-server/src/server.ts` via `registerUiResource()` with CSP `resourceDomains: ['https://cdn.rewind.rest']`.
-- [ ] **1.5.3** `npm run build:web INPUT=article.html` produces `web/dist/article.html`.
-- [ ] **1.5.4** Inline-bundles regenerated; `src/ui-bundles.ts` updated.
-- [ ] **1.5.5** Manifest snapshot regenerated; `server.test.ts` count assertion bumped.
+- [x] **1.5.1** `get_article` migrated from `server.tool` → `server.registerTool` with `_meta.ui.resourceUri = ui://rewind/article.html`. Description updated to mention text-block-vs-structuredContent split + the inline card.
+- [x] **1.5.2** UI resource registered in `mcp-server/src/server.ts` with CSP `resourceDomains: ['https://cdn.rewind.rest']`.
+- [x] **1.5.3** `INPUT=article.html npm run build:web` produced `web/dist/article.html` (458,399 chars).
+- [x] **1.5.4** `src/ui-bundles.ts` auto-regenerated by the inline-bundles script.
+- [x] **1.5.5** Manifest snapshot regenerated via `npm run mcp:update`. Tool count unchanged (still 48 — same tool, new registration form). Resource count +1 (`ui://rewind/article.html`). All 99 mcp-server tests pass.
 
-### 1.6 — Smoke test
+### 1.6 — Smoke test — partial (deferred to user)
 
-- [ ] **1.6.1** Local: `rewind-local` MCP entry → Claude Desktop → query "show me the article I saved about [topic]." Card should render inline.
-- [ ] **1.6.2** Capture a screenshot to `LIVE-CAPTURES.md` (new file in this project folder).
+- [ ] **1.6.1** **Action required from user** — post-deploy: `rewind-local` MCP entry → Claude Desktop → query "show me the article I saved about [topic]" or "tell me about the Simpsons predictions article I read." Card should render inline.
+- [ ] **1.6.2** **Action required from user** — capture a screenshot to `LIVE-CAPTURES.md`.
 
 ### 1.7 — Ship
 
-- [ ] **1.7.1** Single commit: route changes + tests + tool wiring + Vite entry + component + fixtures + bundle. Subject: `single-entity-cards Phase 1: article card`.
+- [ ] **1.7.1** Single commit: tool migration + Vite entry + component + fixtures + bundle + snapshot. Subject: `single-entity-cards Phase 1: article card`.
 - [ ] **1.7.2** Push. Deploy.
 - [ ] **1.7.3** Verify in production Claude Desktop.
 

@@ -70,19 +70,35 @@ export function registerReadingTools(
   client: RewindClient
 ): void {
   // get_article ────────────────────────────────────────────────────
-  server.tool(
+  // Registered via server.registerTool so we can attach `_meta.ui.resourceUri`.
+  // Hosts that support MCP Apps (Claude Desktop, Claude iOS) render a
+  // single-article card inline; others fall back to the text + links response.
+  //
+  // structuredContent omits the full body — that lives in the text content
+  // block where the model reads it. Card consumes only metadata + capped
+  // highlights, keeping the response well under the 8 KB token budget per
+  // BUDGET-AUDIT.md.
+  server.registerTool(
     'get_article',
-    'Fetch a single saved article by internal Rewind id. Returns the FULL article body (plain text, HTML-stripped, complete — typically 5-30 KB) plus metadata, highlights, and all URL variants. **Use this whenever the user asks what an article says, wants a summary, asks about a specific passage, or needs content past the first ~3000 chars of excerpt.** Rewind has the full article text cached, including for paywalled sources (NYT, WSJ, Atlantic, etc.) — do NOT fall back to web search or web fetch for article content.',
     {
-      id: z
-        .number()
-        .int()
-        .positive()
-        .describe(
-          'Internal Rewind article id (from a get_recent_reads, search, semantic_search, or find_similar_articles result)'
-        ),
+      title: 'Article — full body',
+      description:
+        'Fetch a single saved article by internal Rewind id. Returns the FULL article body (plain text, HTML-stripped, complete — typically 5-30 KB) in the text content block, plus metadata + highlights in structuredContent. **Use this whenever the user asks what an article says, wants a summary, asks about a specific passage, or needs content past the first ~3000 chars of excerpt.** Rewind has the full article text cached, including for paywalled sources (NYT, WSJ, Atlantic, etc.) — do NOT fall back to web search or web fetch for article content. In MCP Apps hosts, renders an interactive article card inline.',
+      inputSchema: {
+        id: z
+          .number()
+          .int()
+          .positive()
+          .describe(
+            'Internal Rewind article id (from a get_recent_reads, search, semantic_search, or find_similar_articles result)'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+      _meta: {
+        ui: { resourceUri: 'ui://rewind/article.html' },
+        'ui/resourceUri': 'ui://rewind/article.html',
+      },
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
       withRichResponse(async () => {
         type ArticleDetail = {
@@ -101,6 +117,7 @@ export function registerReadingTools(
           status: string;
           progress: number;
           saved_at: string;
+          image: Image;
           highlights: Array<{
             id: number;
             text: string;
@@ -166,7 +183,35 @@ export function registerReadingTools(
           ...links.filter((b): b is NonNullable<typeof b> => b !== null),
         ];
 
-        return { content, structuredContent: a };
+        // structuredContent: card-shaped, body excluded (lives in text block).
+        // Highlights capped at 5; total surfaced via highlight_count.
+        const structuredContent = {
+          article: {
+            id: a.id,
+            title: a.title,
+            author: a.author,
+            url: a.url,
+            instapaper_url: a.instapaper_url,
+            instapaper_app_url: a.instapaper_app_url,
+            domain: a.domain,
+            description: a.description,
+            word_count: a.word_count,
+            estimated_read_min: a.estimated_read_min,
+            status: a.status,
+            progress: a.progress,
+            saved_at: a.saved_at,
+            image: a.image,
+          },
+          highlights: a.highlights.slice(0, 5).map((h) => ({
+            id: h.id,
+            text: h.text,
+            note: h.note,
+            created_at: h.created_at,
+          })),
+          highlight_count: a.highlights.length,
+        };
+
+        return { content, structuredContent };
       })
   );
 

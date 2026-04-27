@@ -187,6 +187,17 @@ export function createServer(client: RewindClient): McpServer {
   });
 
   registerUiResource(server, {
+    name: 'Rewind -- Article',
+    uri: 'ui://rewind/article.html',
+    html: UI_BUNDLES['article.html'],
+    description:
+      'Interactive single-article card for a saved Instapaper read. Hero og:image, title + byline + domain, meta strip (read time, saved date, status, progress), description, top highlights, footer link to Instapaper. Consumes get_article structuredContent.',
+    csp: {
+      resourceDomains: ['https://cdn.rewind.rest'],
+    },
+  });
+
+  registerUiResource(server, {
     name: 'Rewind -- Top Albums',
     uri: 'ui://rewind/top-albums.html',
     html: UI_BUNDLES['top-albums.html'],
