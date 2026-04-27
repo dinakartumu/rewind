@@ -316,7 +316,7 @@ async function seedAttendedPlayer() {
       photo_silo: p.photo_silo,
       photo_full: p.photo_full,
       league: p.league,
-      team: p.team,
+      primary_team: p.primary_team,
     },
     supported: p.supported,
     season_stats: p.season_stats,

@@ -22,19 +22,28 @@
       "accent_color": "#eab2a2"
     },
     "league": "mlb",
-    "team": {
+    "primary_team": {
       "id": 136,
-      "name": "Seattle Mariners",
-      "abbreviation": "SEA",
       "league": "mlb",
-      "primary_color": null,
-      "logo": null
+      "abbreviation": "SEA",
+      "location": "Seattle",
+      "name": "Mariners",
+      "full_name": "Seattle Mariners",
+      "primary_color": "#005C5C",
+      "secondary_color": "#0C2C56",
+      "tertiary_color": null,
+      "ui_tint_color": "#005C5C",
+      "logo_url": "https://www.mlbstatic.com/team-logos/136.svg",
+      "logo_dark_url": "https://www.mlbstatic.com/team-logos/team-cap-on-dark/136.svg",
+      "logo_light_url": "https://www.mlbstatic.com/team-logos/team-cap-on-light/136.svg",
+      "conference": "AL",
+      "division": "AL West"
     }
   },
   "supported": true,
   "season_stats": {
     "season": 2026,
-    "fetched_at": "2026-04-27T20:25:34.435Z",
+    "fetched_at": "2026-04-27T22:03:59.950Z",
     "cache_hit": true,
     "hitter": {
       "games_played": 29,
