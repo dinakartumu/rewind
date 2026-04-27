@@ -22,16 +22,16 @@ Five concrete things this unlocks:
 
 Direct commits to `main`, one focused commit per phase (or per logical chunk within a phase). No worktree branch.
 
-| Phase | Status                                                                                                                            |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Baseline + coverage audit — DONE (forced 2 design changes; see [coverage-baseline.md](./coverage-baseline.md))                    |
-| 1     | Tier 1: filter and discovery ergonomics — DONE (team / team_id on /events; name on /players; new `get_attended_players` MCP tool) |
-| 2     | Tier 2 pilot: `/players/:id/stats` endpoint (MLB-only) — pending                                                                  |
-| 3     | UI pilot: game card on `get_attended_event` — pending                                                                             |
-| 4     | **ITERATION CHECKPOINT** — review, document learnings, decide go/no-go                                                            |
-| 5     | Tier 2 expansion: `/teams/:team_id/stats` — gated on Phase 4 outcome                                                              |
-| 6     | UI expansion: player stats card + team season card — gated on Phase 4                                                             |
-| 7     | Polish, deploy, close-out                                                                                                         |
+| Phase | Status                                                                                                                                                                             |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Baseline + coverage audit — DONE (forced 2 design changes; see [coverage-baseline.md](./coverage-baseline.md))                                                                     |
+| 1     | Tier 1: filter and discovery ergonomics — DONE (team / team_id on /events; name on /players; new `get_attended_players` MCP tool)                                                  |
+| 2     | Tier 2 pilot: `/players/:id/stats` endpoint (MLB-only) — DONE (career-by-default, hitter / pitcher / unsupported variants, IP outs-math, new `get_attended_player_stats` MCP tool) |
+| 3     | UI pilot: game card on `get_attended_event` — pending                                                                                                                              |
+| 4     | **ITERATION CHECKPOINT** — review, document learnings, decide go/no-go                                                                                                             |
+| 5     | Tier 2 expansion: `/teams/:team_id/stats` — gated on Phase 4 outcome                                                                                                               |
+| 6     | UI expansion: player stats card + team season card — gated on Phase 4                                                                                                              |
+| 7     | Polish, deploy, close-out                                                                                                                                                          |
 
 The hard checkpoint after Phase 3 exists because the value of Phases 5 and 6 depends on whether the model actually reaches for the new endpoints + cards in real conversation, and whether the queries the user asks lean MLB-specific (Phase 5+ continues) or cross-league (pivot to NFL/NBA box-score parsers instead).
 

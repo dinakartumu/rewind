@@ -289,6 +289,28 @@
       }
     },
     {
+      "name": "get_attended_player_stats",
+      "description": "Aggregate stats for one player across the games you attended. MLB players get a hitter slash line + counting stats, or a pitcher line + ERA / WHIP / decisions, depending on which stat lines exist on their appearances. Non-MLB players (NFL, NCAAF, NBA, etc.) return supported=false with appearance summaries (final scores, opponents) — full stat-line parsing for those leagues is on the roadmap. \n\n**Use career (omit `season`) by default.** Single-season slices are tiny — max 50 PAs across the entire dataset; career is where meaningful samples live (Cal Raleigh ~130 PAs / 32 attended games; Kirby ~238 BFs / 10 attended starts). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing the answer so the user can judge confidence.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Player id (from get_attended_players or get_attended_player)."
+          },
+          "season": {
+            "type": "integer",
+            "description": "Optional. Single-season slice. Omit for career across all attended games (recommended — see tool description)."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_attended_players",
       "description": "Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like \"Will Smith\" return multiple matches — disambiguate via the `primary_team_id` and `primary_position` on each result without a follow-up turn.",
       "inputSchema": {

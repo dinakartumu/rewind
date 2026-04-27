@@ -20169,6 +20169,508 @@
         }
       }
     },
+    "/v1/attending/players/{id}/stats": {
+      "get": {
+        "operationId": "getAttendedPlayerStats",
+        "tags": [
+          "Attending"
+        ],
+        "summary": "Per-player aggregate stats across attended games",
+        "description": "Aggregates per-game stat lines for one player across attended games (`attended=1` only — no-shows excluded). MLB players get a hitter slash line + counting stats, or a pitcher line + decisions, depending on which stat lines exist on their appearances. Non-MLB players return `{ supported: false, ... }` with a list of appearance summaries instead — box-score parsing for non-MLB leagues is tracked in the sports-boxscore-parity project.\n\n**`season` is optional.** Omit for career-across-attended-games (the default — and where meaningful samples live: typical Mariners regulars accumulate 100+ PAs across attended games over multiple seasons). Pass a season for a single-season slice, but expect small samples (max 50 PAs in a single season across the entire dataset). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing results so consumers can judge confidence.",
+        "parameters": [
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": 2025,
+              "description": "Optional. Single-season slice (matches event_data.season). Omit for career across all attended games."
+            },
+            "required": false,
+            "description": "Optional. Single-season slice (matches event_data.season). Omit for career across all attended games.",
+            "name": "season",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Player aggregate stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "hitter": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "league": {
+                          "type": "string",
+                          "enum": [
+                            "mlb"
+                          ]
+                        },
+                        "scope": {
+                          "type": "string",
+                          "enum": [
+                            "career",
+                            "season"
+                          ]
+                        },
+                        "season": {
+                          "type": "number"
+                        },
+                        "player": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "number"
+                            },
+                            "full_name": {
+                              "type": "string"
+                            },
+                            "primary_position": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "primary_team_id": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "full_name",
+                            "primary_position",
+                            "primary_team_id"
+                          ]
+                        },
+                        "games": {
+                          "type": "number"
+                        },
+                        "games_with_box_score": {
+                          "type": "number"
+                        },
+                        "batting": {
+                          "type": "object",
+                          "properties": {
+                            "pa": {
+                              "type": "number"
+                            },
+                            "ab": {
+                              "type": "number"
+                            },
+                            "r": {
+                              "type": "number"
+                            },
+                            "h": {
+                              "type": "number"
+                            },
+                            "doubles": {
+                              "type": "number"
+                            },
+                            "triples": {
+                              "type": "number"
+                            },
+                            "hr": {
+                              "type": "number"
+                            },
+                            "rbi": {
+                              "type": "number"
+                            },
+                            "bb": {
+                              "type": "number"
+                            },
+                            "k": {
+                              "type": "number"
+                            },
+                            "sb": {
+                              "type": "number"
+                            },
+                            "hbp": {
+                              "type": "number"
+                            },
+                            "total_bases": {
+                              "type": "number"
+                            },
+                            "avg": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "slg": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "pa",
+                            "ab",
+                            "r",
+                            "h",
+                            "doubles",
+                            "triples",
+                            "hr",
+                            "rbi",
+                            "bb",
+                            "k",
+                            "sb",
+                            "hbp",
+                            "total_bases",
+                            "avg",
+                            "slg"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "supported",
+                        "hitter",
+                        "league",
+                        "scope",
+                        "player",
+                        "games",
+                        "games_with_box_score",
+                        "batting"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "pitcher": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "league": {
+                          "type": "string",
+                          "enum": [
+                            "mlb"
+                          ]
+                        },
+                        "scope": {
+                          "type": "string",
+                          "enum": [
+                            "career",
+                            "season"
+                          ]
+                        },
+                        "season": {
+                          "type": "number"
+                        },
+                        "player": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "number"
+                            },
+                            "full_name": {
+                              "type": "string"
+                            },
+                            "primary_position": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "primary_team_id": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "full_name",
+                            "primary_position",
+                            "primary_team_id"
+                          ]
+                        },
+                        "games": {
+                          "type": "number"
+                        },
+                        "games_with_box_score": {
+                          "type": "number"
+                        },
+                        "pitching": {
+                          "type": "object",
+                          "properties": {
+                            "ip": {
+                              "type": "string"
+                            },
+                            "bf": {
+                              "type": "number"
+                            },
+                            "h": {
+                              "type": "number"
+                            },
+                            "r": {
+                              "type": "number"
+                            },
+                            "er": {
+                              "type": "number"
+                            },
+                            "bb": {
+                              "type": "number"
+                            },
+                            "k": {
+                              "type": "number"
+                            },
+                            "hr": {
+                              "type": "number"
+                            },
+                            "pitches": {
+                              "type": "number"
+                            },
+                            "strikes": {
+                              "type": "number"
+                            },
+                            "era": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "whip": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "decisions": {
+                              "type": "object",
+                              "properties": {
+                                "w": {
+                                  "type": "number"
+                                },
+                                "l": {
+                                  "type": "number"
+                                },
+                                "sv": {
+                                  "type": "number"
+                                },
+                                "hld": {
+                                  "type": "number"
+                                },
+                                "bs": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "w",
+                                "l",
+                                "sv",
+                                "hld",
+                                "bs"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "ip",
+                            "bf",
+                            "h",
+                            "r",
+                            "er",
+                            "bb",
+                            "k",
+                            "hr",
+                            "pitches",
+                            "strikes",
+                            "era",
+                            "whip",
+                            "decisions"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "supported",
+                        "pitcher",
+                        "league",
+                        "scope",
+                        "player",
+                        "games",
+                        "games_with_box_score",
+                        "pitching"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "league": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "string",
+                          "enum": [
+                            "career",
+                            "season"
+                          ]
+                        },
+                        "season": {
+                          "type": "number"
+                        },
+                        "player": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "number"
+                            },
+                            "full_name": {
+                              "type": "string"
+                            },
+                            "primary_position": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "primary_team_id": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "full_name",
+                            "primary_position",
+                            "primary_team_id"
+                          ]
+                        },
+                        "appearances": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "event_id": {
+                                "type": "number"
+                              },
+                              "event_date": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "home_team": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "away_team": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "final_score": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "my_team_won": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "event_id",
+                              "event_date",
+                              "title",
+                              "home_team",
+                              "away_team",
+                              "final_score",
+                              "my_team_won"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "supported",
+                        "league",
+                        "reason",
+                        "scope",
+                        "player",
+                        "appearances"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/attending/year/{year}": {
       "get": {
         "operationId": "getAttendingYearInReview",

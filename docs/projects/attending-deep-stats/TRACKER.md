@@ -62,49 +62,49 @@ Goal: the natural-language query "what Mariners games did I attend this season" 
 - [x] **1.5.1** Commit + push (single commit covering routes + tests + MCP tools + mintlify mdx + spec snapshot).
 - [x] **1.5.2** Deploy auto-triggered on CI green; live endpoints verified.
 
-## Phase 2: Tier 2 pilot — `/v1/attending/players/:id/stats` — pending
+## Phase 2: Tier 2 pilot — `/v1/attending/players/:id/stats` — DONE
 
-Goal: aggregate per-player stat lines for one season, MLB-only, with sample-size disclosure and coverage metadata baked into the response. ~1–2 days.
+Goal: aggregate per-player stat lines, MLB-only, with sample-size disclosure baked into the response.
 
-### 2.1 — Lock in response shape
+### 2.1 — Lock in response shape — DONE
 
-- [ ] **2.1.1** Document the full response shape in `docs/projects/attending-deep-stats/DESIGN.md` (new file). Two variants — hitter and pitcher — discriminated by player primary position.
-- [ ] **2.1.2** Hitter shape: `{ supported: true, league: 'mlb', games_attended: N, games_with_box_score: M, batting: { pa, ab, h, hr, rbi, bb, k, avg, obp, slg }, sample_size_warning: bool, coverage_warning: bool }`.
-- [ ] **2.1.3** Pitcher shape: `{ supported: true, league: 'mlb', games_attended: N, games_with_box_score: M, pitching: { games, ip, h, r, er, bb, k, hr, era, whip, wins, losses, saves, holds, blown_saves }, sample_size_warning: bool, coverage_warning: bool }`.
-- [ ] **2.1.4** Non-MLB shape: `{ supported: false, league: '<league>', reason: 'box-score parsing not yet supported for this league', appearances: [...] }` where appearances list is the existing per-event entries from `attended_event_players`.
+- [x] **2.1.1** Documented in [DESIGN.md](./DESIGN.md). Three variants (hitter, pitcher, unsupported), discriminated by `supported` + (`hitter`/`pitcher`/—).
+- [x] **2.1.2** Hitter shape: `{ supported: true, hitter: true, league: 'mlb', scope, season?, player, games, games_with_box_score, batting: { pa, ab, r, h, doubles, triples, hr, rbi, bb, k, sb, hbp, total_bases, avg, slg } }`. **OBP omitted** because `sf` (sacrifice flies) is not stored — see DESIGN.md.
+- [x] **2.1.3** Pitcher shape: `{ supported: true, pitcher: true, league: 'mlb', scope, season?, player, games, games_with_box_score, pitching: { ip, bf, h, r, er, bb, k, hr, pitches, strikes, era, whip, decisions: { w, l, sv, hld, bs } } }`.
+- [x] **2.1.4** Non-MLB shape: `{ supported: false, league, reason, scope, season?, player, appearances: [{ event_id, event_date, title, home_team, away_team, final_score, my_team_won }] }`.
 
-### 2.2 — Aggregation service
+### 2.2 — Aggregation service — DONE
 
-- [ ] **2.2.1** `src/services/attending/player-stats.ts` exports `aggregatePlayerStats(db, playerId, season): Promise<PlayerStatsResponse>`.
-- [ ] **2.2.2** Reads `attended_event_players` joined to `attended_events` and `players`. Filters to `attended=1` and `attended_events.event_type` matches `<league>_game` for the player's primary `league`.
-- [ ] **2.2.3** Reduces JSON `batting_line` / `pitching_line` blobs into accumulator. Recomputes ratios at the end.
-- [ ] **2.2.4** Sample-size flag: `sample_size_warning = pa < 50` (hitters) or `bf < 60` (pitchers). Bumpable from Phase 0.2 distribution if needed.
-- [ ] **2.2.5** Coverage flag: `coverage_warning = games_with_box_score / games_attended < 0.8`.
-- [ ] **2.2.6** Unit tests with seeded fixtures: hitter normal, hitter small-sample, pitcher normal, pitcher with decisions, non-MLB player returns `supported: false`, player with no attended games returns `games_attended: 0`.
+- [x] **2.2.1** `src/services/attending/player-stats.ts` exports `aggregatePlayerStats(db, playerId, season?)`. Single-query loads player + attended-event appearances joined to events; in-process aggregation.
+- [x] **2.2.2** Filters to `attended=1` (no-shows excluded). When `season` is set, filters by `event_data.season` via json_extract.
+- [x] **2.2.3** Reduces JSON blobs into accumulators. AVG/SLG/ERA/WHIP recomputed from totals (not averaged from per-game rates). IP uses outs-math (`6.2 + 0.1 = 7.0`, not 6.3) — `parseIpToOuts`/`formatIp` helpers exported for tests.
+- [x] **2.2.4** **Boolean warnings dropped per Phase 0 audit.** Response always includes raw `pa`/`bf`/`games`; tool description tells the model to cite them.
+- [x] **2.2.5** Coverage signal exposed via `games_with_box_score < games`; MCP wrapper formats it as a "Note: N of M attended games lack box-score data" line when partial.
+- [x] **2.2.6** 10 service tests in `src/services/attending/player-stats.test.ts`: IP outs-math (parse + format + round-trip across third-out wraparound), hitter career, hitter season slice, pitcher career with decisions/ERA/WHIP, non-MLB → supported:false with appearance summaries, unknown player → throws PlayerNotFoundError, no-show games excluded from aggregates.
 
-### 2.3 — Route handler
+### 2.3 — Route handler — DONE
 
-- [ ] **2.3.1** Add `playerStatsRoute` to `src/routes/attending.ts`. Path `/players/{id}/stats`, query `season` (required, integer).
-- [ ] **2.3.2** OpenAPI schema with full response variants documented (Zod discriminated union or a simple `z.object({ supported: ... })` union).
-- [ ] **2.3.3** Cache `medium` (1h).
-- [ ] **2.3.4** Route tests: 200 with hitter shape, 200 with pitcher shape, 200 with `supported: false` for non-MLB, 404 for unknown player, 400 for invalid season.
+- [x] **2.3.1** `playerStatsRoute` in `src/routes/attending.ts`. Path `/players/{id}/stats`. **`season` is optional** (Phase 0 design pivot — career is the meaningful default).
+- [x] **2.3.2** OpenAPI schema as `z.union([HitterStatsSchema, PitcherStatsSchema, UnsupportedStatsSchema])`. Description in route walks the model through career-by-default and the small-sample reality.
+- [x] **2.3.3** Cache `medium` (1h).
+- [x] **2.3.4** 4 route tests: 404 for unknown player; hitter shape with career scope by default; respects `?season` for single-season slice; `supported: false` for non-MLB with appearance summaries.
 
-### 2.4 — MCP tool wrapper
+### 2.4 — MCP tool wrapper — DONE
 
-- [ ] **2.4.1** New `get_attended_player_stats` tool in `mcp-server/src/tools/attending.ts`. Required params: `player_id`, `season`. Tool description: "Aggregate stats for one player at games you attended in one season. MLB only. Returns slash line for hitters / ERA + decisions for pitchers, with sample-size and coverage warnings."
-- [ ] **2.4.2** Text rendering: include the warnings in the prose so the model picks them up. Example: "Julio Rodriguez at games you attended in 2025: .276/.348/.512 in 25 games (174 PAs). 2 missing box scores."
-- [ ] **2.4.3** Manifest snapshot regenerated.
+- [x] **2.4.1** New `get_attended_player_stats` tool in `mcp-server/src/tools/attending.ts`. Required `id`, optional `season`. Description steers career-by-default, small-sample warning, MLB-only.
+- [x] **2.4.2** Text rendering branches on hitter vs pitcher vs unsupported. Hitter prose: `"Cal Raleigh across all attended games — 32 attended games, 130 PAs. Slash: .295 / .452 (AVG / SLG; OBP not stored). Counting: ..."`. Pitcher prose: `"George Kirby across all attended games — 10 attended games, 238 BF. 65.1 IP, 24 ER, 71 K, 12 BB. 3.31 ERA, 1.10 WHIP. Decisions: 4W-3L"`. Includes coverage note when partial.
+- [x] **2.4.3** Manifest snapshot regenerated. Tool count 47 → 48. `server.test.ts` count assertion bumped.
+- [x] **2.4.4** `docs-mintlify/mcp-server.mdx` Attending accordion gains a row for `get_attended_player_stats`.
 
-### 2.5 — End-to-end sanity check
+### 2.5 — End-to-end sanity check — partial (deferred to Phase 4)
 
-- [ ] **2.5.1** Run "what's Julio's batting average at games I've attended this year" through Claude Desktop. Verify the model picks `get_attended_player_stats`, gets the right shape, and includes the sample size in its response prose.
-- [ ] **2.5.2** Run "how many times have I seen Kirby pitch" — should still work via `get_attended_player` (existing); the new stats tool also returns the count. Validate the model picks the right tool.
+- [ ] **2.5.1** Live conversational verification via Claude Desktop / web / iOS deferred to Phase 4 alongside the broader checkpoint. Tests prove the API behavior; real model behavior validated end-to-end at Phase 4.
 
-### 2.6 — Ship
+### 2.6 — Ship — DONE
 
-- [ ] **2.6.1** Spec snapshot regenerated.
-- [ ] **2.6.2** Commit + push. CI green.
-- [ ] **2.6.3** Deploy auto-triggered. Verify live.
+- [x] **2.6.1** Spec snapshot regenerated.
+- [x] **2.6.2** Commit + push.
+- [x] **2.6.3** Deploy auto-triggered on CI green.
 
 ## Phase 3: UI pilot — game card on `get_attended_event` — pending
 

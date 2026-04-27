@@ -15,6 +15,10 @@ import { getImageAttachmentBatch } from '../lib/images.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import { errorResponses, PaginationMeta } from '../lib/schemas/common.js';
+import {
+  aggregatePlayerStats,
+  PlayerNotFoundError,
+} from '../services/attending/player-stats.js';
 
 const attending = createOpenAPIApp();
 
@@ -944,6 +948,154 @@ attending.openapi(playerDetailRoute, async (c) => {
     },
     200
   );
+});
+
+// ─── GET /players/{id}/stats ────────────────────────────────────────
+
+const PlayerSummarySchema = z.object({
+  id: z.number(),
+  full_name: z.string(),
+  primary_position: z.string().nullable(),
+  primary_team_id: z.number().nullable(),
+});
+
+const HitterStatsSchema = z.object({
+  supported: z.literal(true),
+  hitter: z.literal(true),
+  league: z.literal('mlb'),
+  scope: z.enum(['career', 'season']),
+  season: z.number().optional(),
+  player: PlayerSummarySchema,
+  games: z.number(),
+  games_with_box_score: z.number(),
+  batting: z.object({
+    pa: z.number(),
+    ab: z.number(),
+    r: z.number(),
+    h: z.number(),
+    doubles: z.number(),
+    triples: z.number(),
+    hr: z.number(),
+    rbi: z.number(),
+    bb: z.number(),
+    k: z.number(),
+    sb: z.number(),
+    hbp: z.number(),
+    total_bases: z.number(),
+    avg: z.string().nullable(),
+    slg: z.string().nullable(),
+  }),
+});
+
+const PitcherStatsSchema = z.object({
+  supported: z.literal(true),
+  pitcher: z.literal(true),
+  league: z.literal('mlb'),
+  scope: z.enum(['career', 'season']),
+  season: z.number().optional(),
+  player: PlayerSummarySchema,
+  games: z.number(),
+  games_with_box_score: z.number(),
+  pitching: z.object({
+    ip: z.string(),
+    bf: z.number(),
+    h: z.number(),
+    r: z.number(),
+    er: z.number(),
+    bb: z.number(),
+    k: z.number(),
+    hr: z.number(),
+    pitches: z.number(),
+    strikes: z.number(),
+    era: z.string().nullable(),
+    whip: z.string().nullable(),
+    decisions: z.object({
+      w: z.number(),
+      l: z.number(),
+      sv: z.number(),
+      hld: z.number(),
+      bs: z.number(),
+    }),
+  }),
+});
+
+const UnsupportedStatsSchema = z.object({
+  supported: z.literal(false),
+  league: z.string(),
+  reason: z.string(),
+  scope: z.enum(['career', 'season']),
+  season: z.number().optional(),
+  player: PlayerSummarySchema,
+  appearances: z.array(
+    z.object({
+      event_id: z.number(),
+      event_date: z.string(),
+      title: z.string(),
+      home_team: z.string().nullable(),
+      away_team: z.string().nullable(),
+      final_score: z.string().nullable(),
+      my_team_won: z.boolean().nullable(),
+    })
+  ),
+});
+
+const PlayerStatsResponseSchema = z.union([
+  HitterStatsSchema,
+  PitcherStatsSchema,
+  UnsupportedStatsSchema,
+]);
+
+const playerStatsRoute = createRoute({
+  method: 'get',
+  path: '/players/{id}/stats',
+  operationId: 'getAttendedPlayerStats',
+  tags: ['Attending'],
+  summary: 'Per-player aggregate stats across attended games',
+  description:
+    'Aggregates per-game stat lines for one player across attended games (`attended=1` only — no-shows excluded). MLB players get a hitter slash line + counting stats, or a pitcher line + decisions, depending on which stat lines exist on their appearances. Non-MLB players return `{ supported: false, ... }` with a list of appearance summaries instead — box-score parsing for non-MLB leagues is tracked in the sports-boxscore-parity project.\n\n**`season` is optional.** Omit for career-across-attended-games (the default — and where meaningful samples live: typical Mariners regulars accumulate 100+ PAs across attended games over multiple seasons). Pass a season for a single-season slice, but expect small samples (max 50 PAs in a single season across the entire dataset). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing results so consumers can judge confidence.',
+  request: {
+    params: z.object({
+      id: z.coerce
+        .number()
+        .int()
+        .openapi({ param: { name: 'id', in: 'path', required: true } }),
+    }),
+    query: z.object({
+      season: z.coerce.number().int().optional().openapi({
+        example: 2025,
+        description:
+          'Optional. Single-season slice (matches event_data.season). Omit for career across all attended games.',
+      }),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'Player aggregate stats',
+      content: {
+        'application/json': {
+          schema: PlayerStatsResponseSchema,
+        },
+      },
+    },
+    ...errorResponses(401, 404),
+  },
+});
+
+attending.openapi(playerStatsRoute, async (c) => {
+  const db = createDb(c.env.DB);
+  const { id } = c.req.valid('param');
+  const { season } = c.req.valid('query');
+
+  try {
+    const result = await aggregatePlayerStats(db, id, season);
+    setCache(c, 'medium');
+    return c.json(result, 200);
+  } catch (err) {
+    if (err instanceof PlayerNotFoundError) {
+      return notFound(c, 'Player not found') as any;
+    }
+    throw err;
+  }
 });
 
 // ─── GET /year/{year} ───────────────────────────────────────────────

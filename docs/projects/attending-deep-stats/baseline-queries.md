@@ -8,8 +8,8 @@ These do not block Phase 1 execution. Phase 4 needs them, but Phases 1–3 ship 
 
 ## Query 1: "What Mariners games have I attended this season?"
 
-**Run in**: **_ (Claude Desktop / web / iOS)
-**Date**: _**
+**Run in**: **\_ (Claude Desktop / web / iOS)
+**Date**: \_**
 
 **Tool calls observed**:
 
@@ -33,8 +33,8 @@ These do not block Phase 1 execution. Phase 4 needs them, but Phases 1–3 ship 
 
 ## Query 2: "How many home runs have the Mariners hit at games I attended this season?"
 
-**Run in**: **_
-**Date**: _**
+**Run in**: **\_
+**Date**: \_**
 
 **Tool calls observed**:
 
@@ -58,8 +58,8 @@ These do not block Phase 1 execution. Phase 4 needs them, but Phases 1–3 ship 
 
 ## Query 3: "What's Julio's batting average at games I've attended this year?"
 
-**Run in**: **_
-**Date**: _**
+**Run in**: **\_
+**Date**: \_**
 
 **Tool calls observed**:
 
@@ -83,8 +83,8 @@ These do not block Phase 1 execution. Phase 4 needs them, but Phases 1–3 ship 
 
 ## Query 4: "How many times have I seen Kirby pitch?"
 
-**Run in**: **_
-**Date**: _**
+**Run in**: **\_
+**Date**: \_**
 
 **Tool calls observed**:
 
@@ -108,8 +108,8 @@ These do not block Phase 1 execution. Phase 4 needs them, but Phases 1–3 ship 
 
 ## Bonus query (anything you didn't anticipate)
 
-**Query**: **_
-**Run in**: _**
+**Query**: **\_
+**Run in**: \_**
 **Date**: \_\_\_
 
 **Tool calls observed**:

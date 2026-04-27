@@ -455,6 +455,183 @@ export function registerAttendingTools(
       })
   );
 
+  // get_attended_player_stats ──────────────────────────────────────
+  // Aggregate per-player stat lines across attended games. MLB-only;
+  // non-MLB players return supported:false with appearance summaries
+  // (final scores, opponents) so the model can still answer
+  // "what games did I see this player in" cleanly.
+  type PlayerStatsResp =
+    | {
+        supported: true;
+        hitter?: true;
+        pitcher?: true;
+        league: string;
+        scope: 'career' | 'season';
+        season?: number;
+        player: {
+          id: number;
+          full_name: string;
+          primary_position: string | null;
+          primary_team_id: number | null;
+        };
+        games: number;
+        games_with_box_score: number;
+        batting?: {
+          pa: number;
+          ab: number;
+          h: number;
+          hr: number;
+          rbi: number;
+          bb: number;
+          k: number;
+          sb: number;
+          avg: string | null;
+          slg: string | null;
+        };
+        pitching?: {
+          ip: string;
+          bf: number;
+          k: number;
+          bb: number;
+          er: number;
+          era: string | null;
+          whip: string | null;
+          decisions: {
+            w: number;
+            l: number;
+            sv: number;
+            hld: number;
+            bs: number;
+          };
+        };
+      }
+    | {
+        supported: false;
+        league: string;
+        reason: string;
+        scope: 'career' | 'season';
+        season?: number;
+        player: {
+          id: number;
+          full_name: string;
+          primary_position: string | null;
+          primary_team_id: number | null;
+        };
+        appearances: Array<{
+          event_id: number;
+          event_date: string;
+          title: string;
+          home_team: string | null;
+          away_team: string | null;
+          final_score: string | null;
+          my_team_won: boolean | null;
+        }>;
+      };
+  server.tool(
+    'get_attended_player_stats',
+    'Aggregate stats for one player across the games you attended. MLB players get a hitter slash line + counting stats, or a pitcher line + ERA / WHIP / decisions, depending on which stat lines exist on their appearances. Non-MLB players (NFL, NCAAF, NBA, etc.) return supported=false with appearance summaries (final scores, opponents) — full stat-line parsing for those leagues is on the roadmap. \n\n**Use career (omit `season`) by default.** Single-season slices are tiny — max 50 PAs across the entire dataset; career is where meaningful samples live (Cal Raleigh ~130 PAs / 32 attended games; Kirby ~238 BFs / 10 attended starts). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing the answer so the user can judge confidence.',
+    {
+      id: z
+        .number()
+        .int()
+        .describe(
+          'Player id (from get_attended_players or get_attended_player).'
+        ),
+      season: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'Optional. Single-season slice. Omit for career across all attended games (recommended — see tool description).'
+        ),
+    },
+    READ_ONLY_ANNOTATIONS,
+    async ({ id, season }) =>
+      withRichResponse<PlayerStatsResp>(async () => {
+        const data = await client.get<PlayerStatsResp>(
+          `/attending/players/${id}/stats`,
+          season !== undefined ? { season } : {}
+        );
+
+        const scopeLabel =
+          data.scope === 'career'
+            ? 'across all attended games'
+            : `in ${data.season}`;
+
+        if (data.supported === false) {
+          const games = data.appearances.length;
+          const lines = [
+            `${data.player.full_name} (${data.league}) — ${games} attended game${games === 1 ? '' : 's'} ${scopeLabel}.`,
+            'Per-player stat-line parsing is not yet supported for this league.',
+            '',
+            'Game appearances:',
+          ];
+          for (const a of data.appearances.slice(0, 25)) {
+            const date = formatDate(a.event_date);
+            const score = a.final_score ? ` (${a.final_score})` : '';
+            const result =
+              a.my_team_won === true
+                ? ' W'
+                : a.my_team_won === false
+                  ? ' L'
+                  : '';
+            lines.push(`  ${date}: ${a.title}${score}${result}`);
+          }
+          if (data.appearances.length > 25) {
+            lines.push(`  ... and ${data.appearances.length - 25} more.`);
+          }
+          return {
+            content: [text(lines.join('\n'))],
+            structuredContent: data,
+          };
+        }
+
+        if (data.batting) {
+          const b = data.batting;
+          const lines = [
+            `${data.player.full_name} ${scopeLabel} — ${data.games} attended game${data.games === 1 ? '' : 's'}, ${b.pa} PA${b.pa === 1 ? '' : 's'}.`,
+            `Slash: ${b.avg ?? '—'} / ${b.slg ?? '—'}  (AVG / SLG; OBP not stored)`,
+            `Counting: ${b.h} H, ${b.hr} HR, ${b.rbi} RBI, ${b.bb} BB, ${b.k} K, ${b.sb} SB`,
+            data.games_with_box_score < data.games
+              ? `Note: ${data.games - data.games_with_box_score} of ${data.games} attended games lack box-score data.`
+              : null,
+          ].filter((l): l is string => l !== null);
+          return {
+            content: [text(lines.join('\n'))],
+            structuredContent: data,
+          };
+        }
+
+        if (data.pitching) {
+          const p = data.pitching;
+          const dec = `${p.decisions.w}W-${p.decisions.l}L${p.decisions.sv ? `, ${p.decisions.sv} SV` : ''}${p.decisions.hld ? `, ${p.decisions.hld} HLD` : ''}${p.decisions.bs ? `, ${p.decisions.bs} BS` : ''}`;
+          const lines = [
+            `${data.player.full_name} ${scopeLabel} — ${data.games} attended game${data.games === 1 ? '' : 's'}, ${p.bf} BF.`,
+            `${p.ip} IP, ${p.er} ER, ${p.k} K, ${p.bb} BB`,
+            `${p.era ?? '—'} ERA, ${p.whip ?? '—'} WHIP`,
+            `Decisions: ${dec}`,
+            data.games_with_box_score < data.games
+              ? `Note: ${data.games - data.games_with_box_score} of ${data.games} attended games lack box-score data.`
+              : null,
+          ].filter((l): l is string => l !== null);
+          return {
+            content: [text(lines.join('\n'))],
+            structuredContent: data,
+          };
+        }
+
+        // MLB player with attended games but no batting/pitching lines.
+        return {
+          content: [
+            text(
+              `${data.player.full_name} attended ${data.games} game${data.games === 1 ? '' : 's'} ${scopeLabel}, but no per-player stat lines exist for this player on those games.`
+            ),
+          ],
+          structuredContent: data,
+        };
+      })
+  );
+
   // get_attending_stats ─────────────────────────────────────────────
   server.tool(
     'get_attending_stats',
