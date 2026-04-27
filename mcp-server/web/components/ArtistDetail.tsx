@@ -148,7 +148,7 @@ export function ArtistDetail({
       )}
 
       {similar_artists.length > 0 && (
-        <SimilarArtists similar={similar_artists} onOpen={onOpen} />
+        <SimilarArtists similar={similar_artists} />
       )}
 
       <Footer artist={artist} accent={accent} onOpen={onOpen} />
@@ -414,10 +414,11 @@ function TopAlbums({
 
 function SimilarArtists({
   similar,
-  onOpen,
 }: {
   similar: SimilarArtist[];
-  onOpen?: (url: string) => void;
+  // No URL on similar entries today — these are local artist refs without a
+  // direct external link. Defer click-to-open until a tool surfaces a URL
+  // for them (e.g. the artist's Apple Music page).
 }) {
   return (
     <section style={sectionStyle}>
