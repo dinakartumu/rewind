@@ -204,7 +204,7 @@
     },
     {
       "name": "get_attended_events",
-      "description": "List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, and venue. Includes events you bought tickets for but did not attend (attended=false).",
+      "description": "List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, venue, and team. Includes events you bought tickets for but did not attend (attended=false). Use `team` (substring match like \"mariners\" or \"huskies\") for natural-language queries; `team_id` for stable integer-keyed lookups.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -251,6 +251,14 @@
             "minimum": 0,
             "maximum": 1,
             "description": "1 = only attended, 0 = only unattended (purchased but missed). Omit to return both."
+          },
+          "team": {
+            "type": "string",
+            "description": "Case-insensitive substring match against either team name in event_data. e.g. \"mariners\", \"huskies\", \"storm\". Returns games where this team was either home or away."
+          },
+          "team_id": {
+            "type": "integer",
+            "description": "Exact match on the league-native team id. e.g. 136 = Seattle Mariners (MLB), 264 = Washington Huskies (ESPN). Use when the natural-language `team` substring is ambiguous."
           }
         },
         "additionalProperties": false,
@@ -276,6 +284,42 @@
         "required": [
           "id"
         ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_attended_players",
+      "description": "Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like \"Will Smith\" return multiple matches — disambiguate via the `primary_team_id` and `primary_position` on each result without a follow-up turn.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Page number, 1-indexed."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10,
+            "description": "Items per page (max 50)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Case-insensitive substring match on full name. e.g. \"julio\", \"kirby\", \"will smith\"."
+          },
+          "league": {
+            "type": "string",
+            "description": "Filter by league slug, e.g. \"mlb\", \"nfl\", \"ncaaf\"."
+          },
+          "team_id": {
+            "type": "integer",
+            "description": "Filter by primary team id (league-native, e.g. 136 = Mariners in MLB)."
+          }
+        },
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       }

@@ -143,7 +143,7 @@ export function registerAttendingTools(
   // get_attended_events ─────────────────────────────────────────────
   server.tool(
     'get_attended_events',
-    'List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, and venue. Includes events you bought tickets for but did not attend (attended=false).',
+    'List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, venue, and team. Includes events you bought tickets for but did not attend (attended=false). Use `team` (substring match like "mariners" or "huskies") for natural-language queries; `team_id` for stable integer-keyed lookups.',
     {
       page: z.number().min(1).default(1).describe('Page number, 1-indexed.'),
       limit: z
@@ -180,6 +180,19 @@ export function registerAttendingTools(
         .describe(
           '1 = only attended, 0 = only unattended (purchased but missed). Omit to return both.'
         ),
+      team: z
+        .string()
+        .optional()
+        .describe(
+          'Case-insensitive substring match against either team name in event_data. e.g. "mariners", "huskies", "storm". Returns games where this team was either home or away.'
+        ),
+      team_id: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'Exact match on the league-native team id. e.g. 136 = Seattle Mariners (MLB), 264 = Washington Huskies (ESPN). Use when the natural-language `team` substring is ambiguous.'
+        ),
     },
     READ_ONLY_ANNOTATIONS,
     async ({
@@ -191,6 +204,8 @@ export function registerAttendingTools(
       year,
       venue_id,
       attended,
+      team,
+      team_id,
     }) =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -205,6 +220,8 @@ export function registerAttendingTools(
           year,
           venue_id,
           attended,
+          team,
+          team_id,
         });
 
         if (!data.data.length) {
@@ -294,6 +311,85 @@ export function registerAttendingTools(
   );
 
   // get_attended_player ─────────────────────────────────────────────
+  // get_attended_players ────────────────────────────────────────────
+  // Search across the players-you-have-watched-play list. Supports name
+  // substring lookup so the model can resolve "Julio" -> player id without
+  // the user having to know the integer id.
+  server.tool(
+    'get_attended_players',
+    'Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via the `primary_team_id` and `primary_position` on each result without a follow-up turn.',
+    {
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .default(1)
+        .describe('Page number, 1-indexed.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .default(10)
+        .describe('Items per page (max 50).'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Case-insensitive substring match on full name. e.g. "julio", "kirby", "will smith".'
+        ),
+      league: z
+        .string()
+        .optional()
+        .describe('Filter by league slug, e.g. "mlb", "nfl", "ncaaf".'),
+      team_id: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'Filter by primary team id (league-native, e.g. 136 = Mariners in MLB).'
+        ),
+    },
+    READ_ONLY_ANNOTATIONS,
+    async ({ page, limit, name, league, team_id }) =>
+      withRichResponse(async () => {
+        const data = await client.get<{
+          data: Player[];
+          pagination: Pagination;
+        }>('/attending/players', {
+          page,
+          limit,
+          name,
+          league,
+          team_id,
+        });
+
+        if (!data.data.length) {
+          return {
+            content: [text('No players match those filters.')],
+            structuredContent: data,
+          };
+        }
+
+        const lines = [
+          `Players (${data.data.length} of ${data.pagination.total} matching${name ? ` "${name}"` : ''}):`,
+        ];
+        for (const p of data.data) {
+          const pos = p.primary_position ? ` ${p.primary_position}` : '';
+          const num = p.primary_number ? ` #${p.primary_number}` : '';
+          const team = p.primary_team_id ? ` team_id=${p.primary_team_id}` : '';
+          lines.push(
+            `id=${p.id} ${p.full_name}${num}${pos} (${p.league}${team})`
+          );
+        }
+
+        return {
+          content: [text(lines.join('\n'))],
+          structuredContent: data,
+        };
+      })
+  );
+
   server.tool(
     'get_attended_player',
     'Get details for a player you have watched play in person, including bio (position, jersey, debut), photos, and every attended event in which they appeared with their stat line for that game.',

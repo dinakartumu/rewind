@@ -147,7 +147,7 @@ const eventsRoute = createRoute({
   tags: ['Attending'],
   summary: 'List attended events',
   description:
-    'Returns events you have tickets for, optionally filtered by category, event_type, season, year, and venue. Includes events you bought tickets for but did not attend (attended=false).',
+    "Returns events you have tickets for, optionally filtered by category, event_type, season, year, venue, team, and attendance status. Includes events you bought tickets for but did not attend (attended=false).\n\n**Team filtering** matches against `event_data.home_team` / `event_data.away_team` (both teams in the game). `team` is a case-insensitive substring match on the team's name (e.g. `mariners`, `huskies`). `team_id` is an exact match on the league's team id (e.g. `136` for Seattle Mariners in MLB Stats; `264` for Washington Huskies in ESPN). Pass either, not both.",
   request: {
     query: z.object({
       page: z.coerce
@@ -180,6 +180,16 @@ const eventsRoute = createRoute({
         .max(1)
         .optional()
         .openapi({ example: 1 }),
+      team: z.string().optional().openapi({
+        example: 'mariners',
+        description:
+          'Case-insensitive substring match on event_data.home_team.name OR event_data.away_team.name. Returns games where this team was either side.',
+      }),
+      team_id: z.coerce.number().int().optional().openapi({
+        example: 136,
+        description:
+          'Exact match on event_data.home_team.id OR event_data.away_team.id. Use league-native team ids (MLB Stats id for MLB, ESPN team id for everything else).',
+      }),
     }),
   },
   responses: {
@@ -209,6 +219,8 @@ attending.openapi(eventsRoute, async (c) => {
     year,
     venue_id,
     attended,
+    team,
+    team_id,
   } = c.req.valid('query');
   const offset = (page - 1) * limit;
 
@@ -226,6 +238,22 @@ attending.openapi(eventsRoute, async (c) => {
   if (season) {
     conditions.push(
       sql`json_extract(${attendedEvents.eventData}, '$.season') = ${season}`
+    );
+  }
+  if (team) {
+    // Case-insensitive substring match against either team name in event_data.
+    // Note `like` in SQLite is case-insensitive for ASCII by default; we still
+    // lower both sides so unicode-y team names work the same way.
+    const needle = `%${team.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(json_extract(${attendedEvents.eventData}, '$.home_team.name')) LIKE ${needle}
+        OR lower(json_extract(${attendedEvents.eventData}, '$.away_team.name')) LIKE ${needle})`
+    );
+  }
+  if (team_id !== undefined) {
+    conditions.push(
+      sql`(json_extract(${attendedEvents.eventData}, '$.home_team.id') = ${team_id}
+        OR json_extract(${attendedEvents.eventData}, '$.away_team.id') = ${team_id})`
     );
   }
 
@@ -716,13 +744,18 @@ const playersListRoute = createRoute({
   tags: ['Attending'],
   summary: 'List players you have watched play',
   description:
-    'Returns players who appeared in any attended sports event. Filterable by league and team_id. Includes both photo variants when available.',
+    'Returns players who appeared in any attended sports event. Filterable by league, team_id, and `name` (case-insensitive substring match against full_name). Includes both photo variants when available.\n\n**Disambiguating common names**: a `name=will smith` query returns multiple matches. Each player row carries `league`, `primary_team_id`, and `primary_position` — use those to pick the right one without a follow-up turn.',
   request: {
     query: z.object({
       page: z.coerce.number().int().min(1).optional().default(1),
       limit: z.coerce.number().int().min(1).max(200).optional().default(50),
       league: z.string().optional().openapi({ example: 'mlb' }),
       team_id: z.coerce.number().int().optional().openapi({ example: 136 }),
+      name: z.string().optional().openapi({
+        example: 'julio',
+        description:
+          'Case-insensitive substring match on full_name. Returns multiple hits for common names; disambiguate via league + team_id + primary_position in the response.',
+      }),
     }),
   },
   responses: {
@@ -743,12 +776,17 @@ const playersListRoute = createRoute({
 
 attending.openapi(playersListRoute, async (c) => {
   const db = createDb(c.env.DB);
-  const { page, limit, league, team_id } = c.req.valid('query');
+  const { page, limit, league, team_id, name } = c.req.valid('query');
   const offset = (page - 1) * limit;
 
   const conditions = [eq(players.userId, 1)];
   if (league) conditions.push(eq(players.league, league));
   if (team_id) conditions.push(eq(players.primaryTeamId, team_id));
+  if (name) {
+    conditions.push(
+      sql`lower(${players.fullName}) LIKE ${`%${name.toLowerCase()}%`}`
+    );
+  }
   const where = and(...conditions);
 
   const [{ count }] = await db

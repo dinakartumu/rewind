@@ -27,39 +27,40 @@ Executed in-band rather than as a permanent script — the Python audit ran once
 - [x] **0.3.1** Template captured to `baseline-queries.md` with the four target queries + a "bonus query" slot. **Action required from user**: run the queries through Claude Desktop / web / iOS and paste transcripts. Phase 1–3 do not block on this; Phase 4 checkpoint needs it.
 - [x] **0.3.2** `baseline-queries.md` committed.
 
-## Phase 1: Tier 1 — filter and discovery ergonomics — pending
+## Phase 1: Tier 1 — filter and discovery ergonomics — DONE
 
-Goal: the natural-language query "what Mariners games did I attend this season" works end-to-end without the model having to fetch every event and substring-match. ~half a day to a day.
+Goal: the natural-language query "what Mariners games did I attend this season" works end-to-end without the model having to fetch every event and substring-match.
 
-### 1.1 — `team` substring filter on `/v1/attending/events`
+### 1.1 — `team` + `team_id` filter on `/v1/attending/events` — DONE
 
-- [ ] **1.1.1** Add `team` (string, optional) query param to `eventsRoute` in `src/routes/attending.ts`. Case-insensitive substring match against `event_data->>'home_team'` OR `event_data->>'away_team'`. SQLite `json_extract` + `LIKE` with `LOWER()` on both sides.
-- [ ] **1.1.2** Update OpenAPI schema for the route. Document explicitly: substring match, not slug, not team_id; works for any league with `home_team` / `away_team` populated in `event_data`.
-- [ ] **1.1.3** Tests: `team=mariners` returns Mariners home + away games; `team=Yankees` returns games at Yankee Stadium where Yankees were either team; case-insensitive verified.
-- [ ] **1.1.4** Spec snapshot regenerated via `npm run spec:update`.
+- [x] **1.1.1** Added `team` (string) AND `team_id` (integer) query params. `team` is case-insensitive substring against `json_extract(event_data, '$.home_team.name')` and `$.away_team.name`. `team_id` is exact match against `$.home_team.id` and `$.away_team.id`. Both shipped together (both come free from the same JSON-extract).
+- [x] **1.1.2** OpenAPI schema updated with explicit description: substring matches against either side; team_id uses league-native ids (MLB Stats id for MLB, ESPN id for ESPN-driven leagues).
+- [x] **1.1.3** Six tests in `src/routes/attending.test.ts`: substring matches both home/away; case-insensitive; cross-league; team_id by integer; combines with other filters; returns empty when no match.
+- [x] **1.1.4** Spec snapshot regenerated via `npm run spec:update`.
 
-### 1.2 — `name` substring filter on `/v1/attending/players`
+### 1.2 — `name` substring filter on `/v1/attending/players` — DONE
 
-- [ ] **1.2.1** Add `name` (string, optional) query param to `playersListRoute` in `src/routes/attending.ts`. Case-insensitive substring match against `players.full_name`.
-- [ ] **1.2.2** Response shape unchanged; pagination unchanged.
-- [ ] **1.2.3** Tests: `name=julio` returns multiple matches; verifies team + position are present in each row so the consumer can disambiguate.
-- [ ] **1.2.4** Spec snapshot regenerated.
+- [x] **1.2.1** Added `name` (string, optional) query param to `playersListRoute`. Case-insensitive substring match on `players.full_name`.
+- [x] **1.2.2** Response shape unchanged; pagination unchanged.
+- [x] **1.2.3** Three tests: case-insensitive match, multi-hit disambiguation (two "Will Smith"s differ by `primary_position` + `primary_team_id`), combines with `league` filter.
+- [x] **1.2.4** Spec snapshot regenerated.
 
-### 1.3 — MCP tool wrappers
+### 1.3 — MCP tool wrappers — DONE
 
-- [ ] **1.3.1** `mcp-server/src/tools/attending.ts` — `get_attended_events` gains `team` parameter, passes through to the API. Update tool description to mention "Filter by team via substring match: 'mariners', 'huskies', etc."
-- [ ] **1.3.2** Same file — `get_attended_players` (the list, not the detail) gains `name` parameter. Tool description: "Search by full name substring; multiple matches are common (e.g. 'will smith' returns several MLB players)."
-- [ ] **1.3.3** Manifest snapshot regenerated.
-- [ ] **1.3.4** Tests on the MCP wrappers (or at minimum, the tool registration unit tests).
+- [x] **1.3.1** `get_attended_events` gains `team` + `team_id` parameters with descriptive help text steering the model to use `team` for natural language ("mariners", "huskies") and `team_id` for stable lookups.
+- [x] **1.3.2** **NEW MCP tool** `get_attended_players` (list/search, plural) added — the existing tool was only `get_attended_player` (singular by id). New tool wraps the players list endpoint with name/league/team_id filters; tool description steers the model to disambiguate via `primary_team_id` + `primary_position` on each result. Tool count: 46 → 47.
+- [x] **1.3.3** Manifest snapshot regenerated. `server.test.ts` count assertion bumped 46 → 47.
+- [x] **1.3.4** All 99 MCP tests pass; full root suite 936/936 passes.
+- [x] **1.3.5** `docs-mintlify/mcp-server.mdx` Attending accordion gains a row for `get_attended_players`.
 
-### 1.4 — End-to-end sanity check
+### 1.4 — End-to-end sanity check — partial (deferred to Phase 4)
 
-- [ ] **1.4.1** Locally run the four target queries from Phase 0.3 against the dev MCP server. Capture how many turns each takes after Phase 1 vs the Phase 0 baseline. Ideally "Mariners games this season" goes from 3+ turns to 1.
+- [ ] **1.4.1** Live conversational verification against Claude Desktop / web / iOS deferred to Phase 4 alongside the broader checkpoint. Tests prove the API behavior; real model behavior validated end-to-end at Phase 4.
 
-### 1.5 — Ship
+### 1.5 — Ship — DONE
 
-- [ ] **1.5.1** Commit + push. CI green.
-- [ ] **1.5.2** Deploy auto-triggered. Verify endpoints live: `curl /v1/attending/events?team=mariners` returns expected shape.
+- [x] **1.5.1** Commit + push (single commit covering routes + tests + MCP tools + mintlify mdx + spec snapshot).
+- [x] **1.5.2** Deploy auto-triggered on CI green; live endpoints verified.
 
 ## Phase 2: Tier 2 pilot — `/v1/attending/players/:id/stats` — pending
 

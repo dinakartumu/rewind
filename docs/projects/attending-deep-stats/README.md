@@ -22,16 +22,16 @@ Five concrete things this unlocks:
 
 Direct commits to `main`, one focused commit per phase (or per logical chunk within a phase). No worktree branch.
 
-| Phase | Status                                                                                                         |
-| ----- | -------------------------------------------------------------------------------------------------------------- |
-| 0     | Baseline + coverage audit — DONE (forced 2 design changes; see [coverage-baseline.md](./coverage-baseline.md)) |
-| 1     | Tier 1: filter and discovery ergonomics — pending                                                              |
-| 2     | Tier 2 pilot: `/players/:id/stats` endpoint (MLB-only) — pending                                               |
-| 3     | UI pilot: game card on `get_attended_event` — pending                                                          |
-| 4     | **ITERATION CHECKPOINT** — review, document learnings, decide go/no-go                                         |
-| 5     | Tier 2 expansion: `/teams/:team_id/stats` — gated on Phase 4 outcome                                           |
-| 6     | UI expansion: player stats card + team season card — gated on Phase 4                                          |
-| 7     | Polish, deploy, close-out                                                                                      |
+| Phase | Status                                                                                                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Baseline + coverage audit — DONE (forced 2 design changes; see [coverage-baseline.md](./coverage-baseline.md))                    |
+| 1     | Tier 1: filter and discovery ergonomics — DONE (team / team_id on /events; name on /players; new `get_attended_players` MCP tool) |
+| 2     | Tier 2 pilot: `/players/:id/stats` endpoint (MLB-only) — pending                                                                  |
+| 3     | UI pilot: game card on `get_attended_event` — pending                                                                             |
+| 4     | **ITERATION CHECKPOINT** — review, document learnings, decide go/no-go                                                            |
+| 5     | Tier 2 expansion: `/teams/:team_id/stats` — gated on Phase 4 outcome                                                              |
+| 6     | UI expansion: player stats card + team season card — gated on Phase 4                                                             |
+| 7     | Polish, deploy, close-out                                                                                                         |
 
 The hard checkpoint after Phase 3 exists because the value of Phases 5 and 6 depends on whether the model actually reaches for the new endpoints + cards in real conversation, and whether the queries the user asks lean MLB-specific (Phase 5+ continues) or cross-league (pivot to NFL/NBA box-score parsers instead).
 
@@ -52,7 +52,7 @@ Out of scope:
 - **NFL / NBA / WNBA / NCAAF / NCAAB box-score enrichment.** Per-player stat lines for non-MLB games would require ESPN box-score parsers in `services/sports/`. Tier 2 endpoints return MLB-only data; non-MLB players get a coverage-disclosure response (`{ supported: false, reason: "league not supported", appearances_only: [...] }`) rather than empty stats that look real.
 - **Teams table.** The team filter in Phase 1 is a substring match against `event_data.home_team` / `event_data.away_team` text. A real teams table (with slug, league, official ESPN/MLB ids) is its own follow-up project — useful but not on the critical path for the natural-language queries.
 - **Live game enrichment.** Box-score data is pulled after games are played. Game cards always show finals, never in-progress.
-- **Multi-season aggregation.** `/players/:id/stats` is `?season=N` only; there is no `/players/:id/stats?seasons=2023,2024,2025` rollup. If multi-season is wanted later, it composes from per-season responses on the consumer side (model or chart).
+- **Arbitrary multi-season aggregation.** `/players/:id/stats` supports `?season=N` (single season) and `?season` omitted (career across all attended games). There is no `?seasons=2023,2024,2025` arbitrary-window rollup — if that's wanted later, it composes from per-season responses on the consumer side.
 - **Concert / arts perspective stats.** "Most-seen artist," "longest concert streak," etc. are interesting but use a different join shape (`attended_event_performers`, not `attended_event_players`) and warrant their own project. Cross-domain artist linking via `lastfm_artist_id` is out of scope.
 - **Backfilling missing box scores.** Phase 0 surfaces coverage gaps but does not fix them; gaps are disclosed in API responses (`games_with_box_score: 25, total: 30`) so consumers know when an aggregate is partial.
 

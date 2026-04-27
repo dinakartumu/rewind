@@ -18097,7 +18097,7 @@
           "Attending"
         ],
         "summary": "List attended events",
-        "description": "Returns events you have tickets for, optionally filtered by category, event_type, season, year, and venue. Includes events you bought tickets for but did not attend (attended=false).",
+        "description": "Returns events you have tickets for, optionally filtered by category, event_type, season, year, venue, team, and attendance status. Includes events you bought tickets for but did not attend (attended=false).\n\n**Team filtering** matches against `event_data.home_team` / `event_data.away_team` (both teams in the game). `team` is a case-insensitive substring match on the team's name (e.g. `mariners`, `huskies`). `team_id` is an exact match on the league's team id (e.g. `136` for Seattle Mariners in MLB Stats; `264` for Washington Huskies in ESPN). Pass either, not both.",
         "parameters": [
           {
             "schema": {
@@ -18193,6 +18193,31 @@
             },
             "required": false,
             "name": "attended",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "mariners",
+              "description": "Case-insensitive substring match on event_data.home_team.name OR event_data.away_team.name. Returns games where this team was either side."
+            },
+            "required": false,
+            "description": "Case-insensitive substring match on event_data.home_team.name OR event_data.away_team.name. Returns games where this team was either side.",
+            "name": "team",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "example": 136,
+              "description": "Exact match on event_data.home_team.id OR event_data.away_team.id. Use league-native team ids (MLB Stats id for MLB, ESPN team id for everything else)."
+            },
+            "required": false,
+            "description": "Exact match on event_data.home_team.id OR event_data.away_team.id. Use league-native team ids (MLB Stats id for MLB, ESPN team id for everything else).",
+            "name": "team_id",
             "in": "query"
           }
         ],
@@ -19579,7 +19604,7 @@
           "Attending"
         ],
         "summary": "List players you have watched play",
-        "description": "Returns players who appeared in any attended sports event. Filterable by league and team_id. Includes both photo variants when available.",
+        "description": "Returns players who appeared in any attended sports event. Filterable by league, team_id, and `name` (case-insensitive substring match against full_name). Includes both photo variants when available.\n\n**Disambiguating common names**: a `name=will smith` query returns multiple matches. Each player row carries `league`, `primary_team_id`, and `primary_position` — use those to pick the right one without a follow-up turn.",
         "parameters": [
           {
             "schema": {
@@ -19621,6 +19646,17 @@
             },
             "required": false,
             "name": "team_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "julio",
+              "description": "Case-insensitive substring match on full_name. Returns multiple hits for common names; disambiguate via league + team_id + primary_position in the response."
+            },
+            "required": false,
+            "description": "Case-insensitive substring match on full_name. Returns multiple hits for common names; disambiguate via league + team_id + primary_position in the response.",
+            "name": "name",
             "in": "query"
           }
         ],

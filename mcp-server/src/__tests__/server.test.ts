@@ -775,7 +775,7 @@ describe('MCP Server', () => {
       // an accompanying docs update. See manifest-snapshot.test.ts for
       // the structural snapshot and scripts/check-docs.mjs for the
       // MDX cross-check.
-      expect(tools.length).toBe(46);
+      expect(tools.length).toBe(47);
 
       const names = tools.map((t) => t.name);
       expect(names).toContain('get_health');
@@ -791,6 +791,7 @@ describe('MCP Server', () => {
       expect(names).toContain('find_similar_articles');
       expect(names).toContain('get_article');
       expect(names).toContain('get_feed');
+      expect(names).toContain('get_attended_players');
     });
 
     it('all tools have readOnlyHint annotation', async () => {
