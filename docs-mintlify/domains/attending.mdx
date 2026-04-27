@@ -6,19 +6,25 @@ description: Live events, tickets, and game attendance
 
 ## Overview
 
-The Attending domain tracks live events you bought tickets for: sports games, concerts, theater, and other one-off events. Events come from Google Calendar (when Google's parsers populate ticketing details) and Gmail (per-vendor parsers for Ticketmaster, SeatGeek, Ticket Club, AXS, StubHub, VividSeats, Eventbrite, plus a universal `schema.org/EventReservation` JSON-LD parser).
+The Attending domain tracks live events you bought tickets for: sports games, concerts, theater, and other one-off events. Events come from two sources:
 
-Sports games are enriched with team and score data from the MLB Stats API and ESPN (NFL, NBA, WNBA, MLS, NCAAF, NCAAB). Concerts can cross-link to Last.fm artists for unified listening + attendance views. Data syncs daily at 4:00 AM Pacific via cron with incremental Gmail and Calendar pulls.
+- **Google Calendar** — auto-extracts ticketing details from event descriptions when Google's parsers populate them.
+- **Gmail** — per-vendor parsers for the major ticket sellers, with a universal [`schema.org/EventReservation`](https://schema.org/EventReservation) JSON-LD parser as a fallback for everything else.
+
+Data syncs daily at 4:00 AM Pacific via cron, with incremental Gmail and Calendar pulls.
 
 ## Key endpoints
 
-| Endpoint                                                                               | Description                                                  |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [GET /attending/events](/api-reference/attending/list-attended-events)                 | Attended events with filters (category, season, year, venue) |
-| [GET /attending/events/:id](/api-reference/attending/get-attended-event)               | Single event with venue, tickets, and event_data             |
-| [GET /attending/seasons/:league/:season](/api-reference/attending/get-attended-season) | Attended games in a sports season with W/L record            |
-| [GET /attending/venues](/api-reference/attending/list-venues)                          | Venue catalog with city, capacity, and lat/long              |
-| [GET /attending/stats](/api-reference/attending/get-attending-stats)                   | Aggregate attendance counts by category, type, and year      |
+| Endpoint                                                                               | Description                                                       |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [GET /attending/events](/api-reference/attending/list-attended-events)                 | Attended events with filters                                      |
+| [GET /attending/events/:id](/api-reference/attending/get-attended-event)               | Single event with venue, tickets, and player appearances          |
+| [GET /attending/seasons/:league/:season](/api-reference/attending/get-attended-season) | Attended games in a sports season with W/L record                 |
+| [GET /attending/venues](/api-reference/attending/list-venues)                          | Venue catalog with city, capacity, and lat/long                   |
+| [GET /attending/players](/api-reference/attending/list-attended-players)               | Players you have watched play, with photos                        |
+| [GET /attending/players/:id](/api-reference/attending/get-attended-player)             | Player detail with per-event appearance lines                     |
+| [GET /attending/stats](/api-reference/attending/get-attending-stats)                   | Aggregate counts by category, type, and year                      |
+| [GET /attending/year/:year](/api-reference/attending/year-in-review)                   | Year in review with monthly breakdown, top venues, top performers |
 
 ## Event categories
 
@@ -30,8 +36,20 @@ Every event has a top-level `category` and a more specific `event_type`:
 | `music`  | `concert`                                                                               |
 | `arts`   | `theater`, `comedy`, `other`                                                            |
 
-Sports `event_type` determines which league API enriches the row. `event_data` carries league-specific fields — for MLB games that's `home_team`, `away_team`, `home_score`, `away_score`, `winning_pitcher`, `my_team_won`.
+## Event filters
 
-## Attendance vs ownership
+The events endpoint supports filtering by:
 
-The `attended` flag separates "I went" from "I bought tickets but didn't go." Both states are returned by default — pass `attended=1` to filter to confirmed attendance, `attended=0` to see no-shows. The seasons endpoint only counts wins and losses for events you actually attended, so a 6-game home season with one no-show reports a 5-1 attended record rather than the full 5-2 team record.
+- `category` — `sports`, `music`, or `arts`.
+- `event_type` — specific event type (e.g., `mlb_game`, `concert`).
+- `season` / `year` — sports season or calendar year.
+- `venue_id` — filter to a single venue.
+- `attended` — `1` for confirmed attendance, `0` for tickets bought but not used, omit for both.
+
+## Sports enrichment
+
+Sports events are enriched with team and score data from the MLB Stats API (baseball) and ESPN (NFL, NBA, WNBA, MLS, NCAAF, NCAAB). Each row carries league-specific fields in `event_data` — for MLB games that's `home_team`, `away_team`, `home_score`, `away_score`, `winning_pitcher`, `my_team_won`.
+
+W/L counts on the [seasons endpoint](/api-reference/attending/get-attended-season) are scoped to events you actually attended (`attended=1`), so a 6-game home season with one no-show reports a 5-1 attended record rather than the team's full 5-2 record.
+
+For MLB games, per-game box scores resolve into per-player appearance lines (batting line, pitching line, decisions) that surface on the players endpoints. Player photos backfill from MLB Stats and ESPN.
