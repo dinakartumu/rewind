@@ -23782,7 +23782,9 @@
                       "stats",
                       "full",
                       "backfill",
-                      "artist_tags"
+                      "artist_tags",
+                      "artist_bios",
+                      "artist_similar"
                     ],
                     "default": "scrobbles",
                     "example": "scrobbles"

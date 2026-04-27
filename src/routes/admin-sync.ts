@@ -55,6 +55,8 @@ const ListeningSyncBody = z.object({
       'full',
       'backfill',
       'artist_tags',
+      'artist_bios',
+      'artist_similar',
     ])
     .optional()
     .default('scrobbles')
