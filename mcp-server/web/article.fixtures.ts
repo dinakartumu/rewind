@@ -1,57 +1,7 @@
 import type { ArticlePayload } from './components/ArticleDetail.js';
+import realData from './fixtures/article.json' with { type: 'json' };
 
-const defaultFixture: ArticlePayload = {
-  article: {
-    id: 4821,
-    title: 'The Simpsons predicted everything: a brief and incomplete history',
-    author: 'Mira Singh',
-    url: 'https://example.com/simpsons-predictions-essay',
-    instapaper_url: 'https://www.instapaper.com/read/4821',
-    instapaper_app_url: 'instapaper://read/4821',
-    domain: 'theringer.com',
-    description:
-      'For more than three decades the show has been credited — sometimes deservedly, sometimes ridiculously — with predicting future events. The truth is more interesting than the meme.',
-    word_count: 4280,
-    estimated_read_min: 18,
-    status: 'archived',
-    progress: 1,
-    saved_at: '2026-02-14T14:23:00Z',
-    image: {
-      cdn_url: 'https://cdn.rewind.rest/reading/articles/4821',
-      url: 'https://cdn.theringer.com/2026/02/simpsons-hero.jpg',
-      thumbhash: 'KBgKDYJ4eHmXhoeEd4eIeIB4d3iIA4eHd4iIeIeIA4eHeId4iH',
-      dominant_color: '#0e2b4a',
-      accent_color: '#f5c518',
-    },
-  },
-  highlights: [
-    {
-      id: 12001,
-      text: 'The show works less because it predicts the future and more because it understands the eternal: family resentment, civic incompetence, and the way an American living room organizes the day.',
-      note: 'good for the closing of the essay i want to write',
-      created_at: '2026-02-15T09:11:00Z',
-    },
-    {
-      id: 12002,
-      text: "Most of the 'predictions' people circulate are jokes about American consumer life that aged into reality because American consumer life kept doing the same thing.",
-      note: null,
-      created_at: '2026-02-14T20:44:00Z',
-    },
-    {
-      id: 12003,
-      text: 'When the writers room thinned out in the late 90s, the show stopped predicting the world; it started lagging it.',
-      note: null,
-      created_at: '2026-02-14T20:46:00Z',
-    },
-    {
-      id: 12004,
-      text: 'The Tracey Ullman shorts are not a curiosity — they are a different show entirely, with the same family.',
-      note: null,
-      created_at: '2026-02-14T20:51:00Z',
-    },
-  ],
-  highlight_count: 6,
-};
+const real = realData as unknown as ArticlePayload;
 
 const noImageFixture: ArticlePayload = {
   article: {
@@ -140,7 +90,7 @@ const archivedNoHighlightsFixture: ArticlePayload = {
 };
 
 export const fixtures: Record<string, ArticlePayload> = {
-  default: defaultFixture,
+  default: real,
   'no-image': noImageFixture,
   'in-progress': inProgressFixture,
   'archived-no-highlights': archivedNoHighlightsFixture,

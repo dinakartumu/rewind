@@ -1,0 +1,366 @@
+{
+  "period": "overall",
+  "artist_id": 37,
+  "data": [
+    {
+      "rank": 1,
+      "id": 94,
+      "name": "bad idea right?",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 85,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/bad+idea+right%3F",
+      "apple_music_url": "https://music.apple.com/us/album/bad-idea-right/1736994853?i=1736995097&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/4d/ce/f5/4dcef526-511e-1b98-5101-d04d3717834a/mzaf_6743341899343099963.plus.aac.p.m4a"
+    },
+    {
+      "rank": 2,
+      "id": 104,
+      "name": "vampire",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 60,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/vampire",
+      "apple_music_url": "https://music.apple.com/us/album/vampire/1736994853?i=1736995100&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/83/09/5e/83095ea1-83bf-ecdc-3b75-358c350fca51/mzaf_15560849688086702972.plus.aac.p.m4a"
+    },
+    {
+      "rank": 3,
+      "id": 92,
+      "name": "ballad of a homeschooled girl",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 58,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/ballad+of+a+homeschooled+girl",
+      "apple_music_url": "https://music.apple.com/us/album/ballad-of-a-homeschooled-girl/1736994915?i=1736995395&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9e/81/42/9e8142a3-8319-3fe0-ad2b-84cedc3d02cc/mzaf_15566270659322861589.plus.aac.p.m4a"
+    },
+    {
+      "rank": 4,
+      "id": 91,
+      "name": "making the bed",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 55,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/making+the+bed",
+      "apple_music_url": "https://music.apple.com/us/album/making-the-bed/1694767605?i=1694768035&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/db/15/84/db15846c-629d-1f36-3f71-5613f4559adf/mzaf_11710957387235483191.plus.aac.p.m4a"
+    },
+    {
+      "rank": 5,
+      "id": 93,
+      "name": "lacy",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 55,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/lacy",
+      "apple_music_url": "https://music.apple.com/us/album/lacy/1694767605?i=1694768032&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/bf/87/c4/bf87c465-93cb-7125-8ab2-3dd53e328808/mzaf_12300779447076030101.plus.aac.p.m4a"
+    },
+    {
+      "rank": 6,
+      "id": 97,
+      "name": "traitor",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 52,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/traitor",
+      "apple_music_url": "https://music.apple.com/us/album/traitor/1560735414?i=1560735421&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/4f/ae/6c/4fae6c93-6bb3-d320-00bf-f32310705b3f/mzaf_16796881619991035581.plus.aac.p.m4a"
+    },
+    {
+      "rank": 7,
+      "id": 95,
+      "name": "all‐american bitch",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 47,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/all%E2%80%90american+bitch",
+      "apple_music_url": "https://music.apple.com/us/album/all-american-bitch/1736994853?i=1736994856&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/86/64/af/8664af5d-10a8-5672-1b82-fa5241137d29/mzaf_8227025078934574664.plus.aac.p.m4a"
+    },
+    {
+      "rank": 8,
+      "id": 98,
+      "name": "brutal",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 47,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/brutal",
+      "apple_music_url": "https://music.apple.com/us/album/brutal/1560734944?i=1560735471&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/bd/cb/b8/bdcbb81f-6d71-3cde-7424-2c84c2350a4c/mzaf_8269166269018925457.plus.aac.p.m4a"
+    },
+    {
+      "rank": 9,
+      "id": 103,
+      "name": "get him back!",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 45,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/get+him+back!",
+      "apple_music_url": "https://music.apple.com/us/album/get-him-back/1736994853?i=1736995117&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/c4/51/09/c45109ae-3d69-16de-ae79-1f995caf8763/mzaf_16238198988006888700.plus.aac.p.m4a"
+    },
+    {
+      "rank": 10,
+      "id": 101,
+      "name": "the grudge",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 44,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/the+grudge",
+      "apple_music_url": "https://music.apple.com/us/album/the-grudge/1694767605?i=1694768209&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/d8/0f/87/d80f873b-04cf-886c-3726-d6ad410cdb71/mzaf_5088823930583779341.plus.aac.p.m4a"
+    },
+    {
+      "rank": 11,
+      "id": 329,
+      "name": "good 4 u",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 44,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/good+4+u",
+      "apple_music_url": "https://music.apple.com/us/album/good-4-u/1582277315?i=1582277652&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/9f/bd/f1/9fbdf1ce-12d9-7440-1c1c-3fed40567619/mzaf_7303839465958373073.plus.aac.p.m4a"
+    },
+    {
+      "rank": 12,
+      "id": 90,
+      "name": "logical",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 43,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/logical",
+      "apple_music_url": "https://music.apple.com/us/album/logical/1694386825?i=1694386840&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/f2/3d/16/f23d164e-45c2-eebc-5179-1283a25395a3/mzaf_7914720097848739216.plus.aac.p.m4a"
+    },
+    {
+      "rank": 13,
+      "id": 330,
+      "name": "deja vu",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 40,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/deja+vu",
+      "apple_music_url": "https://music.apple.com/us/album/deja-vu/1560734944?i=1560735847&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/83/5a/c2/835ac220-f31a-006f-b6a9-2acd29eb60d0/mzaf_13621843495437485054.plus.aac.p.m4a"
+    },
+    {
+      "rank": 14,
+      "id": 96,
+      "name": "drivers license",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 39,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/drivers+license",
+      "apple_music_url": "https://music.apple.com/us/album/drivers-license/1560734944?i=1560735480&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/36/62/61/366261be-0996-d73d-de6f-03417867c800/mzaf_8201528327761821135.plus.aac.p.m4a"
+    },
+    {
+      "rank": 15,
+      "id": 102,
+      "name": "love is embarrassing",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 38,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/love+is+embarrassing",
+      "apple_music_url": "https://music.apple.com/us/album/good-4-u/1560734944?i=1560735856&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a4/eb/3a/a4eb3aeb-eb1f-c382-0aec-ff4eafc34e9e/mzaf_238907262667616343.plus.aac.p.m4a"
+    },
+    {
+      "rank": 16,
+      "id": 100,
+      "name": "pretty isn’t pretty",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 33,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/pretty+isn%E2%80%99t+pretty",
+      "apple_music_url": "https://music.apple.com/us/album/pretty-isnt-pretty/1694767605?i=1694768215&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/49/1c/8a/491c8a19-9b10-0b03-626c-f7a1a66daeff/mzaf_2133826261491294523.plus.aac.p.m4a"
+    },
+    {
+      "rank": 17,
+      "id": 325,
+      "name": "favorite crime",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 31,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/favorite+crime",
+      "apple_music_url": "https://music.apple.com/us/album/favorite-crime/1560735414?i=1560735563&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/54/7f/25/547f25ab-844c-c7aa-b3f6-ec0cc9f09b30/mzaf_1436944061349136716.plus.aac.p.m4a"
+    },
+    {
+      "rank": 18,
+      "id": 99,
+      "name": "teenage dream",
+      "detail": "Olivia Rodrigo",
+      "album_id": 20,
+      "album_name": "GUTS",
+      "playcount": 29,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "kRcKLwJfZ4aAm5iNZKqZGIZ5egdnamAI",
+        "dominant_color": "#07040b",
+        "accent_color": "#292346"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/teenage+dream",
+      "apple_music_url": "https://music.apple.com/us/album/teenage-dream/1694767605?i=1694768217&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/41/35/92/413592df-8abd-740f-b5f6-9c8502829716/mzaf_16191369751081394305.plus.aac.p.m4a"
+    },
+    {
+      "rank": 19,
+      "id": 331,
+      "name": "1 step forward, 3 steps back",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 29,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/1+step+forward,+3+steps+back",
+      "apple_music_url": "https://music.apple.com/us/album/1-step-forward-3-steps-back/1560734944?i=1560735846&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/aa/70/f2/aa70f2bf-adc0-b6ad-d604-adfbcef5fba9/mzaf_12249777138695508371.plus.aac.p.m4a"
+    },
+    {
+      "rank": 20,
+      "id": 328,
+      "name": "enough for you",
+      "detail": "Olivia Rodrigo",
+      "album_id": 21,
+      "album_name": "SOUR",
+      "playcount": 26,
+      "image": {
+        "cdn_url": "https://cdn.rewind.rest/listening/albums/21/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+        "thumbhash": "4xYGLwL+MY90inhotLhodnd5dlBoCXQF",
+        "dominant_color": "#807cbd",
+        "accent_color": "#e2bfad"
+      },
+      "url": "https://www.last.fm/music/Olivia+Rodrigo/_/enough+for+you",
+      "apple_music_url": "https://music.apple.com/us/album/enough-for-you/1560735414?i=1560735555&uo=4",
+      "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/b0/5e/e0/b05ee0a7-77cd-0786-fd3a-578b93c3dd5d/mzaf_18380731067636280143.plus.aac.p.m4a"
+    }
+  ]
+}
