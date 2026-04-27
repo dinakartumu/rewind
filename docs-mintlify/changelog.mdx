@@ -3,6 +3,28 @@ title: Changelog
 description: API updates and new features.
 ---
 
+<Update label="April 27, 2026" tags={["New releases", "New features"]}>
+
+## Single-entity cards
+
+Three new interactive cards for MCP Apps clients (Claude Desktop + iOS) that render alongside Claude's text answer when you ask about one specific article, artist, or athlete.
+
+- **Article card** for `get_article` — hero og:image, title + byline + domain, read time / saved date / status, top highlights, link out to Instapaper.
+- **Artist card** for `get_artist_details` — portrait, bio summary, total plays + all-time rank + first/last played, yearly sparkline of plays, top 5 tracks, top 3 albums, similar artists you've also listened to. The bio comes from a new lazy-fill via Last.fm's `artist.getInfo`; similar artists come from `artist.getSimilar` cross-referenced against your own scrobble history so the only suggestions you see are artists you actually listen to. The daily 3:00 AM Last.fm cron now refreshes `similar_artists` for your top-200 artists by playcount.
+- **Athlete card** for `get_attended_player` — headshot, team logo, position/jersey/bats-throws, live current-season stats from MLB Stats API (KV-cached 1h), your-attended summary aggregated across every game you've seen them play, notable highlights, recent appearances. MLB-only for the live-stats panel; non-MLB players surface as `supported: false` with appearance summaries only.
+
+## Listening
+
+- **Per-artist top tracks** — [`GET /v1/listening/top/tracks`](/api-reference/listening/top-tracks) accepts optional `artist_id` (or `artist_name` substring resolver) so you can pull "what Olivia Rodrigo songs have I been listening to lately" by composing the new filter with `period`. Both filters supplied returns a 400.
+- **Extended artist detail** — [`GET /v1/listening/artists/{id}`](/api-reference/listening/get-artist) now carries bio, last-played timestamp, all-time rank, distinct tracks/albums counts, similar artists, and a yearly sparkline.
+
+## Attending
+
+- **Player detail extension** — [`GET /v1/attending/players/{id}`](/api-reference/attending/get-attended-player) now carries the resolved team object (from a new `mlb_teams` lookup), `season_stats` (live MLB Stats API), and an `attended_summary` aggregate.
+- **MLB teams sync** — `POST /v1/admin/sync/mlb-teams` populates the new `mlb_teams` table from MLB Stats API.
+
+</Update>
+
 <Update label="April 25, 2026" tags={["New releases", "New features"]}>
 
 ## Attending domain

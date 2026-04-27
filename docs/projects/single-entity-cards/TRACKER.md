@@ -234,9 +234,13 @@ UI: `ui://rewind/attended-player.html` — Hero (headshot + team logo + name/#/p
 - [ ] **3.9.1** Single commit. Subject: `single-entity-cards Phase 3: athlete card (MLB only)`.
 - [ ] **3.9.2** Push, deploy, verify.
 
-## Phase 4: Polish + winner selection — pending
+## Phase 4: Polish + winner selection — IN PROGRESS
 
 Goal: pick top-tracks layout winner, remove loser, run polish pass. ~half a day.
+
+Docs work landed in this phase: Mintlify `mcp-server.mdx` accordion entries for `get_article`, `get_artist_details`, `get_attended_player`, `get_top_tracks` updated to mention the new card UIs and the artist filter. Changelog entry added at the top of `changelog.mdx` for April 27, 2026.
+
+Pending: top-tracks winner pick + final ship.
 
 ### 4.1 — Top-tracks winner selection
 

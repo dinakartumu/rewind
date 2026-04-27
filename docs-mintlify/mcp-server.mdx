@@ -98,9 +98,9 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
     | `get_listening_stats`   | Total scrobbles, unique artists/albums/tracks, daily average        |
     | `get_top_artists`       | Top artists by period (7d, 1m, 3m, 6m, 12m, all-time) + top-N images |
     | `get_top_albums`        | Top albums by period + top-N covers                                 |
-    | `get_top_tracks`        | Top tracks by period                                                |
+    | `get_top_tracks`        | Top tracks by period; optional `artist_id` / `artist_name` filters to a single artist's catalog |
     | `get_listening_streaks` | Current and longest consecutive listening streaks                   |
-    | `get_artist_details`    | Artist info, play count, top albums and tracks, artist image        |
+    | `get_artist_details`    | Bio, total plays, all-time rank, first/last played, top tracks, top albums, similar artists you've also listened to, yearly sparkline; renders as an interactive single-artist card in MCP Apps clients |
     | `get_album_details`     | Album info, play count, track listing, cover art                    |
     | `get_listening_genres`  | Genre breakdown over time (week / month / year grouping)            |
   </Accordion>
@@ -142,7 +142,7 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
     | Tool                     | Description                                                                     |
     | ------------------------ | ------------------------------------------------------------------------------- |
     | `get_recent_reads`       | Recently saved articles with title, author, domain, reading time, description   |
-    | `get_article`            | Full plain-text article body + metadata + highlights for one article by id. Use this to read past the excerpt (including paywalled sources) instead of falling back to web search. |
+    | `get_article`            | Full plain-text article body + metadata + highlights for one article by id. Use this to read past the excerpt (including paywalled sources) instead of falling back to web search. Renders as an interactive single-article card in MCP Apps clients. |
     | `get_reading_highlights` | Saved highlights with text, notes, and source article                           |
     | `get_random_highlight`   | A single random highlight for inspiration or reflection                         |
     | `get_reading_stats`      | Total articles, finished count, highlights, word count                          |
@@ -158,7 +158,7 @@ Requires a [Rewind API key](/authentication). `REWIND_API_URL` defaults to `http
     | `get_attended_event`    | Single event detail with venue, tickets, and per-player stat lines                                   |
     | `get_attended_season`   | Sports season W/L + game list with notable performers; renders as an interactive grid in MCP Apps clients |
     | `get_attended_players`  | Search the players-you-have-watched-play list by name (substring), league, or team. Resolves "julio" / "kirby" to a player id without a follow-up turn |
-    | `get_attended_player`   | Player bio + photos + every attended event in which they appeared with stat lines                    |
+    | `get_attended_player`   | Player bio, team, live current-season stats (MLB), your-attended summary, recent appearances; renders as an interactive athlete card in MCP Apps clients |
     | `get_attended_player_stats` | Per-player aggregate slash line / pitching line across the games you attended. MLB only; default scope is career (single seasons typically have tiny samples). Always cites pa / bf / games for honest phrasing |
     | `get_attending_stats`   | Aggregate counts of attended events by category, type, and year                                      |
     | `get_attending_year_in_review` | Year-in-review summary: totals, monthly breakdown, top venues, top performers, and full event list |
