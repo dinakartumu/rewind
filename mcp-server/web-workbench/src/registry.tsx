@@ -8,7 +8,6 @@ import { SeasonGrid } from '../../web/components/SeasonGrid';
 import { GameCard } from '../../web/components/GameCard';
 import { ArticleDetail } from '../../web/components/ArticleDetail';
 import { ArtistDetail } from '../../web/components/ArtistDetail';
-import { AthleteDetail } from '../../web/components/AthleteDetail';
 import { AthleteDetailA } from '../../web/components/AthleteDetailA';
 import { TopTracks } from '../../web/components/TopTracks';
 
@@ -160,7 +159,7 @@ export const COMPONENTS: ComponentEntry[] = [
   },
   {
     id: 'article',
-    displayName: 'Article (single)',
+    displayName: 'Article',
     producedBy: 'get_article',
     defaultViewport: 'desktop',
     fixtures: articleFixtures,
@@ -171,7 +170,7 @@ export const COMPONENTS: ComponentEntry[] = [
   },
   {
     id: 'artist',
-    displayName: 'Artist (single)',
+    displayName: 'Artist',
     producedBy: 'get_artist_details',
     defaultViewport: 'desktop',
     fixtures: artistFixtures,
@@ -181,24 +180,12 @@ export const COMPONENTS: ComponentEntry[] = [
     ),
   },
   {
+    // Renders AthleteDetailA (the in-flight redesign). The legacy
+    // AthleteDetail still backs the bundled production attended-player.html
+    // until we repoint it; this workbench entry shows the React HMR
+    // version we're iterating on.
     id: 'attended-player',
-    displayName: 'Attended player (athlete)',
-    producedBy: 'get_attended_player',
-    defaultViewport: 'desktop',
-    fixtures: attendedPlayerFixtures,
-    getBuiltHtml: makeBuiltLoader('attended-player.html'),
-    render: (f) => (
-      <AthleteDetail payload={f as AthletePayload} onOpen={defaultOpen} />
-    ),
-  },
-  {
-    // Variant A — encyclopedia / ESPN-deluxe layout. Same fixture as
-    // production attended-player; shares the bundled HTML so we don't
-    // burn another 460KB on a workbench-only entry. Stays a separate
-    // entry from production attended-player while we keep iterating;
-    // when it lands, the production HTML will repoint to this render.
-    id: 'attended-player-a',
-    displayName: 'Attended player — Variant A',
+    displayName: 'Attended player',
     producedBy: 'get_attended_player',
     defaultViewport: 'desktop',
     fixtures: attendedPlayerFixtures,
