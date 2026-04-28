@@ -253,6 +253,9 @@ function HighlightsPanel({
         {highlights.map((h) => (
           <div key={h.id} style={highlightRowStyle}>
             <div style={highlightTextStyle}>{h.text}</div>
+            <div style={highlightMetaStyle}>
+              highlighted {timeAgo(h.created_at)}
+            </div>
             {h.note && <div style={highlightNoteStyle}>{h.note}</div>}
           </div>
         ))}
@@ -409,18 +412,26 @@ const highlightsListStyle: CSSProperties = {
 };
 
 const highlightRowStyle: CSSProperties = {
-  borderLeft: '3px solid var(--color-accent, #4c6ef5)',
-  paddingLeft: 12,
+  borderLeft: '2px solid rgba(127,127,127,0.32)',
+  paddingLeft: 14,
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 6,
 };
 
 const highlightTextStyle: CSSProperties = {
-  fontSize: 14,
-  lineHeight: 1.45,
-  fontStyle: 'italic',
+  fontFamily: '"Iowan Old Style", "Charter", Georgia, "Times New Roman", serif',
+  fontSize: 15.5,
+  lineHeight: 1.55,
   color: 'var(--color-text-primary, inherit)',
+};
+
+const highlightMetaStyle: CSSProperties = {
+  fontSize: 11,
+  opacity: 0.5,
+  letterSpacing: 0.4,
+  textTransform: 'uppercase',
+  color: 'var(--color-text-secondary, inherit)',
 };
 
 const highlightNoteStyle: CSSProperties = {

@@ -61,6 +61,42 @@ const inProgressFixture: ArticlePayload = {
   highlight_count: 1,
 };
 
+const archivedWithQuoteFixture: ArticlePayload = {
+  article: {
+    id: 1121,
+    title: 'Ichiro Suzuki, Mariners resolve internal battle',
+    author: null,
+    url: 'http://www.espn.com/espn/feature/story/_/id/22624561/ichiro-suzuki-return-seattle-mariners-resolve-internal-battle',
+    instapaper_url: 'https://www.instapaper.com/read/1026945010',
+    instapaper_app_url: 'instapaper://read/1026945010',
+    domain: 'espn.com',
+    description:
+      "How five days in February reveal what Seattle's signing of Ichiro cannot. The future Hall of Famer is haunted by the life he can't escape.",
+    word_count: 4647,
+    estimated_read_min: 20,
+    status: 'finished',
+    progress: 1,
+    saved_at: '2018-03-15T05:00:00.000Z',
+    image: {
+      cdn_url:
+        'https://cdn.rewind.rest/reading/articles/1121/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+      url: null,
+      thumbhash: 'XPcNDwJ3mHegZ4dGmTiHqGl4+Dhob4ME',
+      dominant_color: '#132132',
+      accent_color: '#a297a5',
+    },
+  },
+  highlights: [
+    {
+      id: 4284,
+      text: 'Japanese home run king Sadaharu Oh wrote in his memoir: "Baseball in America is a game that is born in spring and dies in autumn. In Japan it is bound to winter as the heart is to the body."',
+      note: null,
+      created_at: '2018-03-08T21:31:26.000Z',
+    },
+  ],
+  highlight_count: 1,
+};
+
 const archivedNoHighlightsFixture: ArticlePayload = {
   article: {
     id: 5111,
@@ -93,5 +129,6 @@ export const fixtures: Record<string, ArticlePayload> = {
   default: real,
   'no-image': noImageFixture,
   'in-progress': inProgressFixture,
+  'archived-with-quote': archivedWithQuoteFixture,
   'archived-no-highlights': archivedNoHighlightsFixture,
 };
