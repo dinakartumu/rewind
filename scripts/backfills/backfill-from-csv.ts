@@ -89,6 +89,13 @@ function loadEnv(): Record<string, string> {
 const ENV = loadEnv();
 
 function getCfApiToken(): string {
+  // Prefer the long-lived `CLOUDFLARE_API_TOKEN` from .dev.vars (or
+  // env) over the wrangler OAuth token, because the wrangler one
+  // expires every 24h and would silently 401 mid-run on long
+  // backfills. The wrangler-config fallback stays so dev scripts
+  // that haven't been pointed at a custom token still work.
+  if (ENV.CLOUDFLARE_API_TOKEN) return ENV.CLOUDFLARE_API_TOKEN;
+  if (process.env.CLOUDFLARE_API_TOKEN) return process.env.CLOUDFLARE_API_TOKEN;
   const macPath = resolve(
     process.env.HOME || '~',
     'Library/Preferences/.wrangler/config/default.toml'
@@ -103,7 +110,6 @@ function getCfApiToken(): string {
     const m = content.match(/oauth_token\s*=\s*"([^"]+)"/);
     if (m) return m[1];
   }
-  if (process.env.CLOUDFLARE_API_TOKEN) return process.env.CLOUDFLARE_API_TOKEN;
   throw new Error(
     'No Cloudflare API token. Run `npx wrangler login` or set CLOUDFLARE_API_TOKEN.'
   );
