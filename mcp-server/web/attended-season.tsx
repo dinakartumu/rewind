@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { SeasonGrid, type SeasonPayload } from './components/SeasonGrid.js';
+import { rootStyle } from './lib/root-style.js';
 
 function AttendedSeasonApp() {
   const { app, isConnected, error } = useApp({
@@ -32,11 +33,6 @@ function AttendedSeasonApp() {
     </div>
   );
 }
-
-const rootStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-};
 
 const stateStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

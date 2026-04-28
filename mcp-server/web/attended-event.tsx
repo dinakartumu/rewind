@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { GameCard, type EventDetail } from './components/GameCard.js';
+import { rootStyle } from './lib/root-style.js';
 
 function AttendedEventApp() {
   const { app, isConnected, error } = useApp({
@@ -33,12 +34,6 @@ function AttendedEventApp() {
     </div>
   );
 }
-
-const rootStyle: CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-  padding: 4,
-};
 
 const stateStyle: CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

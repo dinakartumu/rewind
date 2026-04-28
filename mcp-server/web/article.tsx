@@ -5,6 +5,7 @@ import {
   ArticleDetail,
   type ArticlePayload,
 } from './components/ArticleDetail.js';
+import { rootStyle } from './lib/root-style.js';
 
 function ArticleApp() {
   const { app, isConnected, error } = useApp({
@@ -42,12 +43,6 @@ function ArticleApp() {
     </div>
   );
 }
-
-const rootStyle: CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-  padding: 4,
-};
 
 const stateStyle: CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

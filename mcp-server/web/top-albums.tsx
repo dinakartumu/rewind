@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { AlbumGrid } from './components/AlbumGrid.js';
 import type { TopItem } from './components/AlbumCard.js';
+import { rootStyle } from './lib/root-style.js';
 
 type TopAlbumsPayload = {
   period: string;
@@ -55,11 +56,6 @@ function TopAlbumsApp() {
     </div>
   );
 }
-
-const rootStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-};
 
 const stateStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

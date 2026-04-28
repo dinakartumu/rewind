@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { PosterGrid } from './components/PosterGrid.js';
 import type { Watch } from './components/PosterCard.js';
+import { rootStyle } from './lib/root-style.js';
 
 type RecentWatchesPayload = {
   items: Watch[];
@@ -51,12 +52,6 @@ function RecentWatchesApp() {
     </div>
   );
 }
-
-const rootStyle: React.CSSProperties = {
-  // Use the host-provided font stack when available, fall back to system UI.
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-};
 
 const stateStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

@@ -164,7 +164,13 @@ function Hero({
     <div
       style={{
         ...heroBaseStyle,
-        background: dominant,
+        // Once the real image has loaded, drop the dominant-color
+        // fallback bg so iOS WebKit's subpixel rounding on
+        // `aspectRatio + objectFit: cover` doesn't leak a 1-2px
+        // hairline of `dominant` between the hero and the body
+        // section. Workbench (Chromium) handled the rounding cleanly,
+        // which is why this only showed up on iOS.
+        background: loaded ? 'transparent' : dominant,
         position: 'relative',
         overflow: 'hidden',
       }}

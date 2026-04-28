@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { TopTracks, type TopTracksPayload } from './components/TopTracks.js';
+import { rootStyle } from './lib/root-style.js';
 
 function TopTracksApp() {
   const { app, isConnected, error } = useApp({
@@ -40,12 +41,6 @@ function TopTracksApp() {
     </div>
   );
 }
-
-const rootStyle: CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-  padding: 4,
-};
 
 const stateStyle: CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',

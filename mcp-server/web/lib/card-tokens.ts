@@ -21,6 +21,10 @@ import { type CSSProperties } from 'react';
 export const CARD_TOKENS_STYLE_ID = 'rewind-card-tokens';
 
 export const CARD_TOKENS_CSS = `
+html, body {
+  margin: 0;
+  padding: 0;
+}
 :root {
   --card-bg: #fcfcfa;
   --card-border: #d9d9d9;

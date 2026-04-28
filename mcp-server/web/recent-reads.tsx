@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { ArticleList } from './components/ArticleList.js';
 import type { Article } from './components/ArticleCard.js';
+import { rootStyle } from './lib/root-style.js';
 
 type RecentReadsPayload = {
   items: Article[];
@@ -49,11 +50,6 @@ function RecentReadsApp() {
     </div>
   );
 }
-
-const rootStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
-};
 
 const stateStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
