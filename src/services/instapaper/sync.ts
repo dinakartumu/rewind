@@ -488,11 +488,23 @@ export async function syncReading(
       `[SYNC] Delta sync: ${haveParam ? haveParam.split(',').length : 0} known bookmarks, ${highlightsParam ? highlightsParam.split('-').length : 0} known highlights`
     );
 
-    // Sync each folder
+    // Sync each folder. The Instapaper API hard-caps `bookmarks/list`
+    // at 500 per call regardless of `have=`, so 500 is the realistic
+    // ceiling for any single folder. The previous archive cap of 100
+    // was leaving 80% of the available archive on the table — bumped
+    // to match unread/starred. Custom user folders are also enumerated
+    // (via `folders/list`) so bookmarks living only in custom folders
+    // get ingested too — the prior code only iterated the 3 default
+    // folders, which left ~30 articles invisible to Rewind.
+    const customFolders = await client.listFolders();
     const folders: { id: string; limit: number }[] = [
       { id: 'unread', limit: 500 },
       { id: 'starred', limit: 500 },
-      { id: 'archive', limit: 100 }, // Only recent archives
+      { id: 'archive', limit: 500 },
+      ...customFolders.map((f) => ({
+        id: String(f.folder_id),
+        limit: 500,
+      })),
     ];
 
     for (const folder of folders) {

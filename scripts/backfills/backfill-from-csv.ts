@@ -1,0 +1,713 @@
+/**
+ * One-shot backfill: ingest Instapaper bookmarks that aren't yet in
+ * Rewind's `reading_items`. Reads the canonical Instapaper CSV export
+ * (instapaper.com/user → Download .CSV file) plus optional manual IDs,
+ * inserts missing rows via D1, and runs the inline-enrichment pieces
+ * each row needs to be readable + searchable. Image enrichment and
+ * embeddings get triggered through existing admin endpoints once the
+ * inserts land.
+ *
+ * Why not extend the live sync? Instapaper's `bookmarks/list` is
+ * hard-capped at 500 per folder, so anything older or "orphaned" (in
+ * the user's account but not in any folder list) can never be reached
+ * by sync. `bookmarks/get_text` works on any bookmark id the account
+ * owns, which is exactly the path this script takes.
+ *
+ * Modes:
+ *   --csv path/to/instapaper-export.csv
+ *       Parse the canonical export; auto-detect bookmark_id (or
+ *       extract from a `URL` column when the CSV uses the
+ *       https://instapaper.com/read/{id} form).
+ *
+ *   --ids 1026945010,1234567,...
+ *       For testing or surgical recovery. Looks up url+title from
+ *       Instapaper's getText response; metadata is best-effort.
+ *
+ *   --dry-run
+ *       Print what would happen, write nothing.
+ *
+ *   --limit N
+ *       Cap the number of bookmarks processed. Useful for staged
+ *       runs and cost control on the first pass.
+ *
+ * Pre-reqs:
+ *   - .dev.vars at the repo root with the Instapaper OAuth quad
+ *     (CONSUMER_KEY/SECRET, ACCESS_TOKEN/SECRET) plus REWIND_ADMIN_KEY
+ *   - A live Cloudflare API token: either `npx wrangler login` (the
+ *     script reads ~/Library/Preferences/.wrangler/config/default.toml)
+ *     or CLOUDFLARE_API_TOKEN env var
+ *
+ * Post-run:
+ *   The script triggers `POST /v1/admin/reembed-reading` and
+ *   `POST /v1/admin/reindex-search` automatically for the user_id=1
+ *   reading data. Image enrichment is left to the existing image cron
+ *   (it queries reading_items without an image and runs its own
+ *   pipeline — typically catches up within 24h).
+ */
+
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import * as crypto from 'node:crypto';
+
+const CF_ACCOUNT_ID = '46bcea726724fbab7d60f236f151f3d3';
+const CF_DATABASE_ID = '35a4edf8-0d4f-4cbe-9a6e-6f1525716774';
+const D1_API_URL = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/d1/database/${CF_DATABASE_ID}/query`;
+const REWIND_API = 'https://api.rewind.rest';
+
+const GET_TEXT_DELAY_MS = 500;
+const OG_FETCH_DELAY_MS = 300;
+const WORDS_PER_MINUTE = 238;
+
+// ─── env ────────────────────────────────────────────────────────────
+
+function loadEnv(): Record<string, string> {
+  const envFile = resolve(import.meta.dirname ?? '.', '../../.dev.vars');
+  if (!existsSync(envFile))
+    throw new Error(`.dev.vars not found at ${envFile}`);
+  const env: Record<string, string> = {};
+  for (const line of readFileSync(envFile, 'utf-8').split('\n')) {
+    const m = line.match(/^([A-Z][A-Z0-9_]*)=(.+)$/);
+    if (m) env[m[1].trim()] = m[2].trim().replace(/^"(.*)"$/, '$1');
+  }
+  for (const k of [
+    'INSTAPAPER_CONSUMER_KEY',
+    'INSTAPAPER_CONSUMER_SECRET',
+    'INSTAPAPER_ACCESS_TOKEN',
+    'INSTAPAPER_ACCESS_TOKEN_SECRET',
+    'REWIND_ADMIN_KEY',
+  ]) {
+    if (!env[k]) throw new Error(`Missing ${k} in .dev.vars`);
+  }
+  return env;
+}
+const ENV = loadEnv();
+
+function getCfApiToken(): string {
+  const macPath = resolve(
+    process.env.HOME || '~',
+    'Library/Preferences/.wrangler/config/default.toml'
+  );
+  const linuxPath = resolve(
+    process.env.XDG_CONFIG_HOME || resolve(process.env.HOME || '~', '.config'),
+    'wrangler/config/default.toml'
+  );
+  const tokenFile = existsSync(macPath) ? macPath : linuxPath;
+  if (existsSync(tokenFile)) {
+    const content = readFileSync(tokenFile, 'utf-8');
+    const m = content.match(/oauth_token\s*=\s*"([^"]+)"/);
+    if (m) return m[1];
+  }
+  if (process.env.CLOUDFLARE_API_TOKEN) return process.env.CLOUDFLARE_API_TOKEN;
+  throw new Error(
+    'No Cloudflare API token. Run `npx wrangler login` or set CLOUDFLARE_API_TOKEN.'
+  );
+}
+
+// ─── d1 ────────────────────────────────────────────────────────────
+
+async function d1Query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const token = getCfApiToken();
+  const res = await fetch(D1_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ sql, params }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `D1 query failed (${res.status}): ${(await res.text()).slice(0, 300)}`
+    );
+  }
+  const data = (await res.json()) as { result: { results: T[] }[] };
+  return data.result?.[0]?.results ?? [];
+}
+
+// ─── instapaper oauth ──────────────────────────────────────────────
+
+function percentEncode(s: string): string {
+  return encodeURIComponent(s).replace(
+    /[!'()*]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
+function generateSignature(
+  method: string,
+  url: string,
+  params: Record<string, string>,
+  consumerSecret: string,
+  tokenSecret: string
+): string {
+  const sorted = Object.keys(params)
+    .sort()
+    .map((k) => `${percentEncode(k)}=${percentEncode(params[k])}`)
+    .join('&');
+  const base = `${method}&${percentEncode(url)}&${percentEncode(sorted)}`;
+  const key = `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`;
+  return crypto.createHmac('sha1', key).update(base).digest('base64');
+}
+
+async function instapaperRequest(
+  path: string,
+  body: Record<string, string> = {}
+): Promise<string> {
+  const url = `https://www.instapaper.com/api${path}`;
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: ENV.INSTAPAPER_CONSUMER_KEY,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: ENV.INSTAPAPER_ACCESS_TOKEN,
+    oauth_version: '1.0',
+  };
+  oauthParams.oauth_signature = generateSignature(
+    'POST',
+    url,
+    { ...oauthParams, ...body },
+    ENV.INSTAPAPER_CONSUMER_SECRET,
+    ENV.INSTAPAPER_ACCESS_TOKEN_SECRET
+  );
+  const auth =
+    'OAuth ' +
+    Object.keys(oauthParams)
+      .sort()
+      .map((k) => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`)
+      .join(', ');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(body).toString(),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Instapaper ${path} failed: ${res.status} ${(await res.text()).slice(0, 200)}`
+    );
+  }
+  return res.text();
+}
+
+// ─── og fetch (mirrors src/services/instapaper/sync.ts:fetchOgMetadata) ─
+
+interface OgResult {
+  ogImage: string | null;
+  ogDescription: string | null;
+  siteName: string | null;
+  author: string | null;
+  publishedAt: string | null;
+  articleSection: string | null;
+  articleTags: string[] | null;
+}
+
+async function fetchOgMetadata(url: string): Promise<OgResult> {
+  const empty: OgResult = {
+    ogImage: null,
+    ogDescription: null,
+    siteName: null,
+    author: null,
+    publishedAt: null,
+    articleSection: null,
+    articleTags: null,
+  };
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(8000),
+      redirect: 'follow',
+    });
+    if (!res.ok) return empty;
+    const html = (await res.text()).slice(0, 60_000);
+    const head = (html.match(/<head[^>]*>([\s\S]*?)<\/head>/i) ?? [, html])[1];
+    const meta = (re: RegExp): string | null => {
+      const m = head.match(re);
+      return m ? m[1].trim() : null;
+    };
+    const tags: string[] = [];
+    const tagRe =
+      /<meta[^>]+(?:property|name)="article:tag"[^>]+content="([^"]+)"/gi;
+    let tm: RegExpExecArray | null;
+    while ((tm = tagRe.exec(head)) !== null) tags.push(tm[1].trim());
+
+    return {
+      ogImage: meta(
+        /<meta[^>]+(?:property|name)="og:image(?::secure_url)?"[^>]+content="([^"]+)"/i
+      ),
+      ogDescription: meta(
+        /<meta[^>]+(?:property|name)="og:description"[^>]+content="([^"]+)"/i
+      ),
+      siteName: meta(
+        /<meta[^>]+(?:property|name)="og:site_name"[^>]+content="([^"]+)"/i
+      ),
+      author: meta(
+        /<meta[^>]+(?:property|name)="article:author"[^>]+content="([^"]+)"/i
+      ),
+      publishedAt: meta(
+        /<meta[^>]+(?:property|name)="article:published_time"[^>]+content="([^"]+)"/i
+      ),
+      articleSection: meta(
+        /<meta[^>]+(?:property|name)="article:section"[^>]+content="([^"]+)"/i
+      ),
+      articleTags: tags.length ? tags : null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+// ─── helpers ───────────────────────────────────────────────────────
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function computeWordCount(html: string): {
+  wordCount: number;
+  estimatedReadMin: number;
+} {
+  const text = htmlToText(html);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return {
+    wordCount,
+    estimatedReadMin: Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE)),
+  };
+}
+
+function extractDomain(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── csv parsing ───────────────────────────────────────────────────
+
+interface BookmarkRecord {
+  bookmarkId: number;
+  url: string;
+  title: string;
+  folder: string | null;
+  savedAtSec: number | null; // unix seconds
+}
+
+function parseCsv(content: string): Record<string, string>[] {
+  // Minimal RFC4180-ish parser — handles quoted fields with embedded
+  // commas, escaped quotes, CRLF. Good enough for Instapaper's export.
+  const rows: string[][] = [];
+  let cur: string[] = [];
+  let field = '';
+  let inQuote = false;
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i];
+    if (inQuote) {
+      if (c === '"' && content[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (c === '"') {
+        inQuote = false;
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') inQuote = true;
+      else if (c === ',') {
+        cur.push(field);
+        field = '';
+      } else if (c === '\n') {
+        cur.push(field);
+        rows.push(cur);
+        cur = [];
+        field = '';
+      } else if (c === '\r') {
+        // ignore
+      } else {
+        field += c;
+      }
+    }
+  }
+  if (field || cur.length) {
+    cur.push(field);
+    rows.push(cur);
+  }
+  if (!rows.length) return [];
+  const headers = rows[0].map((h) => h.trim());
+  return rows
+    .slice(1)
+    .filter((r) => r.some((c) => c !== ''))
+    .map((r) => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
+}
+
+function recordsFromCsv(content: string): BookmarkRecord[] {
+  const rows = parseCsv(content);
+  if (!rows.length) return [];
+
+  // Auto-detect column names — Instapaper has changed export format
+  // over the years; we tolerate a few synonyms.
+  const sample = rows[0];
+  const keys = Object.keys(sample);
+  const find = (...cands: string[]) =>
+    keys.find((k) => cands.some((c) => k.toLowerCase() === c.toLowerCase())) ??
+    null;
+  const urlKey = find('URL', 'Url', 'url');
+  const titleKey = find('Title', 'title');
+  const folderKey = find('Folder', 'folder');
+  const timeKey = find('Timestamp', 'time', 'Time');
+  const idKey = find('bookmark_id', 'BookmarkId', 'id');
+
+  const out: BookmarkRecord[] = [];
+  for (const row of rows) {
+    let bookmarkId: number | null = null;
+    if (idKey && row[idKey]) bookmarkId = Number(row[idKey]);
+    // Fallback: extract from URL when Instapaper exports the read URL
+    // (https://instapaper.com/read/{id}) instead of the source URL.
+    if (!bookmarkId && urlKey) {
+      const m = row[urlKey].match(/instapaper\.com\/read\/(\d+)/i);
+      if (m) bookmarkId = Number(m[1]);
+    }
+    if (!bookmarkId || Number.isNaN(bookmarkId)) continue;
+    const url = (urlKey && row[urlKey]) || '';
+    const title = (titleKey && row[titleKey]) || '';
+    const folder = (folderKey && row[folderKey]) || null;
+    const ts = timeKey && row[timeKey] ? Number(row[timeKey]) : null;
+    out.push({
+      bookmarkId,
+      url,
+      title,
+      folder,
+      savedAtSec: Number.isFinite(ts) ? (ts as number) : null,
+    });
+  }
+  return out;
+}
+
+// ─── existing-row check ────────────────────────────────────────────
+
+async function fetchExistingSourceIds(): Promise<Set<number>> {
+  // Read via the production API (REWIND_ADMIN_KEY) so we don't depend
+  // on the wrangler OAuth token for the read path. The write path
+  // still needs D1 access and will surface a clean error if missing.
+  const ids = new Set<number>();
+  let page = 1;
+  while (true) {
+    const res = await fetch(
+      `${REWIND_API}/v1/reading/articles?limit=50&page=${page}`,
+      { headers: { Authorization: `Bearer ${ENV.REWIND_ADMIN_KEY}` } }
+    );
+    if (!res.ok) throw new Error(`Rewind API failed: ${res.status}`);
+    const data = (await res.json()) as {
+      data: Array<{ source: string; instapaper_url: string | null }>;
+      pagination: { total_pages: number };
+    };
+    for (const a of data.data) {
+      if (a.source !== 'instapaper') continue;
+      const m = (a.instapaper_url || '').match(/\/read\/(\d+)/);
+      if (m) ids.add(Number(m[1]));
+    }
+    if (page >= data.pagination.total_pages) break;
+    page++;
+  }
+  return ids;
+}
+
+// ─── per-bookmark ingest ───────────────────────────────────────────
+
+interface IngestResult {
+  bookmarkId: number;
+  status: 'inserted' | 'skipped' | 'failed';
+  reason?: string;
+}
+
+async function ingestBookmark(
+  rec: BookmarkRecord,
+  dryRun: boolean
+): Promise<IngestResult> {
+  // 1. getText — if this fails, the bookmark isn't accessible to us at
+  // all and we should skip rather than insert a content-less row.
+  let body: string;
+  try {
+    body = await instapaperRequest('/1/bookmarks/get_text', {
+      bookmark_id: String(rec.bookmarkId),
+    });
+  } catch (e) {
+    return {
+      bookmarkId: rec.bookmarkId,
+      status: 'failed',
+      reason: `getText: ${(e as Error).message}`,
+    };
+  }
+  if (!body || body.length < 20) {
+    return {
+      bookmarkId: rec.bookmarkId,
+      status: 'failed',
+      reason: 'getText returned empty body',
+    };
+  }
+
+  await sleep(GET_TEXT_DELAY_MS);
+
+  // 2. word count + body excerpt (3000 chars matches sync.ts)
+  const { wordCount, estimatedReadMin } = computeWordCount(body);
+  const bodyExcerpt = htmlToText(body).slice(0, 3000);
+
+  // 3. og fetch (best-effort — failures leave fields null)
+  let og: OgResult = {
+    ogImage: null,
+    ogDescription: null,
+    siteName: null,
+    author: null,
+    publishedAt: null,
+    articleSection: null,
+    articleTags: null,
+  };
+  if (rec.url) {
+    og = await fetchOgMetadata(rec.url);
+    await sleep(OG_FETCH_DELAY_MS);
+  }
+
+  const domain = rec.url ? extractDomain(rec.url) : null;
+  const folder = rec.folder?.toLowerCase() || 'archive';
+  const status =
+    folder === 'unread'
+      ? 'unread'
+      : folder === 'starred'
+        ? 'reading'
+        : 'finished';
+  // Date columns in reading_items are TEXT (ISO 8601), not integers.
+  const savedAtIso = rec.savedAtSec
+    ? new Date(rec.savedAtSec * 1000).toISOString()
+    : new Date().toISOString();
+  const nowIso = new Date().toISOString();
+
+  if (dryRun) {
+    console.log(
+      `[DRY] would insert ${rec.bookmarkId}: ${rec.title.slice(0, 50)} (${wordCount}w, og=${og.ogImage ? 'yes' : 'no'})`
+    );
+    return { bookmarkId: rec.bookmarkId, status: 'inserted' };
+  }
+
+  // 4. INSERT — leave sourceHash null; live sync reconciles on next run
+  // if Instapaper later returns this bookmark in any folder list.
+  // enrichmentStatus='completed' since we did the full inline pass.
+  // Schema reference: src/db/schema/reading.ts. No `article_section`
+  // column exists; section meta tag is captured but not persisted.
+  await d1Query(
+    `INSERT INTO reading_items (
+       user_id, item_type, source, source_id, source_hash,
+       url, title, description, domain,
+       status, progress, starred, folder, tags,
+       saved_at, started_at, finished_at,
+       content, body_excerpt, word_count, estimated_read_min,
+       site_name, author, published_at, og_image_url, og_description,
+       article_tags,
+       enrichment_status, enrichment_error,
+       created_at, updated_at
+     ) VALUES (?, 'article', 'instapaper', ?, NULL,
+       ?, ?, ?, ?,
+       ?, ?, ?, ?, NULL,
+       ?, NULL, ?,
+       ?, ?, ?, ?,
+       ?, ?, ?, ?, ?,
+       ?,
+       'completed', NULL,
+       ?, ?)
+     ON CONFLICT(source, source_id, user_id) DO UPDATE SET
+       content = excluded.content,
+       body_excerpt = excluded.body_excerpt,
+       word_count = excluded.word_count,
+       estimated_read_min = excluded.estimated_read_min,
+       og_image_url = excluded.og_image_url,
+       og_description = excluded.og_description,
+       site_name = excluded.site_name,
+       author = excluded.author,
+       published_at = excluded.published_at,
+       article_tags = excluded.article_tags,
+       enrichment_status = 'completed',
+       enrichment_error = NULL,
+       updated_at = excluded.updated_at`,
+    [
+      1, // user_id
+      String(rec.bookmarkId), // source_id
+      rec.url || '',
+      rec.title || '(untitled)',
+      og.ogDescription, // description (Instapaper list-API gives one, but we don't have it here)
+      domain,
+      status,
+      status === 'finished' ? 1.0 : 0.0,
+      0, // starred — live sync corrects on next run
+      folder,
+      savedAtIso,
+      status === 'finished' ? savedAtIso : null,
+      body,
+      bodyExcerpt,
+      wordCount,
+      estimatedReadMin,
+      og.siteName,
+      og.author,
+      og.publishedAt,
+      og.ogImage,
+      og.ogDescription,
+      og.articleTags ? JSON.stringify(og.articleTags) : null,
+      nowIso,
+      nowIso,
+    ]
+  );
+
+  return { bookmarkId: rec.bookmarkId, status: 'inserted' };
+}
+
+// ─── post-run reembed + reindex ────────────────────────────────────
+
+async function triggerAdmin(path: string): Promise<void> {
+  const res = await fetch(`${REWIND_API}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ENV.REWIND_ADMIN_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
+  });
+  if (!res.ok) {
+    console.error(`  ${path} failed: ${res.status} ${await res.text()}`);
+    return;
+  }
+  const data = (await res.json()) as Record<string, unknown>;
+  console.log(`  ${path} ok: ${JSON.stringify(data).slice(0, 200)}`);
+}
+
+// ─── main ──────────────────────────────────────────────────────────
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  let csv: string | null = null;
+  let ids: number[] = [];
+  let dryRun = false;
+  let limit: number | null = null;
+  let skipFollowup = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--csv') csv = args[++i];
+    else if (a === '--ids')
+      ids = args[++i]
+        .split(',')
+        .map(Number)
+        .filter((n) => !Number.isNaN(n));
+    else if (a === '--dry-run') dryRun = true;
+    else if (a === '--limit') limit = Number(args[++i]);
+    else if (a === '--skip-followup') skipFollowup = true;
+  }
+  return { csv, ids, dryRun, limit, skipFollowup };
+}
+
+async function main() {
+  const { csv, ids, dryRun, limit, skipFollowup } = parseArgs();
+  if (!csv && !ids.length) {
+    console.error(
+      'Usage: --csv path | --ids id1,id2,... [--dry-run] [--limit N] [--skip-followup]'
+    );
+    process.exit(2);
+  }
+
+  console.log('Loading existing reading_items source_ids from D1...');
+  const existing = await fetchExistingSourceIds();
+  console.log(`  ${existing.size} already in DB`);
+
+  let records: BookmarkRecord[] = [];
+  if (csv) {
+    const path = resolve(csv);
+    if (!existsSync(path)) throw new Error(`CSV not found: ${path}`);
+    const content = readFileSync(path, 'utf-8');
+    records = recordsFromCsv(content);
+    console.log(`  ${records.length} parsed from CSV (${path})`);
+  }
+  for (const id of ids) {
+    if (records.find((r) => r.bookmarkId === id)) continue;
+    records.push({
+      bookmarkId: id,
+      url: '',
+      title: '',
+      folder: null,
+      savedAtSec: null,
+    });
+  }
+
+  // Filter out already-ingested
+  const todo = records.filter((r) => !existing.has(r.bookmarkId));
+  console.log(
+    `  ${todo.length} to ingest (${records.length - todo.length} already in DB)`
+  );
+
+  const work = limit ? todo.slice(0, limit) : todo;
+  if (limit && todo.length > limit) {
+    console.log(
+      `  --limit ${limit}: processing first ${work.length} of ${todo.length}`
+    );
+  }
+
+  const results: IngestResult[] = [];
+  let i = 0;
+  for (const rec of work) {
+    i++;
+    process.stderr.write(
+      `[${i}/${work.length}] ${rec.bookmarkId} ${rec.title.slice(0, 50) || '(no title)'}\n`
+    );
+    try {
+      results.push(await ingestBookmark(rec, dryRun));
+    } catch (e) {
+      results.push({
+        bookmarkId: rec.bookmarkId,
+        status: 'failed',
+        reason: (e as Error).message,
+      });
+    }
+  }
+
+  const inserted = results.filter((r) => r.status === 'inserted').length;
+  const failed = results.filter((r) => r.status === 'failed');
+  console.log(`\n=== Done ===`);
+  console.log(`  Inserted: ${inserted}`);
+  console.log(`  Failed:   ${failed.length}`);
+  if (failed.length) {
+    console.log('\nFailures:');
+    for (const f of failed.slice(0, 30)) {
+      console.log(`  ${f.bookmarkId}  ${f.reason}`);
+    }
+    if (failed.length > 30) console.log(`  ... + ${failed.length - 30} more`);
+  }
+
+  if (!dryRun && inserted && !skipFollowup) {
+    console.log(`\nTriggering downstream enrichment...`);
+    await triggerAdmin('/v1/admin/reindex-search');
+    await triggerAdmin('/v1/admin/reembed-reading');
+    console.log(
+      `\nImage enrichment is left to the existing image cron — new rows have og_image_url set; the cron will pick them up on its next run.`
+    );
+  }
+}
+
+main().catch((e) => {
+  console.error('backfill-from-csv failed:', e);
+  process.exit(1);
+});
