@@ -34,15 +34,35 @@ export function Sparkline({
   if (max === 0) return null;
 
   const stepX = points.length === 1 ? width : width / (points.length - 1);
-  const xy = points.map((value, i) => {
-    const x = i * stepX;
+  const xy = points.map((value, i) => ({
+    x: i * stepX,
     // Reserve 1px top + 1px bottom so the stroke isn't clipped.
-    const y = height - 1 - (value / max) * (height - 2);
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  });
+    y: height - 1 - (value / max) * (height - 2),
+  }));
 
-  const linePath = `M ${xy.join(' L ')}`;
-  const fillPath = `${linePath} L ${width.toFixed(2)},${height} L 0,${height} Z`;
+  // Smooth Catmull-Rom-style cubic path through every point — same
+  // 1/6-scaled-tangent smoothing used by the larger artist sparkline,
+  // so the small inline trend reads as a curve rather than a sawtooth.
+  // Control-point y is clamped to the chart bounds so the curve can't
+  // dip below the baseline (a dip would visually read as a negative
+  // value, which doesn't make sense for play counts).
+  const minY = 1;
+  const maxY = height - 1;
+  const clampY = (v: number) => Math.max(minY, Math.min(maxY, v));
+  const fmt = (n: number) => n.toFixed(2);
+  let linePath = `M ${fmt(xy[0].x)} ${fmt(xy[0].y)}`;
+  for (let i = 1; i < xy.length; i++) {
+    const prev = xy[i - 1];
+    const curr = xy[i];
+    const before = xy[i - 2] ?? prev;
+    const after = xy[i + 1] ?? curr;
+    const cp1x = prev.x + (curr.x - before.x) / 6;
+    const cp1y = clampY(prev.y + (curr.y - before.y) / 6);
+    const cp2x = curr.x - (after.x - prev.x) / 6;
+    const cp2y = clampY(curr.y - (after.y - prev.y) / 6);
+    linePath += ` C ${fmt(cp1x)} ${fmt(cp1y)}, ${fmt(cp2x)} ${fmt(cp2y)}, ${fmt(curr.x)} ${fmt(curr.y)}`;
+  }
+  const fillPath = `${linePath} L ${fmt(width)} ${height} L 0 ${height} Z`;
 
   const strokeColor = color ?? 'currentColor';
 

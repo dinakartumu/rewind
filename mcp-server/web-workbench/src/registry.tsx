@@ -4,7 +4,6 @@ import { PosterGrid } from '../../web/components/PosterGrid';
 import { ArticleList } from '../../web/components/ArticleList';
 import { AlbumGrid } from '../../web/components/AlbumGrid';
 import { ArtistGrid } from '../../web/components/ArtistGrid';
-import { SeasonGrid } from '../../web/components/SeasonGrid';
 import { GameCard } from '../../web/components/GameCard';
 import { ArticleDetail } from '../../web/components/ArticleDetail';
 import { ArtistDetail } from '../../web/components/ArtistDetail';
@@ -27,14 +26,12 @@ import {
   fixtures as topArtistsFixtures,
   type TopArtistsPayload,
 } from '../../web/top-artists.fixtures';
-import { fixtures as attendedSeasonFixtures } from '../../web/attended-season.fixtures';
 import { fixtures as attendedEventFixtures } from '../../web/attended-event.fixtures';
 import { fixtures as articleFixtures } from '../../web/article.fixtures';
 import { fixtures as artistFixtures } from '../../web/artist.fixtures';
 import { fixtures as attendedPlayerFixtures } from '../../web/attended-player.fixtures';
 import { fixtures as topTracksFixtures } from '../../web/top-tracks.fixtures';
 
-import type { SeasonPayload } from '../../web/components/SeasonGrid';
 import type { EventDetail } from '../../web/components/GameCard';
 import type { ArticlePayload } from '../../web/components/ArticleDetail';
 import type { ArtistPayload } from '../../web/components/ArtistDetail';
@@ -136,17 +133,10 @@ export const COMPONENTS: ComponentEntry[] = [
     getBuiltHtml: makeBuiltLoader('top-artists.html'),
     render: (f) => {
       const p = f as TopArtistsPayload;
-      return <ArtistGrid items={p.data} onOpen={defaultOpen} />;
+      return (
+        <ArtistGrid items={p.data} period={p.period} onOpen={defaultOpen} />
+      );
     },
-  },
-  {
-    id: 'attended-season',
-    displayName: 'Attended season',
-    producedBy: 'get_attended_season',
-    defaultViewport: 'desktop',
-    fixtures: attendedSeasonFixtures,
-    getBuiltHtml: makeBuiltLoader('attended-season.html'),
-    render: (f) => <SeasonGrid payload={f as SeasonPayload} />,
   },
   {
     id: 'attended-event',
