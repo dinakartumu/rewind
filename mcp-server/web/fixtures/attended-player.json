@@ -81,25 +81,25 @@
   "supported": true,
   "season_stats": {
     "season": 2026,
-    "fetched_at": "2026-04-27T23:49:46.165Z",
-    "cache_hit": true,
+    "fetched_at": "2026-04-28T02:50:44.577Z",
+    "cache_hit": false,
     "hitter": {
       "games_played": 30,
-      "pa": 129,
-      "ab": 114,
-      "r": 12,
-      "h": 23,
+      "pa": 132,
+      "ab": 117,
+      "r": 13,
+      "h": 24,
       "doubles": 4,
       "triples": 0,
-      "hr": 6,
-      "rbi": 15,
+      "hr": 7,
+      "rbi": 17,
       "bb": 14,
       "k": 38,
       "sb": 2,
-      "avg": ".202",
-      "obp": ".287",
-      "slg": ".395",
-      "ops": ".682"
+      "avg": ".205",
+      "obp": ".288",
+      "slg": ".419",
+      "ops": ".707"
     },
     "pitcher": null
   },
@@ -302,13 +302,19 @@
     "hitter": {
       "pa": 146,
       "ab": 126,
+      "r": 19,
       "h": 27,
+      "doubles": 4,
+      "triples": 0,
       "hr": 11,
       "rbi": 26,
       "bb": 16,
       "k": 34,
+      "sb": 1,
       "avg": ".214",
-      "slg": ".508"
+      "obp": ".313",
+      "slg": ".508",
+      "ops": ".821"
     },
     "pitcher": null
   },

@@ -178,10 +178,14 @@
         "full_name": "Josh Naylor",
         "primary_position": "1B",
         "primary_number": "12",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-06-22",
+        "birth_city": "Mississauga",
+        "birth_state_province": "ON",
+        "birth_country": "Canada",
+        "height": "5' 10\"",
+        "weight": 235,
+        "bats": "L",
+        "throws": "L",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -199,7 +203,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2019-05-24",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2024",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/121/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "IDmKDQJHiIZwi4d5yFaBYCUICIeGeIZodw==",
@@ -260,12 +272,16 @@
         "mlb_stats_id": 645302,
         "espn_id": "35042",
         "full_name": "Victor Robles",
-        "primary_position": "CF",
+        "primary_position": "RF",
         "primary_number": "10",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-05-19",
+        "birth_city": "Santo Domingo Este",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 0\"",
+        "weight": 193,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -283,7 +299,20 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-09-07",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2017",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          },
+          {
+            "season": "2017",
+            "id": "AFLRSMVP",
+            "name": "AFL Rising Stars MVP"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/189/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "2iiGDQJHiIdwi4lY2GeAcAYHB4iHeIdodw==",
@@ -346,10 +375,14 @@
         "full_name": "Cole Young",
         "primary_position": "2B",
         "primary_number": "2",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2003-07-29",
+        "birth_city": "Pittsburgh",
+        "birth_state_province": "PA",
+        "birth_country": "USA",
+        "height": "5' 10\"",
+        "weight": 180,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -367,7 +400,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-05-31",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/122/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "5TiKDQJHeJdwjIaJt2eBcBcIB4iHeIZodw==",
@@ -414,10 +449,14 @@
         "full_name": "Randy Arozarena",
         "primary_position": "LF",
         "primary_number": "56",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1995-02-28",
+        "birth_city": "Havana",
+        "birth_state_province": null,
+        "birth_country": "Cuba",
+        "height": "5' 10\"",
+        "weight": 185,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -435,7 +474,40 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2019-08-14",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2025",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2023",
+            "id": "WBCMVPC",
+            "name": "World Baseball Classic Pool C MVP"
+          },
+          {
+            "season": "2023",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2021",
+            "id": "ALROY",
+            "name": "Jackie Robinson AL Rookie of the Year"
+          },
+          {
+            "season": "2020",
+            "id": "ALCSMVP",
+            "name": "ALCS MVP"
+          },
+          {
+            "season": "2019",
+            "id": "BAAAAAS",
+            "name": "Baseball America Triple-A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/124/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "WhiKDQJHmGdwi41Ft1eIcIYICId2iHdoaA==",
@@ -498,10 +570,14 @@
         "full_name": "J.P. Crawford",
         "primary_position": "SS",
         "primary_number": "3",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1995-01-11",
+        "birth_city": "Long Beach",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "6' 0\"",
+        "weight": 202,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -519,7 +595,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-09-05",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2020",
+            "id": "ALGG",
+            "name": "Rawlings AL Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/125/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "nRiGFQJHiHZxmokJ+Gh4gHYIB4iGiId4Zw==",
@@ -581,11 +665,15 @@
         "espn_id": "31749",
         "full_name": "Luke Jackson",
         "primary_position": "P",
-        "primary_number": "77",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "53",
+        "birth_date": "1991-08-24",
+        "birth_city": "Fort Lauderdale",
+        "birth_state_province": "FL",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 210,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -603,7 +691,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2015-09-04",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/774/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "nDiKDQJGiHdwjIaZx2h1gFcIB5iHeIdoeA==",
@@ -662,11 +752,15 @@
         "espn_id": "4346117",
         "full_name": "Casey Legumina",
         "primary_position": "P",
-        "primary_number": "64",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "67",
+        "birth_date": "1997-06-19",
+        "birth_city": "Dallas",
+        "birth_state_province": "TX",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 195,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -684,7 +778,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-04-15",
+        "college_name": "Gonzaga",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/127/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "5EiGDQJGZ8iAjHa5uGeCcDYIB5iHeIZodw==",
@@ -729,12 +825,16 @@
         "mlb_stats_id": 686527,
         "espn_id": "4345621",
         "full_name": "Dominic Canzone",
-        "primary_position": "DH",
+        "primary_position": "RF",
         "primary_number": "8",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-08-16",
+        "birth_city": "Cleveland",
+        "birth_state_province": "OH",
+        "birth_country": "USA",
+        "height": "6' 0\"",
+        "weight": 190,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -752,7 +852,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-07-08",
+        "college_name": "Ohio State",
+        "awards": [
+          {
+            "season": "2023",
+            "id": "BAAAAAS",
+            "name": "Baseball America Triple-A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/128/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "JDmKDQJHZ6dwjHZ5uGhygEYHCIeHeHZodw==",
@@ -815,10 +923,14 @@
         "full_name": "Cal Raleigh",
         "primary_position": "C",
         "primary_number": "29",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1996-11-26",
+        "birth_city": "Harrisonburg",
+        "birth_state_province": "VA",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 235,
+        "bats": "S",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -836,7 +948,40 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2021-07-11",
+        "college_name": "Florida State",
+        "awards": [
+          {
+            "season": "2025",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2025",
+            "id": "ALSS",
+            "name": "AL Silver Slugger"
+          },
+          {
+            "season": "2025",
+            "id": "MLBAFIRST",
+            "name": "All-MLB First Team"
+          },
+          {
+            "season": "2024",
+            "id": "ALGG",
+            "name": "Rawlings AL Gold Glove"
+          },
+          {
+            "season": "2024",
+            "id": "ALPG",
+            "name": "Rawlings AL Platinum Glove"
+          },
+          {
+            "season": "2019",
+            "id": "CALROY",
+            "name": "CAL Rookie of the Year"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/129/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "oTiGFQRHiHdwi3VryGeGcGYICId3eIdodw==",
@@ -898,11 +1043,15 @@
         "espn_id": "41017",
         "full_name": "Caleb Ferguson",
         "primary_position": "P",
-        "primary_number": "43",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "46",
+        "birth_date": "1996-07-02",
+        "birth_city": "Columbus",
+        "birth_state_province": "OH",
+        "birth_country": "USA",
+        "height": "6' 3\"",
+        "weight": 225,
+        "bats": "R",
+        "throws": "L",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -920,7 +1069,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2018-06-06",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2017",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/737/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "X3mGBQJGeJVwjHiY2IeDgPi4CJeHeHZodw==",
@@ -980,10 +1137,14 @@
         "full_name": "Matt Brash",
         "primary_position": "P",
         "primary_number": "47",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1998-05-12",
+        "birth_city": "Kingston",
+        "birth_state_province": "ON",
+        "birth_country": "Canada",
+        "height": "6' 1\"",
+        "weight": 173,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1001,7 +1162,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2022-04-12",
+        "college_name": "Niagara",
+        "awards": [
+          {
+            "season": "2021",
+            "id": "BAMILAS",
+            "name": "Baseball America Minor League All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/132/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4yiKDQJGeIeAjHZ5t2hxcCcHB5iHeIdodw==",
@@ -1048,10 +1217,14 @@
         "full_name": "Logan Gilbert",
         "primary_position": "P",
         "primary_number": "36",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-05-05",
+        "birth_city": "Winter Park",
+        "birth_state_province": "FL",
+        "birth_country": "USA",
+        "height": "6' 6\"",
+        "weight": 215,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1069,7 +1242,25 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2021-05-13",
+        "college_name": "Stetson",
+        "awards": [
+          {
+            "season": "2024",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2019",
+            "id": "BAMILAS",
+            "name": "Baseball America Minor League All-Star"
+          },
+          {
+            "season": "2019",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/133/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "JUmKDQJHaLdwjHaJqGhwgBYHCId3iHZoeA==",
@@ -1116,10 +1307,14 @@
         "full_name": "Bryan Woo",
         "primary_position": "P",
         "primary_number": "22",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-01-30",
+        "birth_city": "Oakland",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 205,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1137,7 +1332,20 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-06-03",
+        "college_name": "Cal Poly",
+        "awards": [
+          {
+            "season": "2025",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2025",
+            "id": "MLBSECOND",
+            "name": "All-MLB Second Team"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/134/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4DiKDQJHaMZwjXeJt2iAggYYCIeHeHZ4eA==",
@@ -1183,11 +1391,15 @@
         "espn_id": "4872682",
         "full_name": "Harry Ford",
         "primary_position": "C",
-        "primary_number": "5",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "17",
+        "birth_date": "2003-02-21",
+        "birth_city": "Atlanta",
+        "birth_state_province": "GA",
+        "birth_country": "USA",
+        "height": "5' 10\"",
+        "weight": 200,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1205,7 +1417,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-09-05",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2023",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/775/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "F3mGBQJGaLdziXln9wyolPfIB5iHeHZoeA==",
@@ -1268,10 +1488,14 @@
         "full_name": "Luis Castillo",
         "primary_position": "P",
         "primary_number": "58",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1992-12-12",
+        "birth_city": "Bani",
+        "birth_state_province": "-1",
+        "birth_country": "Dominican Republic",
+        "height": "6' 2\"",
+        "weight": 200,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1289,7 +1513,30 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-06-23",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2023",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2022",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2019",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2016",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/136/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4TiKDQJGiIeAfHdp12eEcEYICJeHeHdodw==",
@@ -1349,10 +1596,14 @@
         "full_name": "George Kirby",
         "primary_position": "P",
         "primary_number": "68",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1998-02-04",
+        "birth_city": "Rye",
+        "birth_state_province": "NY",
+        "birth_country": "USA",
+        "height": "6' 4\"",
+        "weight": 215,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1370,7 +1621,15 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2022-05-08",
+        "college_name": "Elon",
+        "awards": [
+          {
+            "season": "2023",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/138/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "JUmKDQJGaKdwjIWJuHeAcBcICIeHeHZodw==",
@@ -1417,10 +1676,14 @@
         "full_name": "Andrés Muñoz",
         "primary_position": "P",
         "primary_number": "75",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-01-16",
+        "birth_city": "Los Mochis",
+        "birth_state_province": "SI",
+        "birth_country": "Mexico",
+        "height": "6' 2\"",
+        "weight": 222,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1438,7 +1701,25 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2019-07-12",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2025",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2025",
+            "id": "MLBSECOND",
+            "name": "All-MLB Second Team"
+          },
+          {
+            "season": "2024",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/139/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3ziGDQJHh4eAe3hJyFd0cFYHCIeHeHdodw==",
@@ -1485,10 +1766,14 @@
         "full_name": "Eugenio Suárez",
         "primary_position": "3B",
         "primary_number": "28",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1991-07-18",
+        "birth_city": "Puerto Ordaz",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "5' 11\"",
+        "weight": 213,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1506,7 +1791,35 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2014-06-04",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2025",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2019",
+            "id": "CINMVP",
+            "name": "Reds Ernie Lombardi MVP Award"
+          },
+          {
+            "season": "2018",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2018",
+            "id": "CINMVP",
+            "name": "Reds Ernie Lombardi MVP Award"
+          },
+          {
+            "season": "2012",
+            "id": "MILBGG",
+            "name": "Rawlings MiLB Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/179/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "XWmGBQJGiXVwjHpX1zuPlPb4B5iHeIdodw==",
@@ -1569,10 +1882,14 @@
         "full_name": "Mitch Garver",
         "primary_position": "C",
         "primary_number": "18",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1991-01-15",
+        "birth_city": "Albuquerque",
+        "birth_state_province": "NM",
+        "birth_country": "USA",
+        "height": "6' 1\"",
+        "weight": 220,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1590,7 +1907,20 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-08-19",
+        "college_name": "New Mexico",
+        "awards": [
+          {
+            "season": "2019",
+            "id": "ALSS",
+            "name": "AL Silver Slugger"
+          },
+          {
+            "season": "2017",
+            "id": "BAAAAAS",
+            "name": "Baseball America Triple-A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/140/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3DiKDQJGeKZwjXaJyGdzcDcHCJeHeHdoeA==",
@@ -1637,10 +1967,14 @@
         "full_name": "Gabe Speier",
         "primary_position": "P",
         "primary_number": "55",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1995-04-12",
+        "birth_city": "Santa Barbara",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "5' 11\"",
+        "weight": 200,
+        "bats": "L",
+        "throws": "L",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1658,7 +1992,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2019-09-05",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/141/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "5DiKDQRHd6dwjHV6t2d0cEcHCIeHeHZoeA==",
@@ -1705,10 +2041,14 @@
         "full_name": "Leo Rivas",
         "primary_position": "3B",
         "primary_number": "76",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-10-10",
+        "birth_city": "Maracay",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "5' 7\"",
+        "weight": 150,
+        "bats": "S",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1726,7 +2066,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-04-28",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/142/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "IUmKFQRHeIZwnIaJt2dzcDYHB4iHeIdodw==",
@@ -1789,10 +2131,14 @@
         "full_name": "Julio Rodríguez",
         "primary_position": "CF",
         "primary_number": "44",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-12-29",
+        "birth_city": "Loma de Cabrera",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 4\"",
+        "weight": 228,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1810,7 +2156,65 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2022-04-08",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2025",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2025",
+            "id": "MLBAFIRST",
+            "name": "All-MLB First Team"
+          },
+          {
+            "season": "2023",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2023",
+            "id": "ALSS",
+            "name": "AL Silver Slugger"
+          },
+          {
+            "season": "2022",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          },
+          {
+            "season": "2022",
+            "id": "BAMLROY",
+            "name": "Baseball America Major League Rookie of the Year"
+          },
+          {
+            "season": "2022",
+            "id": "ALSS",
+            "name": "AL Silver Slugger"
+          },
+          {
+            "season": "2022",
+            "id": "ALROY",
+            "name": "Jackie Robinson AL Rookie of the Year"
+          },
+          {
+            "season": "2022",
+            "id": "MLBSECOND",
+            "name": "All-MLB Second Team"
+          },
+          {
+            "season": "2021",
+            "id": "BAMILAS",
+            "name": "Baseball America Minor League All-Star"
+          },
+          {
+            "season": "2018",
+            "id": "BADSLAS",
+            "name": "Baseball America DSL All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/143/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HkmGDQJGiHdwjHh4x2hzgDYHCIeHeHZodw==",
@@ -1873,10 +2277,14 @@
         "full_name": "Bryce Miller",
         "primary_position": "P",
         "primary_number": "50",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1998-08-23",
+        "birth_city": "Mount Pleasant",
+        "birth_state_province": "TX",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 200,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1894,7 +2302,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-05-02",
+        "college_name": "Texas A&M",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/306/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4ziGDQJHWNdwjYRqt2dxcBYHCIeHeHZ4eA==",
@@ -1941,10 +2351,14 @@
         "full_name": "Eduard Bazardo",
         "primary_position": "P",
         "primary_number": "83",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1995-09-01",
+        "birth_city": "Maracay",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "6' 0\"",
+        "weight": 190,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -1962,7 +2376,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2021-04-14",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/144/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3SiGFQJHmGeAenpIx1h4gIYHCIeGeHZ4Zw==",
@@ -2007,12 +2423,16 @@
         "mlb_stats_id": 593871,
         "espn_id": "32525",
         "full_name": "Jorge Polanco",
-        "primary_position": "DH",
-        "primary_number": "7",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_position": "1B",
+        "primary_number": "11",
+        "birth_date": "1993-07-05",
+        "birth_city": "San Pedro de Macoris",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 0\"",
+        "weight": 208,
+        "bats": "S",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -2030,7 +2450,20 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2014-06-26",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2021",
+            "id": "MINMVP",
+            "name": "Twins Calvin R. Griffith MVP Award"
+          },
+          {
+            "season": "2019",
+            "id": "ALAS",
+            "name": "AL All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/454/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "GkiGFQJGmGdwi4tnp2hzcGUHCJeGeHdodw==",
@@ -2093,10 +2526,14 @@
         "full_name": "Luke Raley",
         "primary_position": "RF",
         "primary_number": "20",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1994-09-19",
+        "birth_city": "Hinckley",
+        "birth_state_province": "OH",
+        "birth_country": "USA",
+        "height": "6' 3\"",
+        "weight": 235,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -2114,7 +2551,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2021-04-09",
+        "college_name": "Lake Erie College",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/145/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "6DiGDQJHiIdwjHZKqGd1cFYHCIeHeIdodw==",
@@ -2161,10 +2600,14 @@
         "full_name": "Emerson Hancock",
         "primary_position": "P",
         "primary_number": "26",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-05-31",
+        "birth_city": "Cairo",
+        "birth_state_province": "GA",
+        "birth_country": "USA",
+        "height": "6' 4\"",
+        "weight": 213,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -2182,7 +2625,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-08-09",
+        "college_name": "Georgia",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/146/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "5EiKDQJGeKZwjXWKt2dxcAYXCJeHeHdodw==",
@@ -2229,10 +2674,14 @@
         "full_name": "Carlos Vargas",
         "primary_position": "P",
         "primary_number": "54",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-10-13",
+        "birth_city": "Moca",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 4\"",
+        "weight": 210,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 136,
           "league": "mlb",
@@ -2250,7 +2699,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-03-30",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/239/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "XUmGFQJHWMiAfYaJ12eAcgYoB4iHeIZ4dw==",
@@ -2297,10 +2748,14 @@
         "full_name": "Ryan Feltner",
         "primary_position": "P",
         "primary_number": "18",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1996-09-02",
+        "birth_city": "Orlando",
+        "birth_state_province": "FL",
+        "birth_country": "USA",
+        "height": "6' 4\"",
+        "weight": 200,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2318,7 +2773,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2021-09-05",
+        "college_name": "Ohio State",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/790/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3ziKDQJGeIdwjHeYuGeAYAYYB5iHeIdodw==",
@@ -2363,12 +2820,16 @@
         "mlb_stats_id": 666160,
         "espn_id": "36181",
         "full_name": "Mickey Moniak",
-        "primary_position": "CF",
-        "primary_number": "16",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_position": "LF",
+        "primary_number": "22",
+        "birth_date": "1998-05-13",
+        "birth_city": "Encinitas",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "6' 1\"",
+        "weight": 209,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 108,
           "league": "mlb",
@@ -2386,7 +2847,9 @@
           "conference": "AL",
           "division": "AL West"
         },
-        "debut_date": null,
+        "debut_date": "2020-09-16",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/538/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HkmKDQJGeIdwjHeZuGdwcQYXB5eHeHdoeA==",
@@ -2449,10 +2912,14 @@
         "full_name": "Victor Vodnik",
         "primary_position": "P",
         "primary_number": "38",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-10-09",
+        "birth_city": "Whittier",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "6' 0\"",
+        "weight": 216,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2470,7 +2937,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-09-09",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/791/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3jiKDQJHeJdwjIeJx2eAYQYIB4iHeIZoeA==",
@@ -2517,10 +2986,14 @@
         "full_name": "McCade Brown",
         "primary_position": "P",
         "primary_number": "51",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-08-15",
+        "birth_city": "Normal",
+        "birth_state_province": "IL",
+        "birth_country": "USA",
+        "height": "6' 6\"",
+        "weight": 247,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2538,7 +3011,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-08-24",
+        "college_name": "Indiana",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/792/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4EiKDQJGeJdwjXaZuHdwcgcXCJeHeIZodw==",
@@ -2585,10 +3060,14 @@
         "full_name": "Jimmy Herget",
         "primary_position": "P",
         "primary_number": "44",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1993-09-09",
+        "birth_city": "Tampa",
+        "birth_state_province": "FL",
+        "birth_country": "USA",
+        "height": "6' 3\"",
+        "weight": 183,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2606,7 +3085,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2019-07-07",
+        "college_name": "South Florida",
+        "awards": [
+          {
+            "season": "2016",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/793/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3EiGDQJGiIZwjHaZuGhxgBYHCJd3iIdoeA==",
@@ -2651,12 +3138,16 @@
         "mlb_stats_id": 682653,
         "espn_id": "4917759",
         "full_name": "Warming Bernabel",
-        "primary_position": "1B",
-        "primary_number": "25",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_position": "3B",
+        "primary_number": "57",
+        "birth_date": "2002-06-06",
+        "birth_city": "Bani",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 1\"",
+        "weight": 180,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2674,7 +3165,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-07-26",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/794/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "2miGBQJGeJdziYpX92ePe/fIB4iHeIZodw==",
@@ -2736,11 +3229,15 @@
         "espn_id": "34874",
         "full_name": "Germán Márquez",
         "primary_position": "P",
-        "primary_number": "48",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "33",
+        "birth_date": "1995-02-22",
+        "birth_city": "San Felix",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "6' 1\"",
+        "weight": 230,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2758,7 +3255,25 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2016-09-08",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2021",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2018",
+            "id": "NLSS",
+            "name": "NL Silver Slugger"
+          },
+          {
+            "season": "2016",
+            "id": "BAAAXAS",
+            "name": "Baseball America Double-A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/157/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "FjmGBQJHplmAeolY+Algg0UHCIeHeHdoeA==",
@@ -2805,10 +3320,14 @@
         "full_name": "Braxton Fulford",
         "primary_position": "C",
         "primary_number": "37",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1998-12-09",
+        "birth_city": "Lubbock",
+        "birth_state_province": "TX",
+        "birth_country": "USA",
+        "height": "5' 10\"",
+        "weight": 205,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2826,7 +3345,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-04-16",
+        "college_name": "Texas Tech",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/795/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3jiKDQJGeJZwjId4x2eCcCYIB5iHeHZodw==",
@@ -2873,10 +3394,14 @@
         "full_name": "Kyle Freeland",
         "primary_position": "P",
         "primary_number": "21",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1993-05-14",
+        "birth_city": "Denver",
+        "birth_state_province": "CO",
+        "birth_country": "USA",
+        "height": "6' 4\"",
+        "weight": 202,
+        "bats": "L",
+        "throws": "L",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2894,7 +3419,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-04-07",
+        "college_name": "Evansville",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/796/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HEmGDQJGeJZwjHWJyHdwcgcXCIeHeIZodw==",
@@ -2941,10 +3468,14 @@
         "full_name": "Tyler Freeman",
         "primary_position": "RF",
         "primary_number": "2",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-05-21",
+        "birth_city": "Rancho Cucamonga",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "5' 11\"",
+        "weight": 200,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -2962,7 +3493,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2022-08-03",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/229/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HEmKDQJGeIZwjHeIx2eAcgYIB5iHeHZodw==",
@@ -3009,10 +3542,14 @@
         "full_name": "Juan Mejia",
         "primary_position": "P",
         "primary_number": "47",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-07-04",
+        "birth_city": "Santo Domingo",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 3\"",
+        "weight": 210,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3030,7 +3567,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-04-24",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/797/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "F0mGDQJGiHVwm3iJt0hycBQHB5iHeHdodw==",
@@ -3076,11 +3615,15 @@
         "espn_id": "4917793",
         "full_name": "Yanquiel Fernández",
         "primary_position": "RF",
-        "primary_number": "35",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "88",
+        "birth_date": "2003-01-01",
+        "birth_city": "Havana",
+        "birth_state_province": null,
+        "birth_country": "Cuba",
+        "height": "6' 2\"",
+        "weight": 198,
+        "bats": "L",
+        "throws": "L",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3098,7 +3641,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-07-02",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2023",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/798/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "10iGFQRGl3eAenhq6GeIcHYICIeHeHdodw==",
@@ -3159,12 +3710,16 @@
         "mlb_stats_id": 690022,
         "espn_id": "5196606",
         "full_name": "Ryan Ritter",
-        "primary_position": "SS",
+        "primary_position": "2B",
         "primary_number": "8",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-11-10",
+        "birth_city": "Evergreen Park",
+        "birth_state_province": "IL",
+        "birth_country": "USA",
+        "height": "6' 1\"",
+        "weight": 209,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3182,7 +3737,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-06-06",
+        "college_name": "Kentucky",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/799/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "GUmGDQJHeJaAfHeZuGhwgwYnCId3iIZoeA==",
@@ -3227,12 +3784,16 @@
         "mlb_stats_id": 688760,
         "espn_id": "4976999",
         "full_name": "Blaine Crim",
-        "primary_position": "DH",
+        "primary_position": "1B",
         "primary_number": "16",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-06-17",
+        "birth_city": "Mobile",
+        "birth_state_province": "AL",
+        "birth_country": "USA",
+        "height": "5' 10\"",
+        "weight": 223,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3250,7 +3811,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-05-02",
+        "college_name": "Mississippi College",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/800/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "4EiKDQJGiHZwjHiIt2eCcBYIB5iHiHdodw==",
@@ -3313,10 +3876,14 @@
         "full_name": "Hunter Goodman",
         "primary_position": "C",
         "primary_number": "15",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-10-08",
+        "birth_city": "Arlington",
+        "birth_state_province": "TN",
+        "birth_country": "USA",
+        "height": "5' 11\"",
+        "weight": 220,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3334,7 +3901,25 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-08-27",
+        "college_name": "Memphis",
+        "awards": [
+          {
+            "season": "2025",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2025",
+            "id": "NLSS",
+            "name": "NL Silver Slugger"
+          },
+          {
+            "season": "2022",
+            "id": "BALAXXAS",
+            "name": "Baseball America Low Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/801/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3DiGDQJHaKZwjHWa2GdwcgYXB4iHeHZoeA==",
@@ -3395,12 +3980,16 @@
         "mlb_stats_id": 571657,
         "espn_id": "33287",
         "full_name": "Kyle Farmer",
-        "primary_position": "2B",
-        "primary_number": "6",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_position": "3B",
+        "primary_number": "15",
+        "birth_date": "1990-08-17",
+        "birth_city": "Atlanta",
+        "birth_state_province": "GA",
+        "birth_country": "USA",
+        "height": "5' 11\"",
+        "weight": 205,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3418,7 +4007,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-07-30",
+        "college_name": "Georgia",
+        "awards": [
+          {
+            "season": "2022",
+            "id": "CINMVP",
+            "name": "Reds Ernie Lombardi MVP Award"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/379/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "XmmGDQJHd5hwjHd5yGhwgDcHCIeHeHdodw==",
@@ -3464,11 +4061,15 @@
         "espn_id": "4720860",
         "full_name": "Bradley Blalock",
         "primary_position": "P",
-        "primary_number": "64",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "31",
+        "birth_date": "2000-12-25",
+        "birth_city": "Conyers",
+        "birth_state_province": "GA",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 213,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3486,7 +4087,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-06-20",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/802/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "IEmKDQJHd4iAfIaZt3eAcwcYB4iHeHZodw==",
@@ -3533,10 +4136,14 @@
         "full_name": "Zach Agnos",
         "primary_position": "P",
         "primary_number": "36",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2000-08-15",
+        "birth_city": "Haymarket",
+        "birth_state_province": "VA",
+        "birth_country": "USA",
+        "height": "6' 0\"",
+        "weight": 225,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3554,7 +4161,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-04-20",
+        "college_name": "East Carolina",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/803/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3jiKDQJHiHZwi3mIp2eFcFYIB4iHeIdodw==",
@@ -3601,10 +4210,14 @@
         "full_name": "Jordan Beck",
         "primary_position": "LF",
         "primary_number": "27",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2001-04-19",
+        "birth_city": "Hazel Green",
+        "birth_state_province": "AL",
+        "birth_country": "USA",
+        "height": "6' 2\"",
+        "weight": 227,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3622,7 +4235,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-04-30",
+        "college_name": "Tennessee",
+        "awards": [
+          {
+            "season": "2023",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/804/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HkmGDQJHaaVwjHaJx2iAcwYoCId3iIZ4dw==",
@@ -3685,10 +4306,14 @@
         "full_name": "Tanner Gordon",
         "primary_position": "P",
         "primary_number": "29",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1997-10-26",
+        "birth_city": "Champaign",
+        "birth_state_province": "IL",
+        "birth_country": "USA",
+        "height": "6' 5\"",
+        "weight": 220,
+        "bats": "L",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3706,7 +4331,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-07-07",
+        "college_name": "Indiana",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/805/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "30iGDQJGaKZwjXWKyHeAcgcoB5iHeIZodw==",
@@ -3766,10 +4393,14 @@
         "full_name": "Brenton Doyle",
         "primary_position": "CF",
         "primary_number": "9",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1998-05-14",
+        "birth_city": "Warrenton",
+        "birth_state_province": "VA",
+        "birth_country": "USA",
+        "height": "6' 3\"",
+        "weight": 223,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3787,7 +4418,25 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2023-04-24",
+        "college_name": "Shepherd (WV)",
+        "awards": [
+          {
+            "season": "2024",
+            "id": "NLGG",
+            "name": "Rawlings NL Gold Glove"
+          },
+          {
+            "season": "2023",
+            "id": "NLGG",
+            "name": "Rawlings NL Gold Glove"
+          },
+          {
+            "season": "2021",
+            "id": "MILBGG",
+            "name": "Rawlings MiLB Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/806/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "3TiKDQJGeJZwjXaI2HdwcBcIB5iHeIZodw==",
@@ -3834,10 +4483,14 @@
         "full_name": "Ezequiel Tovar",
         "primary_position": "SS",
         "primary_number": "14",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2001-08-01",
+        "birth_city": "Maracay",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "6' 0\"",
+        "weight": 192,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3855,7 +4508,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2022-09-23",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2024",
+            "id": "NLGG",
+            "name": "Rawlings NL Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/807/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "FkmGDQJGeJZwjHap2HhwhAdHCJd3iHZoeA==",
@@ -3916,12 +4577,16 @@
         "mlb_stats_id": 606115,
         "espn_id": "32530",
         "full_name": "Orlando Arcia",
-        "primary_position": "2B",
+        "primary_position": "SS",
         "primary_number": "11",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1994-08-04",
+        "birth_city": "Anaco",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "5' 11\"",
+        "weight": 187,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -3939,7 +4604,20 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2016-08-02",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2023",
+            "id": "NLAS",
+            "name": "NL All-Star"
+          },
+          {
+            "season": "2015",
+            "id": "MILBGG",
+            "name": "Rawlings MiLB Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/507/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "WlmGDQJHl2iAe3h52GhxgCUHCIeHeHdodw==",
@@ -4001,11 +4679,15 @@
         "espn_id": "5016983",
         "full_name": "Anthony Molina",
         "primary_position": "P",
-        "primary_number": "43",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "primary_number": "61",
+        "birth_date": "2002-01-12",
+        "birth_city": "San Joaquin",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "6' 1\"",
+        "weight": 170,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4023,7 +4705,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-03-28",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/808/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "G0mGDQJGh4hwm4WK6Gd0cFcHCJeHeHZodw==",
@@ -4070,10 +4754,14 @@
         "full_name": "Angel Chivilli",
         "primary_position": "P",
         "primary_number": "57",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2002-07-28",
+        "birth_city": "La Victoria",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "6' 2\"",
+        "weight": 185,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4091,7 +4779,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-06-03",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/809/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "kDiGDQJGWOeBe3eJ+GdwgwY3CJeHeIZodw==",
@@ -4151,10 +4841,14 @@
         "full_name": "Antonio Senzatela",
         "primary_position": "P",
         "primary_number": "49",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1995-01-21",
+        "birth_city": "Valencia",
+        "birth_state_province": null,
+        "birth_country": "Venezuela",
+        "height": "6' 1\"",
+        "weight": 235,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4172,7 +4866,15 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2017-04-06",
+        "college_name": null,
+        "awards": [
+          {
+            "season": "2015",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/810/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "2DiGDQJGmVZwi3h52GeCcCYICJd3eIdodw==",
@@ -4232,10 +4934,14 @@
         "full_name": "Jaden Hill",
         "primary_position": "P",
         "primary_number": "0",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "1999-12-22",
+        "birth_city": "Ashdown",
+        "birth_state_province": "AR",
+        "birth_country": "USA",
+        "height": "6' 4\"",
+        "weight": 260,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4253,7 +4959,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-09-07",
+        "college_name": "Louisiana State",
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/811/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "1TiGDQJGiHZwi3d56FhxcAUHCJeHeIdodw==",
@@ -4300,10 +5008,14 @@
         "full_name": "Kyle Karros",
         "primary_position": "3B",
         "primary_number": "12",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2002-07-26",
+        "birth_city": "Los Angeles",
+        "birth_state_province": "CA",
+        "birth_country": "USA",
+        "height": "6' 5\"",
+        "weight": 225,
+        "bats": "R",
+        "throws": "R",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4321,7 +5033,20 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2025-08-08",
+        "college_name": "UCLA",
+        "awards": [
+          {
+            "season": "2024",
+            "id": "BAHAXXAS",
+            "name": "Baseball America High Class A All-Star"
+          },
+          {
+            "season": "2024",
+            "id": "MILBGG",
+            "name": "Rawlings MiLB Gold Glove"
+          }
+        ],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/812/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "HEmGDQJGabVwjXZ5yGhwhAYnCJeHiHZ4dw==",
@@ -4384,10 +5109,14 @@
         "full_name": "Luis Peralta",
         "primary_position": "P",
         "primary_number": "41",
-        "birth_date": null,
-        "birth_country": null,
-        "bats": null,
-        "throws": null,
+        "birth_date": "2001-01-06",
+        "birth_city": "Moca",
+        "birth_state_province": null,
+        "birth_country": "Dominican Republic",
+        "height": "5' 11\"",
+        "weight": 203,
+        "bats": "L",
+        "throws": "L",
         "primary_team": {
           "id": 115,
           "league": "mlb",
@@ -4405,7 +5134,9 @@
           "conference": "NL",
           "division": "NL West"
         },
-        "debut_date": null,
+        "debut_date": "2024-08-24",
+        "college_name": null,
+        "awards": [],
         "photo_silo": {
           "cdn_url": "https://cdn.rewind.rest/attending/player_silo/813/original.png?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
           "thumbhash": "GUmGDQJGiYZwjIeJ12eAcQYYCJd3iIdodw==",

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
 import { TeamLogo } from './TeamLogo.js';
+import { HitterStatBlock } from './HitterStatBlock.js';
 import type {
   AthletePayload,
   CareerHistory,
@@ -103,41 +104,29 @@ export function AthleteDetailA({
       <Hero player={player} />
       <BioStrip player={player} />
 
-      <SectionHeader>{season_stats?.season ?? '—'} season</SectionHeader>
       {season_stats?.hitter ? (
-        <BigFourHitter
-          avg={season_stats.hitter.avg}
-          obp={season_stats.hitter.obp}
-          slg={season_stats.hitter.slg}
-          ops={season_stats.hitter.ops}
+        <HitterStatBlock
+          title={`${season_stats.season ?? ''} season`}
+          stats={season_stats.hitter}
+          games={season_stats.hitter.games_played}
           tint={tint}
         />
       ) : season_stats?.pitcher ? (
-        <BigFourPitcher
-          era={season_stats.pitcher.era}
-          whip={season_stats.pitcher.whip}
-          k={season_stats.pitcher.k}
-          ip={season_stats.pitcher.ip}
-          tint={tint}
-        />
+        <>
+          <SectionHeader>{season_stats?.season ?? '—'} season</SectionHeader>
+          <BigFourPitcher
+            era={season_stats.pitcher.era}
+            whip={season_stats.pitcher.whip}
+            k={season_stats.pitcher.k}
+            ip={season_stats.pitcher.ip}
+            tint={tint}
+          />
+        </>
       ) : (
-        <div style={emptyStyle}>Season stats unavailable</div>
-      )}
-      {season_stats?.hitter && (
-        <CountingRow
-          stats={[
-            ['G', fmt(season_stats.hitter.games_played)],
-            ['PA', fmt(season_stats.hitter.pa)],
-            ['AB', fmt(season_stats.hitter.ab)],
-            ['HR', fmt(season_stats.hitter.hr)],
-            ['RBI', fmt(season_stats.hitter.rbi)],
-            ['R', fmt(season_stats.hitter.r)],
-            ['2B', fmt(season_stats.hitter.doubles)],
-            ['BB', fmt(season_stats.hitter.bb)],
-            ['K', fmt(season_stats.hitter.k)],
-            ['SB', fmt(season_stats.hitter.sb)],
-          ]}
-        />
+        <>
+          <SectionHeader>Season</SectionHeader>
+          <div style={emptyStyle}>Season stats unavailable</div>
+        </>
       )}
 
       {splits && hasAnySplit(splits) && (
@@ -149,27 +138,12 @@ export function AthleteDetailA({
 
       {attended_summary?.hitter && (
         <>
-          <SectionHeader trailing={`${attended_summary.games_attended} games`}>
-            In games you attended
-          </SectionHeader>
-          <BigFourHitter
-            avg={attended_summary.hitter.avg ?? null}
-            obp={null}
-            slg={attended_summary.hitter.slg ?? null}
-            ops={null}
+          <HitterStatBlock
+            title="In games you attended"
+            trailing={`${attended_summary.games_attended} games`}
+            stats={attended_summary.hitter}
+            games={attended_summary.games_attended}
             tint={tint}
-          />
-          <CountingRow
-            stats={[
-              [
-                'H/AB',
-                `${fmt(attended_summary.hitter.h)}/${fmt(attended_summary.hitter.ab)}`,
-              ],
-              ['HR', fmt(attended_summary.hitter.hr)],
-              ['RBI', fmt(attended_summary.hitter.rbi)],
-              ['BB', fmt(attended_summary.hitter.bb)],
-              ['K', fmt(attended_summary.hitter.k)],
-            ]}
           />
           {attended_summary.games_attended >
             attended_summary.games_with_box_score && (
@@ -320,37 +294,6 @@ function BioStrip({ player }: { player: PlayerMeta }) {
   );
 }
 
-function BigFourHitter({
-  avg,
-  obp,
-  slg,
-  ops,
-  tint,
-}: {
-  avg: string | null | undefined;
-  obp: string | null | undefined;
-  slg: string | null | undefined;
-  ops: string | null | undefined;
-  tint: string;
-}) {
-  const cells: Array<[string, string]> = [];
-  if (avg) cells.push(['AVG', avg]);
-  if (obp) cells.push(['OBP', obp]);
-  if (slg) cells.push(['SLG', slg]);
-  if (ops) cells.push(['OPS', ops]);
-  if (cells.length === 0) return null;
-  return (
-    <div style={bigFourStyle}>
-      {cells.map(([k, v]) => (
-        <div key={k} style={bigFourCellStyle}>
-          <div style={{ ...bigFourValueStyle, color: tint }}>{v}</div>
-          <div style={bigFourLabelStyle}>{k}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function BigFourPitcher({
   era,
   whip,
@@ -376,19 +319,6 @@ function BigFourPitcher({
         <div key={key} style={bigFourCellStyle}>
           <div style={{ ...bigFourValueStyle, color: tint }}>{v}</div>
           <div style={bigFourLabelStyle}>{key}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CountingRow({ stats }: { stats: Array<[string, string]> }) {
-  return (
-    <div style={countingRowStyle}>
-      {stats.map(([k, v]) => (
-        <div key={k} style={countingCellStyle}>
-          <div style={countingValueStyle}>{v}</div>
-          <div style={countingLabelStyle}>{k}</div>
         </div>
       ))}
     </div>
@@ -782,34 +712,6 @@ const bigFourLabelStyle: CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
   letterSpacing: 0.6,
-  textTransform: 'uppercase',
-  opacity: 0.55,
-};
-
-const countingRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 16,
-  paddingTop: 4,
-};
-
-const countingCellStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 1,
-  minWidth: 36,
-};
-
-const countingValueStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 600,
-  fontVariantNumeric: 'tabular-nums',
-};
-
-const countingLabelStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: 0.5,
   textTransform: 'uppercase',
   opacity: 0.55,
 };

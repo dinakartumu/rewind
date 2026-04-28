@@ -163,7 +163,27 @@ export type AttendedSummary = {
   games_with_box_score: number;
   wins: number;
   losses: number;
-  hitter: (HitterStats & { pa: number; ab: number; h: number }) | null;
+  // The attended slice mirrors HitterStats so the season + attended
+  // panels can render through one shared component. obp/ops are
+  // approximate (box-score schema lacks HBP/SF) — close enough for
+  // a "cut of the season" comparison.
+  hitter:
+    | (HitterStats & {
+        pa: number;
+        ab: number;
+        r: number;
+        h: number;
+        doubles: number;
+        triples: number;
+        hr: number;
+        rbi: number;
+        bb: number;
+        k: number;
+        sb: number;
+        obp: string | null;
+        ops: string | null;
+      })
+    | null;
   pitcher: (PitcherStats & { ip: string; bf: number }) | null;
 };
 
