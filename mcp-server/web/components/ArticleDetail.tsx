@@ -171,6 +171,11 @@ function Hero({
         // section. Workbench (Chromium) handled the rounding cleanly,
         // which is why this only showed up on iOS.
         background: loaded ? 'transparent' : dominant,
+        // Intentional hairline between hero and body, same token used
+        // by the highlights section header so dividers across the
+        // card all share one color.
+        borderBottom:
+          '1px solid var(--color-border-tertiary, rgba(127,127,127,0.12))',
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -259,9 +264,6 @@ function HighlightsPanel({
         {highlights.map((h) => (
           <div key={h.id} style={highlightRowStyle}>
             <div style={highlightTextStyle}>{h.text}</div>
-            <div style={highlightMetaStyle}>
-              highlighted {timeAgo(h.created_at)}
-            </div>
             {h.note && <div style={highlightNoteStyle}>{h.note}</div>}
           </div>
         ))}
@@ -430,14 +432,6 @@ const highlightTextStyle: CSSProperties = {
   fontSize: 15.5,
   lineHeight: 1.55,
   color: 'var(--color-text-primary, inherit)',
-};
-
-const highlightMetaStyle: CSSProperties = {
-  fontSize: 11,
-  opacity: 0.5,
-  letterSpacing: 0.4,
-  textTransform: 'uppercase',
-  color: 'var(--color-text-secondary, inherit)',
 };
 
 const highlightNoteStyle: CSSProperties = {
