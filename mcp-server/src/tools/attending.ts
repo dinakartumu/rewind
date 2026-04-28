@@ -338,7 +338,7 @@ export function registerAttendingTools(
   // the user having to know the integer id.
   server.tool(
     'get_attended_players',
-    'Search the list of players you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn.',
+    'Search the list of players (MLB, NFL, NCAAF, NBA, etc.) you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn. When the user asks about a SPECIFIC player ("how\'s JP Crawford playing this year", "what are Cal Raleigh\'s stats", "tell me about Kirby"), call this to resolve the name to an id, then follow up with `get_attended_player(id)` to render the rich inline athlete card with current-season stats — do not stop at the search-result text response.',
     {
       page: z
         .number()
@@ -425,7 +425,7 @@ export function registerAttendingTools(
     {
       title: 'Athlete — detail',
       description:
-        "Profile for a player you've watched play in person. Returns bio (position, jersey, debut), team logo, current-season stats (live MLB Stats API for MLB players, KV-cached 1h), your-attended summary aggregated across every attended game, and the 10 most recent attended appearances with their stat lines. MLB-only for the live-stats panel — non-MLB players surface as supported:false. In MCP Apps hosts, renders an interactive athlete card inline.",
+        'Detailed athlete card for an MLB / NFL / NCAAF / NBA player you\'ve watched play in person. **Use this whenever the user asks how a specific player is performing this season, what their batting average / ERA / current stats are, how their career has gone, or how they\'ve played in the games you attended** — e.g. "how\'s JP Crawford playing this year", "what are Cal Raleigh\'s numbers", "show me Kirby\'s stats", "tell me about Julio Rodriguez". Returns bio (position, jersey, debut, height/weight, college, awards), team logo, current-season stats (live MLB Stats API for MLB players, KV-cached 1h), career-by-season table, home/away/L-R splits, your-attended summary aggregated across every attended game, and the 10 most recent attended appearances with their stat lines. MLB-only for the live-stats panel — non-MLB players surface as supported:false. In MCP Apps hosts, renders the rich inline athlete card. If you do not have the player id, first call `get_attended_players` with `name` to resolve the id, then call this to render the card.',
       inputSchema: {
         id: z.number().int().describe('Player id.'),
         ...includeImagesParam,
