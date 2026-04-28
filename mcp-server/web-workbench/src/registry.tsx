@@ -10,7 +10,6 @@ import { ArticleDetail } from '../../web/components/ArticleDetail';
 import { ArtistDetail } from '../../web/components/ArtistDetail';
 import { AthleteDetail } from '../../web/components/AthleteDetail';
 import { AthleteDetailA } from '../../web/components/AthleteDetailA';
-import { AthleteDetailB } from '../../web/components/AthleteDetailB';
 import { TopTracks } from '../../web/components/TopTracks';
 
 import {
@@ -195,27 +194,17 @@ export const COMPONENTS: ComponentEntry[] = [
   {
     // Variant A — encyclopedia / ESPN-deluxe layout. Same fixture as
     // production attended-player; shares the bundled HTML so we don't
-    // burn another 460KB on a workbench-only entry.
+    // burn another 460KB on a workbench-only entry. Stays a separate
+    // entry from production attended-player while we keep iterating;
+    // when it lands, the production HTML will repoint to this render.
     id: 'attended-player-a',
-    displayName: 'Attended player — Variant A (deluxe)',
+    displayName: 'Attended player — Variant A',
     producedBy: 'get_attended_player',
     defaultViewport: 'desktop',
     fixtures: attendedPlayerFixtures,
     getBuiltHtml: makeBuiltLoader('attended-player.html'),
     render: (f) => (
       <AthleteDetailA payload={f as AthletePayload} onOpen={defaultOpen} />
-    ),
-  },
-  {
-    // Variant B — story-flow / Rewind-personality layout.
-    id: 'attended-player-b',
-    displayName: 'Attended player — Variant B (story flow)',
-    producedBy: 'get_attended_player',
-    defaultViewport: 'desktop',
-    fixtures: attendedPlayerFixtures,
-    getBuiltHtml: makeBuiltLoader('attended-player.html'),
-    render: (f) => (
-      <AthleteDetailB payload={f as AthletePayload} onOpen={defaultOpen} />
     ),
   },
   {

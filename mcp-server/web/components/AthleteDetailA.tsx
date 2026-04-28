@@ -137,22 +137,13 @@ export function AthleteDetailA({
       )}
 
       {attended_summary?.hitter && (
-        <>
-          <HitterStatBlock
-            title="In games you attended"
-            trailing={`${attended_summary.games_attended} games`}
-            stats={attended_summary.hitter}
-            games={attended_summary.games_attended}
-            tint={tint}
-          />
-          {attended_summary.games_attended >
-            attended_summary.games_with_box_score && (
-            <div style={subtleNoteStyle}>
-              {attended_summary.games_with_box_score} of{' '}
-              {attended_summary.games_attended} games have box-score data
-            </div>
-          )}
-        </>
+        <HitterStatBlock
+          title="In games you attended"
+          trailing={`${attended_summary.games_attended} games`}
+          stats={attended_summary.hitter}
+          games={attended_summary.games_attended}
+          tint={tint}
+        />
       )}
 
       {career && career.seasons.length > 0 && (
@@ -880,11 +871,4 @@ const emptyStyle: CSSProperties = {
   fontSize: 12,
   opacity: 0.6,
   fontStyle: 'italic',
-};
-
-const subtleNoteStyle: CSSProperties = {
-  fontSize: 11,
-  opacity: 0.55,
-  fontStyle: 'italic',
-  paddingTop: 2,
 };
