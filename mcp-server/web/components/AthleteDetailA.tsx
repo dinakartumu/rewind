@@ -427,7 +427,7 @@ function SplitsGrid({
               {s.avg ?? '—'}
             </div>
             <div style={splitSubStyle}>
-              {s.hr ?? 0} HR · {s.rbi ?? 0} RBI · {s.ops ?? '—'} OPS
+              {s.hr ?? 0} HR · {s.rbi ?? 0} RBI · OPS {s.ops ?? '—'}
             </div>
           </div>
         ) : null

@@ -81,25 +81,19 @@ export function GameCard({ event }: { event: EventDetail }) {
   const homeScore = ed.home_score;
   const awayScore = ed.away_score;
   const hasScore = homeScore !== undefined && awayScore !== undefined;
-  const won = ed.my_team_won;
 
-  // Derive a result badge — green W, red L, grey for no-show / non-sports.
-  const badge = !event.attended
-    ? { color: 'rgba(127,127,127,0.6)', label: 'NO-SHOW' }
-    : event.category !== 'sports'
-      ? null
-      : won === true
-        ? { color: '#16a34a', label: 'W' }
-        : won === false
-          ? { color: '#dc2626', label: 'L' }
-          : null;
+  // Tiny dim "no-show" tag stays for the non-attended case so the user
+  // can still tell at a glance — but the green W / red L for attended
+  // sports games is handled by the score-emphasis (winning side stays
+  // full-opacity, loser dims). No badge chip on the attended path.
+  const showNoShowTag = !event.attended;
 
   const notable = (event.players ?? []).filter((p) => p.notable);
 
   return (
     <div style={cardStyle}>
       <header style={headerStyle}>
-        <div>
+        <div style={headerLeftStyle}>
           <div style={dateStyle}>{formatLongDate(event.event_date)}</div>
           {event.venue && (
             <div style={venueStyle}>
@@ -108,11 +102,31 @@ export function GameCard({ event }: { event: EventDetail }) {
             </div>
           )}
         </div>
-        {badge && (
-          <span style={{ ...badgeStyle, background: badge.color }}>
-            {badge.label}
-          </span>
-        )}
+        <div style={headerRightStyle}>
+          {showNoShowTag ? (
+            <span style={noShowTagStyle}>NO-SHOW</span>
+          ) : (
+            <>
+              {ed.attendance && (
+                <div style={metaTopStyle}>
+                  {formatAttendance(ed.attendance)} fans
+                </div>
+              )}
+              {(ed.weather || ed.duration_minutes) && (
+                <div style={metaBottomStyle}>
+                  {[
+                    ed.weather ? formatWeather(ed.weather) : null,
+                    ed.duration_minutes
+                      ? formatDuration(ed.duration_minutes)
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </header>
 
       {hasScore && home && away ? (
@@ -129,20 +143,6 @@ export function GameCard({ event }: { event: EventDetail }) {
 
       {ed.linescore && ed.linescore.length > 0 && (
         <Linescore innings={ed.linescore} home={home} away={away} />
-      )}
-
-      {(ed.attendance || ed.weather || ed.duration_minutes) && (
-        <div style={metaStyle}>
-          {ed.attendance ? (
-            <span>{formatAttendance(ed.attendance)} fans</span>
-          ) : null}
-          {ed.weather && formatWeather(ed.weather) ? (
-            <span>{formatWeather(ed.weather)}</span>
-          ) : null}
-          {ed.duration_minutes ? (
-            <span>{formatDuration(ed.duration_minutes)}</span>
-          ) : null}
-        </div>
       )}
 
       {notable.length > 0 && (
@@ -210,7 +210,7 @@ function TeamScore({
 
   return (
     <div style={teamSlotStyle}>
-      <TeamLogo team={team} size={44} variant="default" />
+      <TeamLogo team={team} size={36} variant="default" />
       <div
         style={{
           ...teamNameStyle,
@@ -295,7 +295,10 @@ function PerformerRow({ appearance }: { appearance: Appearance }) {
   const placeholder = photo?.thumbhash
     ? thumbhashToDataUrl(photo.thumbhash)
     : null;
-  const dominant = photo?.dominant_color ?? 'rgba(127,127,127,0.18)';
+  // Match AthleteDetailA's portrait fill — neutral gray instead of
+  // the per-photo dominant_color tint, so all the headshots in the
+  // notable-performances strip read as one row.
+  const photoBgColor = 'rgba(127,127,127,0.08)';
 
   // Prefer batting line summary, then pitching line summary, then bare name.
   const stat =
@@ -306,7 +309,7 @@ function PerformerRow({ appearance }: { appearance: Appearance }) {
 
   return (
     <div style={performerRowStyle}>
-      <div style={{ ...performerAvatarStyle, background: dominant }}>
+      <div style={{ ...performerAvatarStyle, background: photoBgColor }}>
         {placeholder && (
           <img
             src={placeholder}
@@ -333,17 +336,22 @@ function PerformerRow({ appearance }: { appearance: Appearance }) {
         )}
       </div>
       <div style={performerNameStyle}>
-        <div style={performerNameLineStyle}>
-          {appearance.player.full_name}
-          {decision && (
-            <span style={decisionBadgeStyle(decision)}>{decision}</span>
-          )}
+        <div style={performerHeaderStyle}>
+          <span style={performerNameLineStyle}>
+            {appearance.player.full_name}
+          </span>
+          {stat && <span style={statLineStyle}>{stat}</span>}
         </div>
         <div style={performerSubStyle}>
-          {[number ? `#${number}` : null, position].filter(Boolean).join(' · ')}
+          {[
+            number ? `#${number}` : null,
+            position,
+            decision, // W/L/SV is just text now, alongside #/POS
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </div>
       </div>
-      {stat && <div style={statLineStyle}>{stat}</div>}
     </div>
   );
 }
@@ -435,27 +443,41 @@ function formatPrice(cents: number, currency: string): string {
 
 // ─── Styles ─────────────────────────────────────────────────────────
 
+// Match AthleteDetailA's outer chrome — same border/radius/maxWidth/
+// padding so the two attended-domain cards feel like one family.
+// No drop shadow, no background fill — the iframe surface shows through.
 const cardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 12,
-  padding: 16,
+  gap: 18,
+  maxWidth: 720,
+  margin: '0 auto',
+  padding: '20px 22px 22px',
   borderRadius: 12,
-  border: '1px solid rgba(127,127,127,0.18)',
-  background: 'var(--color-bg-secondary, rgba(127,127,127,0.03))',
+  border: '1px solid var(--color-border-tertiary, rgba(127,127,127,0.12))',
+  background: 'var(--color-background-primary, transparent)',
+  color: 'var(--color-text-primary, #1a1a1a)',
   fontFamily:
-    'var(--font-sans, -apple-system, BlinkMacSystemFont, system-ui, sans-serif)',
-  color: 'var(--color-text-primary, inherit)',
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   fontSize: 14,
-  maxWidth: 520,
-  boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06)',
 };
 
 const headerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 8,
+  gap: 12,
+};
+
+const headerLeftStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+};
+
+const headerRightStyle: CSSProperties = {
+  textAlign: 'right',
+  minWidth: 0,
 };
 
 const dateStyle: CSSProperties = {
@@ -468,16 +490,14 @@ const dateStyle: CSSProperties = {
 const venueStyle: CSSProperties = {
   fontSize: 12,
   opacity: 0.7,
-  marginTop: 2,
 };
 
-const badgeStyle: CSSProperties = {
-  fontSize: 11,
+const noShowTagStyle: CSSProperties = {
+  fontSize: 10,
   fontWeight: 700,
-  color: 'white',
-  padding: '3px 8px',
-  borderRadius: 6,
-  letterSpacing: '0.04em',
+  letterSpacing: 0.6,
+  textTransform: 'uppercase',
+  opacity: 0.55,
 };
 
 const titleStyle: CSSProperties = {
@@ -491,14 +511,14 @@ const scoreboardStyle: CSSProperties = {
   gridTemplateColumns: '1fr auto 1fr',
   alignItems: 'center',
   gap: 12,
-  padding: '8px 0',
+  padding: '14px 0 8px',
 };
 
 const teamSlotStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: 4,
+  gap: 6,
 };
 
 const teamNameStyle: CSSProperties = {
@@ -562,29 +582,30 @@ const lineCellStyle: CSSProperties = {
   borderTop: '1px solid rgba(127,127,127,0.12)',
 };
 
-const metaStyle: CSSProperties = {
-  display: 'flex',
-  gap: 12,
+// Right-column meta in the header — both lines render as the same
+// dim secondary type so they read as one block of supporting context.
+const metaBottomStyle: CSSProperties = {
   fontSize: 12,
   opacity: 0.7,
-  flexWrap: 'wrap',
 };
 
+const metaTopStyle = metaBottomStyle;
+
+// Match AthleteDetailA's sectionHeaderStyle so the two attended-domain
+// cards land on the same type scale (uppercase 11px / 700 / 0.8 ls).
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: 0.8,
   textTransform: 'uppercase',
-  letterSpacing: '0.08em',
   opacity: 0.55,
-  fontWeight: 600,
-  marginBottom: 6,
 };
 
 const notableSectionStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 6,
-  paddingTop: 8,
-  borderTop: '1px solid rgba(127,127,127,0.12)',
+  gap: 10,
+  marginTop: 10,
 };
 
 const performerRowStyle: CSSProperties = {
@@ -594,9 +615,9 @@ const performerRowStyle: CSSProperties = {
 };
 
 const performerAvatarStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 18,
+  width: 40,
+  height: 40,
+  borderRadius: 20,
   position: 'relative',
   overflow: 'hidden',
   flexShrink: 0,
@@ -617,21 +638,30 @@ const performerNameStyle: CSSProperties = {
   minWidth: 0,
 };
 
-const performerNameLineStyle: CSSProperties = {
+const performerHeaderStyle: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 13,
-  fontWeight: 500,
+  alignItems: 'baseline',
+  gap: 10,
+};
+
+const performerNameLineStyle: CSSProperties = {
+  flex: 1,
+  fontSize: 14,
+  fontWeight: 600,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const performerSubStyle: CSSProperties = {
   fontSize: 11,
   opacity: 0.6,
+  marginTop: 1,
 };
 
 const statLineStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontVariantNumeric: 'tabular-nums',
   opacity: 0.85,
   textAlign: 'right',
@@ -661,24 +691,3 @@ const ticketVendorStyle: CSSProperties = {
   opacity: 0.55,
   marginTop: 2,
 };
-
-function decisionBadgeStyle(d: 'W' | 'L' | 'SV' | 'HLD' | 'BS'): CSSProperties {
-  const bg =
-    d === 'W'
-      ? '#16a34a'
-      : d === 'L'
-        ? '#dc2626'
-        : d === 'SV'
-          ? '#2563eb'
-          : 'rgba(127,127,127,0.6)';
-  return {
-    display: 'inline-block',
-    fontSize: 10,
-    fontWeight: 700,
-    color: 'white',
-    background: bg,
-    padding: '1px 5px',
-    borderRadius: 4,
-    letterSpacing: '0.04em',
-  };
-}
