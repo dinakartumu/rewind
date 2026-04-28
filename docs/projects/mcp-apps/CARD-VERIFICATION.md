@@ -184,10 +184,21 @@ weight.
 
 ## When the local build is good, before publishing
 
-If everything above checks out and you want to ship:
+Publishing is automated — never run `npm publish` by hand and never bump
+`mcp-server/package.json` manually. Both will fail CI's drift check
+(`.github/workflows/mcp-server.yml` "Verify release-please manifest
+matches package.json"). The flow is:
 
-1. Bump `mcp-server/package.json` version
-2. `cd mcp-server && npm publish` (2FA prompt expected)
-3. Flip Claude Desktop's connector from `rewind-local` to `rewind`
-4. Re-run a single trigger from above (e.g. `get_recent_watches`) on
-   the published build to confirm parity
+1. Land conventional-commit-prefixed commits (`feat:`, `fix:`, etc.)
+   touching `mcp-server/**` on `main`.
+2. `release-please.yml` opens (or updates) a release PR that bumps
+   `mcp-server/package.json` AND `.release-please-manifest.json`
+   atomically and updates `mcp-server/CHANGELOG.md`.
+3. Merge the release PR. release-please tags the release as
+   `mcp-server-v<version>`.
+4. `mcp-server.yml` reacts to the tag: builds, publishes to npm with
+   provenance, and redeploys the Cloudflare Worker (mcp.rewind.rest).
+5. Flip Claude Desktop's connector from `rewind-local` to `rewind`.
+   On iOS, sign out + sign back in so the new version is picked up.
+6. Re-run a single trigger from above (e.g. `get_recent_watches`) on
+   the published build to confirm parity.
