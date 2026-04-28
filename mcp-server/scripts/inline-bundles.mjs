@@ -1,24 +1,30 @@
 #!/usr/bin/env node
 /**
- * Build each HTML entry in web/ (one at a time with vite-plugin-singlefile,
- * since it's single-entry by design) and emit src/ui-bundles.ts with one
- * exported constant per HTML file.
+ * Build each HTML entry in web/ via Vite's programmatic API and emit
+ * src/ui-bundles.ts with one exported constant per HTML file.
  *
- * Called from `build:web`. Takes no arguments -- the list of entries is
- * hardcoded here so adding a new UI app is one line in this file.
+ * Why programmatic + Promise.all over per-entry `vite build` CLI calls:
+ * each `vite build` cold start is ~5-7s of Node + plugin loader overhead.
+ * Paid once and amortized across all 11 entries it's ~0.5s total; paid
+ * 11x via execSync it's ~70-90s. Same byte-for-byte output, no plugin
+ * surgery needed — vite-plugin-singlefile is single-input by design but
+ * "single Node process running 11 builds" satisfies that constraint.
+ *
+ * Called from `build:web`. Takes no arguments — entries are discovered
+ * from web/*.html.
  */
-import { execSync } from 'node:child_process';
+import { build } from 'vite';
+import react from '@vitejs/plugin-react';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const distDir = join(root, 'web', 'dist');
+const webDir = join(root, 'web');
+const distDir = join(webDir, 'dist');
 const outFile = join(root, 'src', 'ui-bundles.ts');
 
-// Discover entries = every .html file in web/ that isn't under dist/.
-// These are the vite inputs; one `vite build` per entry.
-const webDir = join(root, 'web');
 const entries = readdirSync(webDir).filter(
   (f) => f.endsWith('.html') && f !== 'dist'
 );
@@ -27,12 +33,34 @@ if (!entries.length) {
   process.exit(1);
 }
 
-for (const entry of entries) {
-  console.log(`> vite build INPUT=${entry}`);
-  execSync(`INPUT=${entry} vite build --config web/vite.config.ts`, {
-    cwd: root,
-    stdio: 'inherit',
-  });
+const t0 = Date.now();
+
+// allSettled so a syntax error in one component doesn't mask which other
+// entries succeeded. We surface the failure list explicitly afterward.
+const results = await Promise.allSettled(
+  entries.map((entry) =>
+    build({
+      root: webDir,
+      plugins: [react(), viteSingleFile()],
+      logLevel: 'warn',
+      build: {
+        outDir: distDir,
+        emptyOutDir: false, // each build writes only its own entry
+        rollupOptions: { input: join(webDir, entry) },
+      },
+    })
+  )
+);
+
+const failures = results
+  .map((r, i) => (r.status === 'rejected' ? { entry: entries[i], reason: r.reason } : null))
+  .filter(Boolean);
+if (failures.length) {
+  for (const f of failures) {
+    console.error(`\n[build:web] FAILED ${f.entry}:`);
+    console.error(f.reason?.stack ?? f.reason);
+  }
+  process.exit(1);
 }
 
 function toConstName(filename) {
@@ -67,7 +95,9 @@ parts.push('');
 
 writeFileSync(outFile, parts.join('\n'));
 
-console.log(`\nWrote ${outFile}:`);
+const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+console.log(`\nBuilt ${entries.length} entries in ${elapsed}s.`);
+console.log(`Wrote ${outFile}:`);
 for (const { file, size } of manifest) {
   console.log(`  - ${file}: ${size.toLocaleString()} chars`);
 }

@@ -12,9 +12,13 @@ changes. Local-build inner loop:
 
 ```bash
 cd mcp-server
-npm run build:web        # rebuild HTML bundles into src/ui-bundles.ts
-npm run build            # tsc -> dist/
+npm run build:web        # rebuild HTML bundles into src/ui-bundles.ts (~0.3s)
+npm run build            # tsc -> dist/ (~1s)
 ```
+
+The rebuild is fast (sub-second `build:web` after the 2026-04-28
+programmatic-Vite refactor) so this lives at the top of the inner loop,
+not as a separate ceremony.
 
 Then in Claude Desktop:
 
