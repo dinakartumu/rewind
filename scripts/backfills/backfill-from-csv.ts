@@ -38,11 +38,12 @@
  *     or CLOUDFLARE_API_TOKEN env var
  *
  * Post-run:
- *   The script triggers `POST /v1/admin/reembed-reading` and
- *   `POST /v1/admin/reindex-search` automatically for the user_id=1
- *   reading data. Image enrichment is left to the existing image cron
- *   (it queries reading_items without an image and runs its own
- *   pipeline — typically catches up within 24h).
+ *   The script triggers three admin endpoints in sequence so the new
+ *   rows reach feature parity with cron-synced ones in one shot:
+ *     - POST /v1/reading/admin/backfill-images   (image pipeline)
+ *     - POST /v1/admin/reembed-reading           (Voyage embeddings)
+ *     - POST /v1/admin/reindex-search            (FTS5 index)
+ *   These are idempotent — re-running is safe.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -575,19 +576,75 @@ async function ingestBookmark(
     ]
   );
 
+  // 5. Highlights — fetch any highlights this bookmark has and insert
+  // them. Highlights are searchable separately from the body and
+  // surface in the reading-detail UI; missing them would leave the
+  // ingest "complete on body, partial on annotations".
+  await ingestHighlights(rec.bookmarkId);
+
   return { bookmarkId: rec.bookmarkId, status: 'inserted' };
+}
+
+interface InstapaperHighlight {
+  highlight_id: number;
+  bookmark_id: number;
+  text: string;
+  note: string | null;
+  position: number;
+  time: number;
+}
+
+async function ingestHighlights(bookmarkId: number): Promise<void> {
+  let highlights: InstapaperHighlight[] = [];
+  try {
+    const res = await instapaperRequest(
+      `/1.1/bookmarks/${bookmarkId}/highlights`
+    );
+    highlights = JSON.parse(res) as InstapaperHighlight[];
+  } catch {
+    // Some bookmarks 404 the highlights endpoint; treat as "no highlights".
+    return;
+  }
+  if (!Array.isArray(highlights) || highlights.length === 0) return;
+
+  // Resolve the freshly-inserted reading_items row to get its primary key
+  // — reading_highlights needs item_id (the autoincrement id), not the
+  // Instapaper bookmark_id.
+  const rows = await d1Query<{ id: number }>(
+    `SELECT id FROM reading_items WHERE source = 'instapaper' AND source_id = ? AND user_id = 1 LIMIT 1`,
+    [String(bookmarkId)]
+  );
+  const itemId = rows[0]?.id;
+  if (!itemId) return;
+
+  for (const h of highlights) {
+    await d1Query(
+      `INSERT INTO reading_highlights (
+         user_id, item_id, source_id, text, note, position, created_at
+       ) VALUES (1, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(source_id, user_id) DO NOTHING`,
+      [
+        itemId,
+        String(h.highlight_id),
+        h.text,
+        h.note,
+        h.position ?? 0,
+        new Date((h.time || Date.now() / 1000) * 1000).toISOString(),
+      ]
+    );
+  }
 }
 
 // ─── post-run reembed + reindex ────────────────────────────────────
 
-async function triggerAdmin(path: string): Promise<void> {
+async function triggerAdmin(path: string, body = '{}'): Promise<void> {
   const res = await fetch(`${REWIND_API}${path}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${ENV.REWIND_ADMIN_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: '{}',
+    body,
   });
   if (!res.ok) {
     console.error(`  ${path} failed: ${res.status} ${await res.text()}`);
@@ -699,11 +756,15 @@ async function main() {
 
   if (!dryRun && inserted && !skipFollowup) {
     console.log(`\nTriggering downstream enrichment...`);
-    await triggerAdmin('/v1/admin/reindex-search');
-    await triggerAdmin('/v1/admin/reembed-reading');
-    console.log(
-      `\nImage enrichment is left to the existing image cron — new rows have og_image_url set; the cron will pick them up on its next run.`
+    // Order matters: images first so embeddings + FTS pick up the
+    // image keys; embeddings before reindex so the FTS pass sees
+    // any text adjustments from embed-side normalization.
+    await triggerAdmin(
+      '/v1/reading/admin/backfill-images',
+      JSON.stringify({ limit: Math.max(50, inserted * 2) })
     );
+    await triggerAdmin('/v1/admin/reembed-reading');
+    await triggerAdmin('/v1/admin/reindex-search');
   }
 }
 
