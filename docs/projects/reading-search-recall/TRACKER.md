@@ -91,37 +91,60 @@ Branch: `reading-search-recall` (12 files changed, +697/-80).
       regenerated.
 - [x] **2.9** PR opened.
 
-## Phase 3: Backfill — PENDING
+## Phase 3: Backfill — COMPLETE (2026-04-29)
 
-Run after Phase 2 merges and Worker auto-deploys (~2 min via CI on push
-to main). Sequence matters: re-derive → FTS → embed.
+Sequence matters: re-derive → FTS → embed. Driven by
+`scripts/run-phase3-backfill.ts` against the deployed Worker after
+PR #95 merged + auto-deployed.
 
-- [ ] **3.1** Re-derive `body_excerpt` for the full archive.
-      `POST /admin/backfill-body-excerpt` with `{ force: true,
-limit: 2000 }`, looped until `scanned < limit`. Expected: ~10
-      route calls × 30–60s = 5–15 min.
-- [ ] **3.2** Reindex FTS for reading.
-      `POST /admin/reindex-search` with
-      `{ domains: ["reading"], chunk_size: 2000 }`, looped until
-      `has_more === false`. Expected: ~10 calls × 20–40s = 2–5 min.
-- [ ] **3.3** Reembed Vectorize.
-      `POST /admin/reembed-reading` with
-      `{ limit: 2000, batchSize: 10 }` and incrementing `offset` until
-      `scanned < limit`. Expected: ~10 calls × 2–4 min = 25–40 min.
-      Cost: ~$1 in Voyage tokens.
+- [x] **3.1** Re-derive `body_excerpt` — **16,489 rows updated** across 10
+      calls (~13 min). Each call ~75–95s. Cleanly done.
+- [x] **3.2** Reindex FTS — **client-driven calls completed**, but we
+      hit two real issues that needed mitigation: 1. **Headers timeout at chunk_offset=14000.** Calls were getting
+      slower as offset grew (152s → 293s) because `LIMIT/OFFSET` in
+      SQLite is O(N) on the offset side, not O(1). The next call
+      crossed undici's default 300s headers timeout. Fixes applied
+      to the driver: bumped headers timeout to 600s and shrunk
+      chunk_size from 2000 → 1000. Resumed cleanly from 14000.
+      Followup: switch admin-reindex pagination to id-cursor
+      (WHERE id > last_id) instead of OFFSET — Phase 5.4. 2. **Concurrent reindex from the parallel Instapaper-backfill
+      project.** That project's Phase 2 (no-body recovery) finished
+      around 12:21 PDT and immediately kicked off its own
+      reindex-search reading sweep. The route's
+      `chunk_offset === 0` DELETE step nuked our just-written rows.
+      End state was correct (their reindex re-populated from the
+      same `body_excerpt` column we'd updated), but for ~30 min
+      row counts looked like data loss. Initially diagnosed as
+      D1 replica lag; correct cause was concurrent execution.
+      Followup: add a domain-level advisory lock on
+      reindex-search so two simultaneous calls with chunk_offset=0
+      can't race-DELETE each other's work — Phase 5.6.
+- [x] **3.3** Reembed Vectorize — **19,939 vectors, 19.2M tokens,
+      $0.38**, 40 calls (~50 min). Bumped per-call limit down from
+      2000 → 500 because Voyage calls dominate per-row cost. Clean.
 
-## Phase 4: Validation — PENDING
+## Phase 4: Validation — COMPLETE (2026-04-29)
 
-After backfill, confirm the fix generalizes.
+| Test                                                                            | Pre-fix      | Post-fix                  |
+| ------------------------------------------------------------------------------- | ------------ | ------------------------- |
+| `search(keyword, "Ichiro batting cages")`                                       | 0 results    | rank 1 ✅                 |
+| `search(hybrid, "Ichiro work ethic batting cages")`                             | n/a          | rank 1, 0.031 ✅          |
+| `search(keyword, "Colin Powell hardliner Bush administration")` → 20035 (~3.5K) | 0 results    | rank 1 ✅                 |
+| `search(keyword, "steam room sauna etiquette grooming")` → 20040 (~4.5K)        | 0 results    | rank 1 ✅                 |
+| `search(keyword, "White House Iran missile")` → 20037 (406-char body)           | n/a          | rank 1 (no regression) ✅ |
+| `semantic_search("Ichiro work ethic batting cages Japan training")` → 1121      | rank 5 @ .52 | rank 7 @ .524             |
 
-- [ ] **4.1** Re-run the Ichiro article query in Claude Desktop / iOS;
-      should still surface at rank 1 in keyword/hybrid.
-- [ ] **4.2** Pick 2–3 other long-form articles (audit query identifies
-      candidates with `length(content) > 12000`) and confirm a
-      query targeting their _body_ content (not headline) returns them
-      at rank 1 in keyword mode.
-- [ ] **4.3** Spot-check 2–3 short articles to confirm they're
-      unaffected (content < 3000 chars → no change).
+- [x] **4.1** Ichiro article: keyword and hybrid both rank 1 decisively.
+      Pure semantic dropped 5 → 7 because every other Ichiro biography
+      ALSO got a richer 12K vector and pulled ahead — the dilution
+      effect we documented as a known tradeoff. Hybrid mode +
+      tool-description nudge is the answer for this query class and
+      it works.
+- [x] **4.2** Two long-form body-recall checks at ~3.5K and ~4.5K
+      char depth — both rank 1. FTS body coverage is the headline
+      win.
+- [x] **4.3** Short article (406-char body) still rank 1 on
+      title-keyword search. No regression.
 
 ## Phase 5: Follow-ups — DEFERRED
 
@@ -139,3 +162,28 @@ Filed for future scoping; explicitly out of this project.
       detail API response. With the bump, `excerpt` is now ≤12 KB. Card
       render and `get_article` are confirmed unaffected; check web
       frontend if it pulls `excerpt` for any preview surface.
+- [ ] **5.4** Switch admin-reindex pagination from `LIMIT/OFFSET` to
+      id-cursor (`WHERE id > last_id ORDER BY id LIMIT N`) so chunked
+      reindex performance is constant per call regardless of offset.
+      Today late chunks take ~2× the time of early chunks because
+      SQLite has to walk the prior rows on every offsetted SELECT.
+- [ ] **5.5** Switch admin-reindex pagination from `LIMIT/OFFSET` to
+      id-cursor: see 5.4 (kept here for visibility — the same fix
+      addresses both the perf cliff and the long-tail timeout risk).
+- [ ] **5.6** Add a domain-level advisory lock on
+      `POST /admin/reindex-search`. Two concurrent calls with
+      `chunk_offset=0` race-DELETE each other's writes. The current
+      "DELETE only on chunk 0" pattern assumes a single caller; with
+      multiple agents touching the same domain (real scenario in this
+      project — collided with the Instapaper-backfill project's
+      post-Phase-2 reindex), the loser silently loses work. Cheapest
+      guard: refuse a chunk_offset=0 call if a row was inserted for
+      the domain in the last 60s.
+- [ ] **5.7** The other agent's `recover-no-body.ts` script writes
+      `body_excerpt = text.slice(0, 3000)` (line 381) — predates this
+      project's 12K cap bump. The 561 articles it recovered carry
+      shorter excerpts than the 16,489 we re-derived. In practice
+      doesn't matter (recovered bodies are paywall stubs typically
+      <500 chars), but for strict consistency, run another
+      `force:true` re-derive when convenient. Script update is one
+      line: `text.slice(0, 12000)`.
