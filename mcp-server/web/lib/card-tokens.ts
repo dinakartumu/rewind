@@ -78,7 +78,18 @@ a:active {
 }
 `;
 
-const IOS_RADIUS_OVERRIDE_CSS = `:root { --rewind-card-radius: 0px; }`;
+// iOS override: zero out BOTH our radius and our border. Claude iOS
+// wraps the iframe in its own rounded container with its own visible
+// edge — anything we draw inside competes with that. With radius:0 +
+// transparent border, our card becomes pure content (bg + children)
+// inside Claude's mask, and Claude's host edge is the only thing
+// rendering at the corners. Workbench and Claude Desktop don't get
+// this override (their UA / standalone signals don't match), so they
+// keep the 12px radius + 1px border they need to define their card.
+const IOS_RADIUS_OVERRIDE_CSS = `:root {
+  --rewind-card-radius: 0px;
+  --card-border: transparent;
+}`;
 
 if (typeof document !== 'undefined') {
   if (!document.getElementById(CARD_TOKENS_STYLE_ID)) {
@@ -113,53 +124,6 @@ if (typeof document !== 'undefined') {
       override.id = CARD_TOKENS_IOS_OVERRIDE_STYLE_ID;
       override.textContent = IOS_RADIUS_OVERRIDE_CSS;
       document.head.appendChild(override);
-    }
-  }
-
-  // TEMP DEBUG STRIP — remove after diagnosing the iOS corner-clipping
-  // artifact. Renders a fixed monospace bar at the bottom of the
-  // iframe showing the four signals we care about so we can read
-  // them off a screenshot without Web Inspector access:
-  //   r  = computed --rewind-card-radius (0px = override fired)
-  //   s  = 'standalone' in navigator (iOS WebKit signal)
-  //   t  = navigator.maxTouchPoints
-  //   p  = navigator.platform
-  //   ua = navigator.userAgent
-  if (typeof document !== 'undefined' && typeof navigator !== 'undefined') {
-    const renderDebug = () => {
-      if (document.getElementById('rewind-debug-strip')) return;
-      if (!document.body) return;
-      const debug = document.createElement('div');
-      debug.id = 'rewind-debug-strip';
-      const radius = getComputedStyle(document.documentElement)
-        .getPropertyValue('--rewind-card-radius')
-        .trim();
-      const standalone = 'standalone' in navigator;
-      const touch = navigator.maxTouchPoints ?? 0;
-      const platform = navigator.platform ?? '';
-      const ua = navigator.userAgent;
-      debug.style.cssText = `
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        padding: 4px 6px;
-        background: rgba(0,0,0,0.88);
-        color: #fff;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 9px;
-        line-height: 1.25;
-        z-index: 2147483647;
-        word-break: break-all;
-        pointer-events: none;
-      `;
-      debug.textContent = `r=${radius || '(unset)'} s=${standalone} t=${touch} p=${platform} ua=${ua}`;
-      document.body.appendChild(debug);
-    };
-    if (document.body) {
-      renderDebug();
-    } else {
-      document.addEventListener('DOMContentLoaded', renderDebug);
     }
   }
 }
