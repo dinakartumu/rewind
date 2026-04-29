@@ -428,7 +428,7 @@ function SplitsGrid({
               {s.avg ?? '—'}
             </div>
             <div style={splitSubStyle}>
-              {s.hr ?? 0} HR · {s.rbi ?? 0} RBI · OPS {s.ops ?? '—'}
+              {s.ops ?? '—'} · {s.hr ?? 0} HR · {s.rbi ?? 0} RBI
             </div>
           </div>
         ) : null
@@ -869,8 +869,8 @@ const bigFourCellStyle: CSSProperties = {
 };
 
 const bigFourValueStyle: CSSProperties = {
-  fontSize: 32,
-  fontWeight: 700,
+  fontSize: 28,
+  fontWeight: 600,
   lineHeight: 1,
   fontVariantNumeric: 'tabular-nums',
   letterSpacing: -0.5,
@@ -908,8 +908,8 @@ const splitLabelStyle: CSSProperties = {
 };
 
 const splitValueStyle: CSSProperties = {
-  fontSize: 22,
-  fontWeight: 700,
+  fontSize: 20,
+  fontWeight: 600,
   lineHeight: 1.1,
   fontVariantNumeric: 'tabular-nums',
 };

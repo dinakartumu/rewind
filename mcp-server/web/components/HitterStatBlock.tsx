@@ -124,8 +124,8 @@ const labelStyle: CSSProperties = {
 };
 
 const valueStyle: CSSProperties = {
-  fontSize: 24,
-  fontWeight: 700,
+  fontSize: 22,
+  fontWeight: 600,
   lineHeight: 1.05,
   fontVariantNumeric: 'tabular-nums',
   letterSpacing: -0.4,
