@@ -330,6 +330,11 @@ const ReembedBodySchema = z
     limit: z.number().int().min(1).max(5000).optional(),
     batchSize: z.number().int().min(1).max(50).optional(),
     onlyMissing: z.boolean().optional(),
+    // Pagination cursor — bumps SQL OFFSET so callers can walk past
+    // the first `limit` rows. Necessary for large backfills like the
+    // Instapaper bulk ingest where 20K+ rows need embedding but the
+    // route caps at 5000 per call.
+    offset: z.number().int().min(0).optional(),
   })
   .optional();
 
@@ -370,16 +375,23 @@ const reembedRoute = createRoute({
 adminReindex.openapi(reembedRoute, async (c) => {
   const db = createDb(c.env.DB);
   const body = (await c.req.json().catch(() => undefined)) as
-    | { limit?: number; batchSize?: number; onlyMissing?: boolean }
+    | {
+        limit?: number;
+        batchSize?: number;
+        onlyMissing?: boolean;
+        offset?: number;
+      }
     | undefined;
   const limit = body?.limit ?? 2000;
   const batchSize = body?.batchSize ?? 10;
+  const offset = body?.offset ?? 0;
 
   const t0 = Date.now();
 
   // Select candidates: anything with *some* indexable text. We skip the
   // `onlyMissing` filter for now since Vectorize doesn't expose a cheap
   // "does vector exist" predicate; re-running is idempotent (upsert).
+  // ORDER BY id makes pagination deterministic across calls.
   const rows = await db
     .select({
       id: readingItems.id,
@@ -392,7 +404,9 @@ adminReindex.openapi(reembedRoute, async (c) => {
     })
     .from(readingItems)
     .where(eq(readingItems.userId, 1))
-    .limit(limit);
+    .orderBy(readingItems.id)
+    .limit(limit)
+    .offset(offset);
 
   const articles: ArticleForEmbedding[] = rows.map((r) => ({
     id: r.id,

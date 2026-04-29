@@ -36,7 +36,26 @@ Status: **in progress**
 
 ## Phase 1 — bulk ingest with `archived=1`
 
-Status: **pending Phase 0**
+Status: **ingest complete (2026-04-29 00:26 PDT) — admin enrichment partial**
+
+Final ingest numbers:
+
+|                                             | Count      | % of CSV  |
+| ------------------------------------------- | ---------- | --------- |
+| Total in DB                                 | **19,938** | **99.9%** |
+| `completed` (full body)                     | **16,200** | **81.2%** |
+| `no_body` (URL+title only — Phase 2 target) | **3,733**  | **18.7%** |
+| `failed` (transient D1 hiccups)             | 5          | 0.025%    |
+
+Wall time: ~7h 50m for ~16,300 ingested. ~$0.30 in Voyage tokens (only the first 2K embedded — see admin status below).
+
+Post-run admin status:
+
+- ✅ **Image pipeline**: deferred to the live cron (runs every 15 min, will catch up over hours/days)
+- ⚠️ **Reembed-reading**: only 2K of ~20K embedded. The route caps `limit` at 5000 and has no `offset` param, so calling repeatedly returns the same first rows. Need to deploy an `offset` patch (`src/routes/admin-reindex.ts:328-395`, already coded but blocked on wrangler re-auth) and loop 4 batches.
+- ⚠️ **Reindex-search**: Cloudflare 1102 (CPU exhaustion) when rebuilding all five domains at once. Need to retry scoped to `{"domains":["reading"]}` to avoid touching the 45K-row listening index.
+
+Next step requires `npx wrangler login` (the user-action API token has D1-only scope; wrangler deploy needs Workers Scripts permissions).
 
 **Inputs:** updated script, fresh CF API token, full CSV.
 
@@ -135,6 +154,9 @@ Status: **pending Phase 2**
 - **WSJ articles stay no_body.** Both `getText` and ScraperAPI fail. WSJ's paywall is sophisticated; even residential IPs return paywall stubs. User keeps URL+title in DB, can navigate to WSJ.com if they have an active subscription.
 - **~31 custom-folder articles flatten to Archive.** Backfill ingests them but loses the user-defined folder (e.g., "Pete & Pete", "David Foster Wallace"). User can re-categorize manually in Instapaper after; not blocking.
 - **Notification spam during Phase 1 was a real risk** — solved by `archived=1` parameter to `bookmarks/add`. Don't regress.
+- **Reembed/reindex admin endpoints have client-side timeout risk.** The script's `triggerAdmin` uses default Node undici 5-min headers timeout, which is shorter than the time these endpoints can take for ~20K-row operations. Either run them via curl with `--max-time`, or update the script to set a longer `AbortSignal.timeout`. The endpoints themselves complete fine server-side — only the client fetch errors out.
+- **Reindex-search 1102 on full rebuild.** With ~65K rows across all domains (after the Instapaper backfill), the all-domains reindex hits Cloudflare Workers CPU limits. Use `{"domains":["reading"]}` to scope per-domain.
+- **Reembed-reading needs offset for >5K rows.** Route caps `limit` at 5000. The offset patch (added 2026-04-29, blocked on deploy) lets callers paginate through.
 
 ## Reference
 
