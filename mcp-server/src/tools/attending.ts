@@ -255,13 +255,16 @@ export function registerAttendingTools(
         const lines = [
           `Attended events (page ${page} of ${data.pagination.total_pages}, ${data.pagination.total} total):`,
         ];
-        for (const [i, e] of data.data.entries()) {
+        for (const e of data.data) {
           const date = formatDate(e.event_date);
           const venue = e.venue ? ` @ ${e.venue.name}` : '';
           const score = e.subtitle ? ` -- ${e.subtitle}` : '';
           const noShow = e.attended ? '' : ' [no-show]';
+          // Lead with `id=N` so Claude can pass it directly to
+          // `get_attended_event(id)` for the rich card. Matches the
+          // pattern used by `get_attended_players`.
           lines.push(
-            `${i + 1}. ${date} -- ${e.title}${venue}${score}${noShow}`
+            `id=${e.id} ${date} -- ${e.title}${venue}${score}${noShow}`
           );
         }
 
@@ -321,7 +324,9 @@ export function registerAttendingTools(
           const venue = e.venue ? ` @ ${e.venue.name}` : '';
           const score = e.subtitle ? ` -- ${e.subtitle}` : '';
           const noShow = e.attended ? '' : ' [no-show]';
-          lines.push(`${date}: ${e.title}${venue}${score}${noShow}`);
+          // Lead with `id=N` so Claude can pass it directly to
+          // `get_attended_event(id)` for the rich card.
+          lines.push(`id=${e.id} ${date}: ${e.title}${venue}${score}${noShow}`);
         }
 
         return {
