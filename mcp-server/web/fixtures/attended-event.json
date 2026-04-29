@@ -167,7 +167,20 @@
     "longitude": -122.3325,
     "capacity": 47929
   },
-  "tickets": [],
+  "tickets": [
+    {
+      "id": 1,
+      "vendor": "seatgeek",
+      "order_id": "6P2-8YP454J",
+      "section": "183",
+      "row": "12",
+      "seat": "18",
+      "quantity": 1,
+      "total_price_cents": 7290,
+      "currency": "USD",
+      "purchased_at": null
+    }
+  ],
   "players": [
     {
       "player": {

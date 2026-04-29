@@ -8,6 +8,14 @@ import type { Photo, Team } from './types.js';
 // rather than imported so this card can evolve independently as the
 // inline-render needs diverge from the season-grid card.
 
+// Toggle for the ticket section at the bottom of the card. Currently
+// hidden in production while we figure out the right styling and
+// when it's actually useful (most users don't care about their seat
+// number after the fact). The TicketBlock component + the tickets
+// array on EventDetail stay in place so flipping this back to true
+// re-enables the section without code archaeology.
+const SHOW_TICKETS = false;
+
 export type { Photo };
 
 export type LineScoreInning = {
@@ -158,7 +166,9 @@ export function GameCard({ event }: { event: EventDetail }) {
         </section>
       )}
 
-      {event.tickets.length > 0 && <TicketBlock tickets={event.tickets} />}
+      {SHOW_TICKETS && event.tickets.length > 0 && (
+        <TicketBlock tickets={event.tickets} />
+      )}
     </div>
   );
 }
