@@ -335,16 +335,36 @@ export default {
             `[SYNC] Retrying failed attending sync (${attendingRetry.consecutiveFailures} consecutive failures)`
           );
         }
-        console.log('[SYNC] Attending refresh (calendar + gmail)');
+        console.log(
+          '[SYNC] Attending refresh (calendar + gmail) + MLB box-score enrichment'
+        );
+        // Chain MLB box-score enrichment after the calendar/gmail backfill
+        // so newly-discovered games get attendance / weather / duration /
+        // linescore populated within 24h. enrichAttendedBoxScores is
+        // idempotent (skipEnriched: true) so already-enriched games are
+        // no-ops; the admin route remains available for one-shot
+        // backfills if you need to force an earlier refresh.
         ctx.waitUntil(
           backfillAttending(db, env, {
             source: 'all',
             mode: 'incremental',
-          }).catch((err) =>
-            console.log(
-              `[ERROR] Attending sync failed: ${err instanceof Error ? err.message : String(err)}`
+          })
+            .then(async () => {
+              const { enrichAttendedBoxScores } =
+                await import('./services/attending/enrich-boxscore.js');
+              const result = await enrichAttendedBoxScores(db, {
+                skipEnriched: true,
+                limit: 100,
+              });
+              console.log(
+                `[SYNC] Attending box-score enrichment: scanned=${result.scanned}, enriched=${result.enriched}, failures=${result.failures.length}`
+              );
+            })
+            .catch((err) =>
+              console.log(
+                `[ERROR] Attending sync/enrich failed: ${err instanceof Error ? err.message : String(err)}`
+              )
             )
-          )
         );
         break;
       }
