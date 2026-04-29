@@ -34,6 +34,12 @@
 // live in this file; components only carry the className.
 
 import { type CSSProperties } from 'react';
+import {
+  CARD_BG_DARK,
+  CARD_BG_LIGHT,
+  CARD_BORDER_DARK,
+  CARD_BORDER_LIGHT,
+} from './colors.mjs';
 
 export const CARD_TOKENS_STYLE_ID = 'rewind-card-tokens';
 export const CARD_TOKENS_IOS_OVERRIDE_STYLE_ID = 'rewind-card-tokens-ios';
@@ -45,16 +51,18 @@ export const CARD_TOKENS_CSS = `
 html, body {
   margin: 0;
   padding: 0;
-  /* Match Claude's loading-surface colors so the brief paint window
-     before our card mounts blends with the host shimmer. Transparent
-     used to fall through to browser-default white on iOS for a frame
-     before our content rendered. Workbench overrides this via
-     host-styles.ts with a page bg keyed to its manual theme toggle. */
-  background: #F3F0EF;
+  /* Body bg = card bg so the iframe paints as the card surface
+     directly. Earlier versions matched Claude's loading-surface
+     color (#F3F0EF / #121212) to blend with the host shimmer,
+     but that produced two visible transitions (shimmer →
+     loading-match → card). Using the card bg collapses to one
+     (shimmer → card-shape → content fills in). Workbench
+     overrides via host-styles.ts. */
+  background: ${CARD_BG_LIGHT};
 }
 @media (prefers-color-scheme: dark) {
   html, body {
-    background: #121212;
+    background: ${CARD_BG_DARK};
   }
 }
 :root {
@@ -63,14 +71,14 @@ html, body {
      themeStyleSheet overrides this with the explicit toggle value;
      iOS WebKit picks up the system theme. */
   color-scheme: light dark;
-  --card-bg: #fcfcfa;
-  --card-border: #d9d9d9;
+  --card-bg: ${CARD_BG_LIGHT};
+  --card-border: ${CARD_BORDER_LIGHT};
   --rewind-card-radius: 12px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --card-bg: #272726;
-    --card-border: #383836;
+    --card-bg: ${CARD_BG_DARK};
+    --card-border: ${CARD_BORDER_DARK};
   }
 }
 .${CARD_OUTER_CLASSNAME} {

@@ -19,6 +19,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  CARD_BG_DARK,
+  CARD_BG_LIGHT,
+} from '../web/lib/colors.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webDir = join(root, 'web');
@@ -35,23 +39,25 @@ if (!entries.length) {
 
 const t0 = Date.now();
 
-// Inject the loading-surface body bg directly into each HTML's <head>
-// so the browser paints it as soon as the iframe document loads —
-// before our JS bundle parses and before card-tokens.ts runs its
-// runtime CSS injection. Without this, iOS WebKit briefly shows
-// browser-default white in the gap between Claude's shimmer
-// disappearing and our React app mounting. Values match Claude's
-// known loading-surface colors (#F3F0EF light / #121212 dark) so
-// the transition into our card chrome is seamless.
+// Inject the card bg directly into each HTML's <head> so the browser
+// paints it as soon as the iframe document loads — before our JS
+// bundle parses and before card-tokens.ts runs its runtime CSS
+// injection. Values come from web/lib/colors.mjs (single source of
+// truth), shared with card-tokens.ts and host-styles.ts. Earlier
+// versions tried Claude's loading-surface color (#F3F0EF / #121212)
+// to blend with the host shimmer, but that produced two visible
+// transitions (shimmer → loading-match → card). Using the card bg
+// collapses to one transition: shimmer → card-shape (briefly
+// empty) → content fills in.
 const LOADING_BG_STYLE = `<style>
 html, body {
   margin: 0;
   padding: 0;
-  background: #F3F0EF;
+  background: ${CARD_BG_LIGHT};
 }
 @media (prefers-color-scheme: dark) {
   html, body {
-    background: #121212;
+    background: ${CARD_BG_DARK};
   }
 }
 </style>`;
@@ -80,7 +86,7 @@ const injectLoadingBg = {
   transformIndexHtml(html) {
     let out = html.replace(
       /<html\b/,
-      '<html style="color-scheme:light dark;background:light-dark(#F3F0EF,#121212)"'
+      `<html style="color-scheme:light dark;background:light-dark(${CARD_BG_LIGHT},${CARD_BG_DARK})"`
     );
     out = out.replace(/<head>\s*/, `<head>\n${LOADING_BG_STYLE}\n`);
     return out;

@@ -4,6 +4,13 @@
  * values, so these are eyeballed from observed renders and refined as we
  * iterate. The host can change these any time — treat as best-effort.
  */
+import {
+  CARD_BG_DARK,
+  CARD_BG_LIGHT,
+  CARD_BORDER_DARK,
+  CARD_BORDER_LIGHT,
+} from '../../../web/lib/colors.mjs';
+
 export type Theme = 'light' | 'dark';
 
 const lightVars: Record<string, string> = {
@@ -25,8 +32,8 @@ const lightVars: Record<string, string> = {
   // a distinct surface even before the border kicks in. Anthropic's
   // "Ivory Light" — warm-tinted off-white that fits Claude's brand
   // rather than the slightly bluish neutral grays.
-  '--card-bg': '#fcfcfa',
-  '--card-border': '#d9d9d9',
+  '--card-bg': CARD_BG_LIGHT,
+  '--card-border': CARD_BORDER_LIGHT,
   // Bug-bait: GameCard.tsx references --color-bg-secondary instead of
   // --color-background-secondary. We deliberately don't define the typo'd
   // name so the workbench surfaces the inconsistency.
@@ -43,8 +50,8 @@ const darkVars: Record<string, string> = {
   '--color-background-primary': '#3a3938',
   '--color-background-secondary': 'rgba(255,255,255,0.06)',
   '--color-border-tertiary': 'rgba(255,255,255,0.12)',
-  '--card-bg': '#272726',
-  '--card-border': '#383836',
+  '--card-bg': CARD_BG_DARK,
+  '--card-border': CARD_BORDER_DARK,
 };
 
 // Workbench page background — matched to Claude Desktop's light surface
