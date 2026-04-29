@@ -50,6 +50,40 @@ function paginate(page: number, limit: number, total: number) {
   return { page, limit, total, total_pages: Math.ceil(total / limit) };
 }
 
+// Strip Latin diacritics from a user-supplied query string by
+// NFD-normalizing into base char + combining marks, then dropping
+// the marks. Pairs with the SQL `replace()` chain below so both
+// sides of LIKE compare with no accents.
+function foldDiacritics(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// SQL-side accent fold for the most common Latin diacritics in MLB
+// player + team data — Spanish / Portuguese names. Lower()s the
+// column first, then strips the lowercase diacritics we know
+// appear in the dataset. Cloudflare D1's SQLite has no built-in
+// unaccent / custom collations, so the chained replace() is the
+// portable equivalent.
+const DIACRITIC_FOLDS: ReadonlyArray<readonly [string, string]> = [
+  ['á', 'a'],
+  ['é', 'e'],
+  ['í', 'i'],
+  ['ó', 'o'],
+  ['ú', 'u'],
+  ['ü', 'u'],
+  ['ñ', 'n'],
+  ['ç', 'c'],
+  ['ã', 'a'],
+  ['õ', 'o'],
+];
+
+function foldedColumnSql(col: typeof players.fullName) {
+  return DIACRITIC_FOLDS.reduce(
+    (acc, [from, to]) => sql`replace(${acc}, ${from}, ${to})`,
+    sql`lower(${col})`
+  );
+}
+
 function parseJson<T = unknown>(raw: string | null): T | null {
   if (!raw) return null;
   try {
@@ -906,8 +940,12 @@ attending.openapi(playersListRoute, async (c) => {
   if (league) conditions.push(eq(players.league, league));
   if (team_id) conditions.push(eq(players.primaryTeamId, team_id));
   if (name) {
+    // Accent-insensitive substring match. Both sides of LIKE are
+    // lowercased + diacritic-stripped so e.g. `Rodriguez` matches
+    // the stored `Rodríguez` (Julio, Joely, etc.).
+    const folded = foldDiacritics(name).toLowerCase();
     conditions.push(
-      sql`lower(${players.fullName}) LIKE ${`%${name.toLowerCase()}%`}`
+      sql`${foldedColumnSql(players.fullName)} LIKE ${`%${folded}%`}`
     );
   }
   const where = and(...conditions);
