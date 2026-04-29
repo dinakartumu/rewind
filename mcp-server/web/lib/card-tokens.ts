@@ -89,18 +89,31 @@ if (typeof document !== 'undefined') {
   }
 
   // iOS-only override: see the radius-control comment at the top of
-  // the file for the rationale. UA sniffing is the simplest reliable
-  // signal — Claude Desktop's Electron Chromium and the workbench's
-  // host browser never match this regex.
+  // the file for the rationale. We use multiple signals because
+  // Claude iOS's WKWebView may use a custom UA string that doesn't
+  // include "iPhone/iPad/iPod":
+  //   - `'standalone' in navigator` is the most reliable — that
+  //     property exists only on iOS Safari and WKWebView. Survives
+  //     UA spoofing.
+  //   - UA regex catches stock iOS / mobile-web fallbacks.
+  //   - The iPad-on-macOS trick (Macintosh UA + touch points) catches
+  //     iPads that report as desktop Mac.
+  // Claude Desktop's Electron Chromium fails all three.
   if (
     typeof navigator !== 'undefined' &&
-    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
     !document.getElementById(CARD_TOKENS_IOS_OVERRIDE_STYLE_ID)
   ) {
-    const override = document.createElement('style');
-    override.id = CARD_TOKENS_IOS_OVERRIDE_STYLE_ID;
-    override.textContent = IOS_RADIUS_OVERRIDE_CSS;
-    document.head.appendChild(override);
+    const ua = navigator.userAgent;
+    const isIOS =
+      'standalone' in navigator ||
+      /iPad|iPhone|iPod/.test(ua) ||
+      (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      const override = document.createElement('style');
+      override.id = CARD_TOKENS_IOS_OVERRIDE_STYLE_ID;
+      override.textContent = IOS_RADIUS_OVERRIDE_CSS;
+      document.head.appendChild(override);
+    }
   }
 }
 
