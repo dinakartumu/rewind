@@ -430,7 +430,7 @@ export function registerAttendingTools(
     {
       title: 'Athlete — detail',
       description:
-        'Detailed athlete card for an MLB / NFL / NCAAF / NBA player you\'ve watched play in person. **Use this whenever the user asks how a specific player is performing this season, what their batting average / ERA / current stats are, how their career has gone, or how they\'ve played in the games you attended** — e.g. "how\'s JP Crawford playing this year", "what are Cal Raleigh\'s numbers", "show me Kirby\'s stats", "tell me about Julio Rodriguez". Returns bio (position, jersey, debut, height/weight, college, awards), team logo, current-season stats (live MLB Stats API for MLB players, KV-cached 1h), career-by-season table, home/away/L-R splits, your-attended summary aggregated across every attended game, and the 10 most recent attended appearances with their stat lines. MLB-only for the live-stats panel — non-MLB players surface as supported:false. In MCP Apps hosts, renders the rich inline athlete card. If you do not have the player id, first call `get_attended_players` with `name` to resolve the id, then call this to render the card.',
+        'Detailed athlete card for an MLB / NFL / NCAAF / NBA player you\'ve watched play in person. **Use this whenever the user asks how a specific player is performing this season, what their batting average / ERA / current stats are, how their career has gone, or how they\'ve played in the games you attended** — e.g. "how\'s JP Crawford playing this year", "what are Cal Raleigh\'s numbers", "show me Kirby\'s stats", "tell me about Julio Rodriguez". Returns bio (position, jersey, debut, height/weight, college, awards), team logo, current-season stats (live MLB Stats API for MLB players, KV-cached 1h), career-by-season table, home/away/L-R splits, the **season_attended_summary** (this player\'s line in only the games you attended this season — use this to answer "how has he done in the games I\'ve been to this year"), the **attended_summary** (career line across every game you\'ve ever seen this player in), and the 10 most recent attended appearances. Trust season_attended_summary.games_attended as the count of games you\'ve attended this season — do NOT derive it by filtering attended_appearances yourself; that array is capped at 10 most-recent and will undercount for players you see often. MLB-only for the live-stats panel — non-MLB players surface as supported:false. In MCP Apps hosts, renders the rich inline athlete card. If you do not have the player id, first call `get_attended_players` with `name` to resolve the id, then call this to render the card.',
       inputSchema: {
         id: z.number().int().describe('Player id.'),
         ...includeImagesParam,
@@ -483,6 +483,15 @@ export function registerAttendingTools(
               hitter: Record<string, unknown> | null;
               pitcher: Record<string, unknown> | null;
             };
+            season_attended_summary: {
+              games_attended: number;
+              games_with_box_score: number;
+              wins: number;
+              losses: number;
+              hitter: Record<string, unknown> | null;
+              pitcher: Record<string, unknown> | null;
+            } | null;
+            season_attended_summary_season: number | null;
             appearances: Array<{
               event_id: number;
               event_date: string;
@@ -535,12 +544,39 @@ export function registerAttendingTools(
           );
         }
 
-        // Attended summary — your stat line from games you attended.
+        // Season-scoped attended summary — surfaced before the career line
+        // so the model has the "this year, in games I've seen" answer
+        // pre-computed and doesn't have to filter the appearance list.
+        // Skip when zero games (preseason, or player you've never seen
+        // play in the active season).
+        const seasonSum = data.season_attended_summary;
+        const seasonLabel = data.season_attended_summary_season;
+        if (seasonSum && seasonSum.games_attended > 0 && seasonLabel != null) {
+          if (seasonSum.hitter) {
+            const h = seasonSum.hitter;
+            lines.push(
+              '',
+              `In ${seasonSum.games_attended} ${seasonLabel} game${seasonSum.games_attended === 1 ? '' : 's'} you attended: ${h.h ?? 0}-for-${h.ab ?? 0} (.${(h.avg ?? '.000').toString().replace(/^\./, '')}), ${h.hr ?? 0} HR, ${h.rbi ?? 0} RBI`
+            );
+          } else if (seasonSum.pitcher) {
+            const p = seasonSum.pitcher;
+            const dec = p.decisions as
+              | { w: number; l: number; sv: number }
+              | undefined;
+            lines.push(
+              '',
+              `In ${seasonSum.games_attended} ${seasonLabel} game${seasonSum.games_attended === 1 ? '' : 's'} you attended: ${p.ip ?? '0'} IP, ${p.k ?? 0} K, ${p.era ?? '0.00'} ERA${dec ? ` (${dec.w ?? 0}-${dec.l ?? 0})` : ''}`
+            );
+          }
+        }
+
+        // Career attended summary — your stat line across every game
+        // you've ever seen this player in.
         if (data.attended_summary.hitter) {
           const h = data.attended_summary.hitter;
           lines.push(
             '',
-            `In ${data.attended_summary.games_attended} games you attended: ${h.h ?? 0} hits in ${h.ab ?? 0} AB, ${h.hr ?? 0} HR, ${h.rbi ?? 0} RBI`
+            `Across all ${data.attended_summary.games_attended} games you've ever attended: ${h.h ?? 0} hits in ${h.ab ?? 0} AB, ${h.hr ?? 0} HR, ${h.rbi ?? 0} RBI`
           );
         } else if (data.attended_summary.pitcher) {
           const p = data.attended_summary.pitcher;
@@ -549,7 +585,7 @@ export function registerAttendingTools(
             | undefined;
           lines.push(
             '',
-            `In ${data.attended_summary.games_attended} games you attended: ${p.ip ?? '0'} IP, ${p.k ?? 0} K, ${p.era ?? '0.00'} ERA${dec ? ` (${dec.w ?? 0}-${dec.l ?? 0})` : ''}`
+            `Across all ${data.attended_summary.games_attended} games you've ever attended: ${p.ip ?? '0'} IP, ${p.k ?? 0} K, ${p.era ?? '0.00'} ERA${dec ? ` (${dec.w ?? 0}-${dec.l ?? 0})` : ''}`
           );
         }
 
@@ -605,6 +641,8 @@ export function registerAttendingTools(
           career: data.career,
           splits: data.splits,
           attended_summary: data.attended_summary,
+          season_attended_summary: data.season_attended_summary,
+          season_attended_summary_season: data.season_attended_summary_season,
           attended_appearances: data.appearances.slice(0, 10).map((a) => ({
             event_id: a.event_id,
             event_date: a.event_date,

@@ -21014,7 +21014,19 @@
                     "splits": {
                       "description": "Current-season home/away/vs-LHP/vs-RHP splits. KV-cached 6h. Null when unavailable."
                     },
-                    "attended_summary": {},
+                    "attended_summary": {
+                      "description": "Career-scoped: your stat line aggregated across every attended game where this player appeared."
+                    },
+                    "season_attended_summary": {
+                      "description": "Current-season slice of attended_summary: this player's line across only the games you attended in `season_attended_summary_season`. Null for non-MLB players or when no season-stats season can be resolved."
+                    },
+                    "season_attended_summary_season": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Season the season_attended_summary covers (matches season_stats.season when available, otherwise the current calendar year UTC)."
+                    },
                     "appearances": {
                       "type": "array",
                       "items": {
@@ -21099,6 +21111,7 @@
                     "photo_silo",
                     "photo_full",
                     "supported",
+                    "season_attended_summary_season",
                     "appearances",
                     "appearance_count"
                   ]

@@ -1023,7 +1023,18 @@ const playerDetailRoute = createRoute({
               description:
                 'Current-season home/away/vs-LHP/vs-RHP splits. KV-cached 6h. Null when unavailable.',
             }),
-            attended_summary: z.any(),
+            attended_summary: z.any().openapi({
+              description:
+                'Career-scoped: your stat line aggregated across every attended game where this player appeared.',
+            }),
+            season_attended_summary: z.any().nullable().openapi({
+              description:
+                "Current-season slice of attended_summary: this player's line across only the games you attended in `season_attended_summary_season`. Null for non-MLB players or when no season-stats season can be resolved.",
+            }),
+            season_attended_summary_season: z.number().nullable().openapi({
+              description:
+                'Season the season_attended_summary covers (matches season_stats.season when available, otherwise the current calendar year UTC).',
+            }),
             appearances: z.array(
               z.object({
                 event_id: z.number(),
@@ -1112,15 +1123,29 @@ attending.openapi(playerDetailRoute, async (c) => {
     ]);
   }
 
-  // "In games you attended" aggregate. Reuses the existing helper from
-  // attending-deep-stats Phase 2 (career scope by default — single-season
-  // samples are tiny per the audit there). Non-MLB falls through to a
-  // null hitter/pitcher pair via the helper's existing unsupported path,
-  // which we coerce here into the card-friendly null shape.
+  // "In games you attended" aggregates. Career is the headline number
+  // (full sample); season is what the model needs to answer "how's he
+  // doing this year in the games I've seen." Both run in parallel
+  // against the same indexed join.
+  //
+  // Season choice: prefer the season MLB Stats API just told us is
+  // active (`season_stats.season`) — handles spring training and the
+  // Feb/Mar rollover cleanly. Falls back to the current calendar year
+  // (UTC) for non-MLB or when season_stats is unavailable.
+  const summarySeason = season_stats?.season ?? new Date().getUTCFullYear();
   let attended_summary: AttendedSummary;
+  let season_attended_summary: AttendedSummary | null;
   try {
-    const aggregate = await aggregatePlayerStats(db, p.id);
-    attended_summary = buildAttendedSummary(aggregate);
+    const [career, seasonSlice] = await Promise.all([
+      aggregatePlayerStats(db, p.id),
+      p.league === 'mlb'
+        ? aggregatePlayerStats(db, p.id, summarySeason)
+        : Promise.resolve(null),
+    ]);
+    attended_summary = buildAttendedSummary(career);
+    season_attended_summary = seasonSlice
+      ? buildAttendedSummary(seasonSlice)
+      : null;
   } catch (err) {
     if (err instanceof PlayerNotFoundError) {
       return notFound(c, 'Player not found') as any;
@@ -1140,6 +1165,8 @@ attending.openapi(playerDetailRoute, async (c) => {
       career,
       splits,
       attended_summary,
+      season_attended_summary,
+      season_attended_summary_season: p.league === 'mlb' ? summarySeason : null,
       appearances: appearances
         .filter((r) => r.attended_events != null)
         .map((r) => {
