@@ -115,6 +115,53 @@ if (typeof document !== 'undefined') {
       document.head.appendChild(override);
     }
   }
+
+  // TEMP DEBUG STRIP — remove after diagnosing the iOS corner-clipping
+  // artifact. Renders a fixed monospace bar at the bottom of the
+  // iframe showing the four signals we care about so we can read
+  // them off a screenshot without Web Inspector access:
+  //   r  = computed --rewind-card-radius (0px = override fired)
+  //   s  = 'standalone' in navigator (iOS WebKit signal)
+  //   t  = navigator.maxTouchPoints
+  //   p  = navigator.platform
+  //   ua = navigator.userAgent
+  if (typeof document !== 'undefined' && typeof navigator !== 'undefined') {
+    const renderDebug = () => {
+      if (document.getElementById('rewind-debug-strip')) return;
+      if (!document.body) return;
+      const debug = document.createElement('div');
+      debug.id = 'rewind-debug-strip';
+      const radius = getComputedStyle(document.documentElement)
+        .getPropertyValue('--rewind-card-radius')
+        .trim();
+      const standalone = 'standalone' in navigator;
+      const touch = navigator.maxTouchPoints ?? 0;
+      const platform = navigator.platform ?? '';
+      const ua = navigator.userAgent;
+      debug.style.cssText = `
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 4px 6px;
+        background: rgba(0,0,0,0.88);
+        color: #fff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+        line-height: 1.25;
+        z-index: 2147483647;
+        word-break: break-all;
+        pointer-events: none;
+      `;
+      debug.textContent = `r=${radius || '(unset)'} s=${standalone} t=${touch} p=${platform} ua=${ua}`;
+      document.body.appendChild(debug);
+    };
+    if (document.body) {
+      renderDebug();
+    } else {
+      document.addEventListener('DOMContentLoaded', renderDebug);
+    }
+  }
 }
 
 // Spread into the cardStyle of any top-level container component.
