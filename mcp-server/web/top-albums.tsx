@@ -4,6 +4,7 @@ import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { AlbumGrid } from './components/AlbumGrid.js';
 import type { TopItem } from './components/AlbumCard.js';
 import { rootStyle } from './lib/root-style.js';
+import { stateStyle } from './lib/state-style.js';
 
 type TopAlbumsPayload = {
   period: string;
@@ -56,14 +57,6 @@ function TopAlbumsApp() {
     </div>
   );
 }
-
-const stateStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  padding: 24,
-  textAlign: 'center',
-  opacity: 0.6,
-  fontSize: 14,
-};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

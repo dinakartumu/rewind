@@ -4,6 +4,7 @@ import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { PosterGrid } from './components/PosterGrid.js';
 import type { Watch } from './components/PosterCard.js';
 import { rootStyle } from './lib/root-style.js';
+import { stateStyle } from './lib/state-style.js';
 
 type RecentWatchesPayload = {
   items: Watch[];
@@ -52,14 +53,6 @@ function RecentWatchesApp() {
     </div>
   );
 }
-
-const stateStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  padding: 24,
-  textAlign: 'center',
-  opacity: 0.6,
-  fontSize: 14,
-};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

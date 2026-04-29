@@ -8,6 +8,7 @@ import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { AthleteDetailA } from './components/AthleteDetailA.js';
 import type { AthletePayload } from './components/AthleteDetail.js';
 import { rootStyle } from './lib/root-style.js';
+import { stateStyle } from './lib/state-style.js';
 
 function AthleteApp() {
   const { app, isConnected, error } = useApp({
@@ -45,14 +46,6 @@ function AthleteApp() {
     </div>
   );
 }
-
-const stateStyle: CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  padding: 24,
-  textAlign: 'center',
-  opacity: 0.6,
-  fontSize: 14,
-};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

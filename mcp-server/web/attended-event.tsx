@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { GameCard, type EventDetail } from './components/GameCard.js';
 import { rootStyle } from './lib/root-style.js';
+import { stateStyle } from './lib/state-style.js';
 
 function AttendedEventApp() {
   const { app, isConnected, error } = useApp({
@@ -34,14 +35,6 @@ function AttendedEventApp() {
     </div>
   );
 }
-
-const stateStyle: CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  padding: 24,
-  textAlign: 'center',
-  opacity: 0.6,
-  fontSize: 14,
-};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

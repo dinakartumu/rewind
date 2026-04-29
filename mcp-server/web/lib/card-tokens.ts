@@ -45,6 +45,13 @@ export const CARD_TOKENS_CSS = `
 html, body {
   margin: 0;
   padding: 0;
+  /* Transparent body so the host's container bg shows through —
+     keeps the loading states ("Waiting for article…", etc.) from
+     flashing browser-default white before the card chrome paints.
+     Production hosts (Claude iOS / Desktop) have their own surface
+     under the iframe. The workbench overrides this in
+     host-styles.ts with an explicit page bg per theme. */
+  background: transparent;
 }
 :root {
   --card-bg: #fcfcfa;

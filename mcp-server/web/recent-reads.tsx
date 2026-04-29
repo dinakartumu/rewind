@@ -4,6 +4,7 @@ import { useApp, useHostStyles } from '@modelcontextprotocol/ext-apps/react';
 import { ArticleList } from './components/ArticleList.js';
 import type { Article } from './components/ArticleCard.js';
 import { rootStyle } from './lib/root-style.js';
+import { stateStyle } from './lib/state-style.js';
 
 type RecentReadsPayload = {
   items: Article[];
@@ -50,14 +51,6 @@ function RecentReadsApp() {
     </div>
   );
 }
-
-const stateStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans, system-ui, -apple-system, sans-serif)',
-  padding: 24,
-  textAlign: 'center',
-  opacity: 0.6,
-  fontSize: 14,
-};
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
