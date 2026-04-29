@@ -11,6 +11,7 @@ coverage/
 .claudelint-cache/
 .claude/settings.local.json
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 scripts/**/.*.json
 scripts/**/.tmp-sql.sql
 scripts/**/*.csv

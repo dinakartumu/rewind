@@ -208,7 +208,6 @@ Original verification checklist (kept for reference):
 - `scripts/backfills/diff-instapaper.ts` — API↔DB diff (read-only, prod API)
 - `scripts/backfills/backfill-from-csv.ts` — main ingest script (Phase 1)
 - `scripts/backfills/recover-no-body.ts` — Phase 2 (committed `a807914`)
-- `scripts/compare-body-recovery.ts` — Phase 2 strategy validation; safe to delete after Phase 2 lands
 
 **Required env vars (in `.dev.vars`):**
 
