@@ -32,6 +32,16 @@ For iOS: rebuild + restart Desktop is enough — iOS reads the same
 connector config when you sign in. If iOS still shows old behavior,
 sign out + sign back in.
 
+---
+
+How's Julio Rodriguez's hitting looking this year?
+
+I remember reading an article a few years ago about Ichiro, I think it was on ESPN, about like, how he had a great work ethic.
+
+I think it mentioned him going to the batting cages in Japan and training. Can you find that for me?
+
+---
+
 ## What to verify, per tool
 
 ### `get_recent_watches` — Reviewed / Watched tabs
@@ -184,20 +194,44 @@ weight.
 
 ## When the local build is good, before publishing
 
+The `mcp-server/` workspace ships through **two independent CI paths**.
+Don't conflate them — most of the time you only need one.
+
+### Path A — Cloudflare Worker (`mcp.rewind.rest`)
+
+Serves Claude iOS, claude.ai web, and any client that connects via the
+remote URL. The `deploy-worker` job in `.github/workflows/mcp-server.yml`
+runs on **every push to `main`** (gated `if: github.ref ==
+'refs/heads/main' || startsWith(github.ref, 'refs/tags/mcp-server-v')`).
+That means a conventional-commit fix lands and the Worker is live ~2
+min later — **no release-please PR, no tag, no version bump required**.
+
+For iOS-only / web-only iteration this is the fast path. Push and test;
+let the release-please PR catch up whenever.
+
+### Path B — npm package (`rewind-mcp-server`)
+
+Serves Claude Desktop and Claude Code via stdio (the `npx
+rewind-mcp-server` config in `claude_desktop_config.json`). The
+`publish-npm` job is gated on the `mcp-server-v*` tag, so it only fires
+when a release-please PR is merged.
+
 Publishing is automated — never run `npm publish` by hand and never bump
 `mcp-server/package.json` manually. Both will fail CI's drift check
 (`.github/workflows/mcp-server.yml` "Verify release-please manifest
-matches package.json"). The flow is:
+matches package.json"). The flow:
 
 1. Land conventional-commit-prefixed commits (`feat:`, `fix:`, etc.)
-   touching `mcp-server/**` on `main`.
+   touching `mcp-server/**` on `main`. (This already triggers the
+   Worker redeploy via Path A.)
 2. `release-please.yml` opens (or updates) a release PR that bumps
    `mcp-server/package.json` AND `.release-please-manifest.json`
    atomically and updates `mcp-server/CHANGELOG.md`.
 3. Merge the release PR. release-please tags the release as
    `mcp-server-v<version>`.
 4. `mcp-server.yml` reacts to the tag: builds, publishes to npm with
-   provenance, and redeploys the Cloudflare Worker (mcp.rewind.rest).
+   provenance, and redeploys the Cloudflare Worker again (idempotent —
+   Path A already deployed the same code on the original push).
 5. Flip Claude Desktop's connector from `rewind-local` to `rewind`.
    On iOS, sign out + sign back in so the new version is picked up.
 6. Re-run a single trigger from above (e.g. `get_recent_watches`) on
