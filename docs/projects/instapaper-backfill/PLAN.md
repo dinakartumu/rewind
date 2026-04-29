@@ -21,18 +21,18 @@ Why not just use the source URL: ~33% of articles return `1550 Error generating 
 
 ## Phase 0 — up-front prep
 
-Status: **in progress**
+Status: **complete**
 
-- [ ] **0a. Update backfill script: `bookmarks/add` with `archived=1`.** Replaces the two-call `add → archive` round-trip (which caused user-side Unread folder pollution + iOS notifications). Single call, idempotent ID lookup, no folder side effect. ~5 lines in `scripts/backfills/backfill-from-csv.ts`.
+- [x] **0a. Update backfill script: `bookmarks/add` with `archived=1`.** Replaces the two-call `add → archive` round-trip (which caused user-side Unread folder pollution + iOS notifications). Single call, idempotent ID lookup, no folder side effect. ~5 lines in `scripts/backfills/backfill-from-csv.ts`.
 
-- [ ] **0b. Generate a long-lived Cloudflare API token.** The wrangler OAuth token expires every 24h. Phase 1 takes 5-7 hours so a mid-run expiry is a real risk. Create a token at `dash.cloudflare.com/profile/api-tokens` with **D1 → Edit** scope, save as `CLOUDFLARE_API_TOKEN` in `.dev.vars`. The script's `getCfApiToken()` already prefers the env var.
+- [x] **0b. Generate a long-lived Cloudflare API token.** The wrangler OAuth token expires every 24h. Phase 1 takes 5-7 hours so a mid-run expiry is a real risk. Create a token at `dash.cloudflare.com/profile/api-tokens` with **D1 → Edit** scope, save as `CLOUDFLARE_API_TOKEN` in `.dev.vars`. The script's `getCfApiToken()` already prefers the env var.
 
-- [ ] **0c. MCP no-body filter (3 small route changes).** Land before Phase 1 so the in-progress run doesn't pollute the UX with empty cards.
+- [x] **0c. MCP no-body filter (3 small route changes).** Land before Phase 1 so the in-progress run doesn't pollute the UX with empty cards.
   - `get_recent_reads`: exclude `enrichment_status='no_body'` from default response; opt-in flag `include_no_body`.
   - `get_article(id)`: surface `body_unavailable: true` flag in structuredContent so the article card UI can render "Body not available — read on source" instead of empty.
   - Search ranking: deprioritize no-body matches in the FTS hybrid score.
 
-- [ ] **0d. Pre-flight dry-run.** `--csv ~/Downloads/instapaper-export.csv --limit 25 --dry-run` after 0a lands. Confirms parser + dedup still work end-to-end. ~30s.
+- [x] **0d. Pre-flight dry-run.** `--csv ~/Downloads/instapaper-export.csv --limit 25 --dry-run` after 0a lands. Confirms parser + dedup still work end-to-end. ~30s.
 
 ## Phase 1 — bulk ingest with `archived=1`
 
@@ -172,7 +172,16 @@ Post-Phase-2 admin pipeline (in flight at completion):
 
 ## Phase 3 — verification
 
-Status: **pending Phase 2**
+Status: **complete (2026-04-29 13:15 PDT)**
+
+Spot-checks (all passing):
+
+- `/v1/reading/stats`: `total_articles=19,939, finished=17,965, total_word_count=23.4M`. The +1 over Phase-1 ingest is a live-cron pickup since.
+- Ichiro `get_article(1121)`: 4,647 words, 12K excerpt, 26K content, image + thumbhash + dominant color, 1 highlight intact.
+- Phase-2-recovered NYT spot-check (`get_article(4)`): 2,397 words, 12K excerpt, real article body. Confirms the recover-no-body pipeline landed clean text in D1, and the post-Phase-2 reembed + reindex made it queryable.
+- `diff-instapaper.ts`: 1,096 bookmarks visible via Instapaper's live API; all present in DB. The remaining ~18,800 articles in DB are unreachable via the live API by design (500-per-folder cap) — they're the bulk-ingest target this whole project existed to capture.
+
+Original verification checklist (kept for reference):
 
 - [ ] Re-run `npx tsx scripts/backfills/diff-instapaper.ts` → API↔DB gap should be near zero (only the unrecoverable subset).
 - [ ] Spot-check Ichiro: `get_article(1121)` returns full body; semantic search for "Ichiro work ethic Japan" returns it as top match.
@@ -188,7 +197,7 @@ Status: **pending Phase 2**
 - **Notification spam during Phase 1 was a real risk** — solved by `archived=1` parameter to `bookmarks/add`. Don't regress.
 - **Reembed/reindex admin endpoints have client-side timeout risk.** The script's `triggerAdmin` uses default Node undici 5-min headers timeout, which is shorter than the time these endpoints can take for ~20K-row operations. Either run them via curl with `--max-time`, or update the script to set a longer `AbortSignal.timeout`. The endpoints themselves complete fine server-side — only the client fetch errors out.
 - **Reindex-search 1102 on full rebuild.** With ~65K rows across all domains (after the Instapaper backfill), the all-domains reindex hits Cloudflare Workers CPU limits. Use `{"domains":["reading"]}` to scope per-domain.
-- **Reembed-reading needs offset for >5K rows.** Route caps `limit` at 5000. The offset patch (added 2026-04-29, blocked on deploy) lets callers paginate through.
+- **Reembed-reading needs offset for >5K rows.** Route caps `limit` at 5000. The offset patch (deployed 2026-04-29, version `c6e20f5e`) lets callers paginate through. Required smaller `limit` per call (~500-1250) to stay under the 30s Workers CPU budget; full sweep ran in ~30 min total.
 
 ## Reference
 
@@ -198,7 +207,7 @@ Status: **pending Phase 2**
 - `scripts/probe-add.ts` — verify `bookmarks/add` idempotency on a known URL (includes side-effect probe)
 - `scripts/backfills/diff-instapaper.ts` — API↔DB diff (read-only, prod API)
 - `scripts/backfills/backfill-from-csv.ts` — main ingest script (Phase 1)
-- `scripts/backfills/recover-no-body.ts` — to be built (Phase 2)
+- `scripts/backfills/recover-no-body.ts` — Phase 2 (committed `a807914`)
 - `scripts/compare-body-recovery.ts` — Phase 2 strategy validation; safe to delete after Phase 2 lands
 
 **Required env vars (in `.dev.vars`):**
