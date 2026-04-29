@@ -120,14 +120,26 @@ a:active {
 // iOS override: zero out BOTH our radius and our border. Claude iOS
 // wraps the iframe in its own rounded container with its own visible
 // edge — anything we draw inside competes with that. With radius:0 +
-// transparent border, our card becomes pure content (bg + children)
-// inside Claude's mask, and Claude's host edge is the only thing
-// rendering at the corners. Workbench and Claude Desktop don't get
-// this override (their UA / standalone signals don't match), so they
-// keep the 12px radius + 1px border they need to define their card.
+// no border, our card becomes pure content (bg + children) inside
+// Claude's mask, and Claude's host edge is the only thing rendering
+// at the corners. Workbench and Claude Desktop don't get this
+// override (their UA / standalone signals don't match), so they keep
+// the 12px radius + 1px border they need to define their card.
+//
+// The `border: 0 !important` (rather than just coloring the border
+// transparent via --card-border) is load-bearing for full-bleed
+// children like ArticleDetail's hero. A transparent 1px border still
+// occupies 1px of layout, which inset the hero from the visual card
+// edge by 1px on every side and produced a hairline gap between the
+// image and Claude's host mask. Removing the border itself lets the
+// hero go truly edge-to-edge. !important is required because
+// `cardOuterChrome` is applied via inline `style` on the card root,
+// and inline styles win over class rules without it.
 const IOS_RADIUS_OVERRIDE_CSS = `:root {
   --rewind-card-radius: 0px;
-  --card-border: transparent;
+}
+.${CARD_OUTER_CLASSNAME} {
+  border: 0 !important;
 }`;
 
 if (typeof document !== 'undefined') {
