@@ -7,6 +7,10 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { themeStyleSheet, type Theme } from './themes/host-styles';
+import {
+  CARD_TOKENS_CSS,
+  CARD_TOKENS_STYLE_ID,
+} from '../../web/lib/card-tokens';
 
 const STYLE_ID = 'workbench-theme';
 const EMPTY_DOC = '<!doctype html><html><head></head><body></body></html>';
@@ -48,6 +52,10 @@ export function IframeShell(props: Props) {
       if (cancelled) return;
       const doc = iframe.contentDocument;
       if (!doc) return;
+      // Inject card-tokens (radius var, .rewind-card-outer class,
+      // body reset) before the theme stylesheet so theme-driven
+      // overrides of --card-bg / --card-border win on the cascade.
+      injectCardTokens(doc);
       injectTheme(doc, theme);
       if (mode === 'hmr') setIframeBody(doc.body);
     };
@@ -92,6 +100,18 @@ export function IframeShell(props: Props) {
       {mode === 'hmr' && iframeBody && createPortal(props.children, iframeBody)}
     </>
   );
+}
+
+function injectCardTokens(doc: Document): void {
+  let style = doc.getElementById(
+    CARD_TOKENS_STYLE_ID
+  ) as HTMLStyleElement | null;
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = CARD_TOKENS_STYLE_ID;
+    doc.head.appendChild(style);
+  }
+  style.textContent = CARD_TOKENS_CSS;
 }
 
 function injectTheme(doc: Document, theme: Theme): void {

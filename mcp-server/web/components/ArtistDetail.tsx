@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
 import { timeAgo } from '../lib/time-ago.js';
-import { cardOuterChrome } from '../lib/card-tokens.js';
+import { cardOuterChrome, CARD_OUTER_CLASSNAME } from '../lib/card-tokens.js';
 
 type Image = {
   cdn_url?: string | null;
@@ -144,7 +144,7 @@ export function ArtistDetail({
   const showSimilar = tab === 'all' || tab === 'similar';
 
   return (
-    <article style={cardStyle}>
+    <article className={CARD_OUTER_CLASSNAME} style={cardStyle}>
       <Hero artist={artist} accent={accent} dominant={dominant} />
       <TabNav active={tab} onChange={setTab} accent={accent} />
 
@@ -729,7 +729,6 @@ const cardStyle: CSSProperties = {
   maxWidth: 720,
   margin: '0 auto',
   padding: '20px 22px 22px',
-  borderRadius: 12,
   ...cardOuterChrome,
 };
 

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
 import { timeAgo } from '../lib/time-ago.js';
-import { cardOuterChrome } from '../lib/card-tokens.js';
+import { cardOuterChrome, CARD_OUTER_CLASSNAME } from '../lib/card-tokens.js';
 
 type Image = {
   cdn_url?: string | null;
@@ -91,7 +91,7 @@ export function ArticleDetail({
   const remainingHighlights = highlight_count - visibleHighlights.length;
 
   return (
-    <article style={cardStyle}>
+    <article className={CARD_OUTER_CLASSNAME} style={cardStyle}>
       <Hero
         hero={hero}
         accent={accent}
@@ -307,8 +307,6 @@ const cardStyle: CSSProperties = {
   flexDirection: 'column',
   maxWidth: 720,
   margin: '0 auto',
-  borderRadius: 12,
-  overflow: 'hidden',
   ...cardOuterChrome,
 };
 

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
 import { legibleColor } from '../lib/legible-color.js';
-import { cardOuterChrome } from '../lib/card-tokens.js';
+import { cardOuterChrome, CARD_OUTER_CLASSNAME } from '../lib/card-tokens.js';
 import { Sparkline } from './Sparkline.js';
 import { type TopItem } from './AlbumCard.js';
 
@@ -55,7 +55,7 @@ export function AlbumGrid({
   onOpen?: (url: string) => void;
 }) {
   return (
-    <article style={cardStyle}>
+    <article className={CARD_OUTER_CLASSNAME} style={cardStyle}>
       <header style={headerStyle}>
         <h1 style={titleStyle}>Top albums</h1>
         {period && <div style={subtitleStyle}>{periodLabel(period)}</div>}
@@ -163,7 +163,6 @@ const cardStyle: CSSProperties = {
   maxWidth: 720,
   margin: '0 auto',
   padding: '20px 22px 22px',
-  borderRadius: 12,
   ...cardOuterChrome,
   color: 'var(--color-text-primary, #1a1a1a)',
   fontFamily:

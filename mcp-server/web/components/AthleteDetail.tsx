@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { thumbhashToDataUrl } from '../lib/thumbhash.js';
-import { cardOuterChrome } from '../lib/card-tokens.js';
+import { cardOuterChrome, CARD_OUTER_CLASSNAME } from '../lib/card-tokens.js';
 import { TeamLogo } from './TeamLogo.js';
 import type { Team } from './types.js';
 
@@ -267,7 +267,7 @@ export function AthleteDetail({
   const accentColor = teamColor ?? 'var(--color-accent, #4c6ef5)';
 
   return (
-    <article style={cardStyle}>
+    <article className={CARD_OUTER_CLASSNAME} style={cardStyle}>
       <Hero player={player} accentColor={accentColor} />
 
       {!supported && (
@@ -705,7 +705,6 @@ const cardStyle: CSSProperties = {
   maxWidth: 720,
   margin: '0 auto',
   padding: '20px 22px 22px',
-  borderRadius: 12,
   ...cardOuterChrome,
 };
 
