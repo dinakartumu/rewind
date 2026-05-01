@@ -7,6 +7,7 @@ import { resolveMovie } from '../watching/resolve-movie.js';
 import { computeWatchStats } from '../plex/sync.js';
 import { fetchLetterboxdFeed, type LetterboxdEntry } from './client.js';
 import { runPipeline, type PipelineEnv } from '../images/pipeline.js';
+import { upsertDirectors } from '../plex/webhook.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 
@@ -85,6 +86,7 @@ async function resolveTvAsMovie(
   let backdropPath: string | null = null;
   let contentRating: string | null = null;
   let tmdbRating: number | null = null;
+  let creators: string[] = [];
   if (entry.tmdbTvId) {
     try {
       const detail = await tmdbClient.getTvShowDetail(entry.tmdbTvId);
@@ -95,6 +97,7 @@ async function resolveTvAsMovie(
       backdropPath = detail.backdropPath;
       contentRating = detail.contentRating;
       tmdbRating = detail.tmdbRating;
+      creators = detail.createdBy;
     } catch (error) {
       console.log(
         `[ERROR] TMDB TV fetch failed for ${entry.tmdbTvId}: ${error instanceof Error ? error.message : String(error)}`
@@ -119,6 +122,12 @@ async function resolveTvAsMovie(
   console.log(
     `[INFO] Created movie row from Letterboxd TV entry: ${title} (${year}) [tmdb-tv:${entry.tmdbTvId}]`
   );
+
+  // Showrunners from TMDB's `created_by` map onto the same movie_directors
+  // table — different credit type, same surface in get_movie_details.
+  if (creators.length > 0) {
+    await upsertDirectors(db, inserted.id, creators);
+  }
 
   if (entry.posterUrl && pipelineEnv) {
     await maybeRunPosterPipeline(db, pipelineEnv, inserted.id, entry.posterUrl);

@@ -78,6 +78,7 @@ interface TmdbTvDetail {
   };
   number_of_seasons?: number;
   number_of_episodes?: number;
+  created_by?: { id: number; name: string }[];
 }
 
 export interface TmdbShowDetail {
@@ -91,6 +92,12 @@ export interface TmdbShowDetail {
   tmdbRating: number | null;
   totalSeasons: number;
   totalEpisodes: number;
+  /**
+   * Showrunners / creators from TMDB's `created_by`. Stored alongside
+   * movie directors so TV-shaped Letterboxd entries surface a "directed
+   * by" line in the UI even though the underlying credit type differs.
+   */
+  createdBy: string[];
 }
 
 export class TmdbClient {
@@ -187,6 +194,7 @@ export class TmdbClient {
       tmdbRating: raw.vote_average || null,
       totalSeasons: raw.number_of_seasons || 0,
       totalEpisodes: raw.number_of_episodes || 0,
+      createdBy: (raw.created_by || []).map((c) => c.name).filter(Boolean),
     };
   }
 
