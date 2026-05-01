@@ -1,12 +1,11 @@
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { movies, watchHistory } from '../../db/schema/watching.js';
-import { syncRuns, images } from '../../db/schema/system.js';
+import { syncRuns } from '../../db/schema/system.js';
 import { TmdbClient } from '../watching/tmdb.js';
 import { resolveMovie } from '../watching/resolve-movie.js';
 import { computeWatchStats } from '../plex/sync.js';
 import { fetchLetterboxdFeed, type LetterboxdEntry } from './client.js';
-import { runPipeline, type PipelineEnv } from '../images/pipeline.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 
@@ -22,8 +21,7 @@ import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 async function resolveMovieFromLetterboxd(
   db: Database,
   entry: LetterboxdEntry,
-  tmdbClient: TmdbClient,
-  pipelineEnv: PipelineEnv | null
+  tmdbClient: TmdbClient
 ): Promise<number | null> {
   if (entry.tmdbMovieId !== null || !entry.tmdbTvId) {
     const result = await resolveMovie(db, tmdbClient, {
@@ -34,7 +32,7 @@ async function resolveMovieFromLetterboxd(
     return result?.id ?? null;
   }
 
-  return await resolveTvAsMovie(db, entry, tmdbClient, pipelineEnv);
+  return await resolveTvAsMovie(db, entry, tmdbClient);
 }
 
 /**
@@ -45,8 +43,7 @@ async function resolveMovieFromLetterboxd(
 async function resolveTvAsMovie(
   db: Database,
   entry: LetterboxdEntry,
-  tmdbClient: TmdbClient,
-  pipelineEnv: PipelineEnv | null
+  tmdbClient: TmdbClient
 ): Promise<number | null> {
   // Dedupe: another Letterboxd TV watch may have already created this row.
   const existing = await db
@@ -62,20 +59,7 @@ async function resolveTvAsMovie(
       )
     )
     .limit(1);
-  if (existing[0]) {
-    // Self-heal: if the existing row has no images table entry yet but we
-    // now have a poster URL, run the pipeline. Lets backfill catch up
-    // without needing a manual one-shot per row.
-    if (entry.posterUrl && pipelineEnv) {
-      await maybeRunPosterPipeline(
-        db,
-        pipelineEnv,
-        existing[0].id,
-        entry.posterUrl
-      );
-    }
-    return existing[0].id;
-  }
+  if (existing[0]) return existing[0].id;
 
   // Fetch TV-show metadata from TMDB (different endpoint from movies).
   let title = entry.filmTitle;
@@ -119,50 +103,7 @@ async function resolveTvAsMovie(
   console.log(
     `[INFO] Created movie row from Letterboxd TV entry: ${title} (${year}) [tmdb-tv:${entry.tmdbTvId}]`
   );
-
-  if (entry.posterUrl && pipelineEnv) {
-    await maybeRunPosterPipeline(db, pipelineEnv, inserted.id, entry.posterUrl);
-  }
-
   return inserted.id;
-}
-
-/**
- * Pull the Letterboxd-supplied poster URL through the image pipeline so
- * the TV-as-movie row gets the same R2/thumbhash/colors treatment as a
- * normal movie. Idempotent: bails if an images row already exists.
- */
-async function maybeRunPosterPipeline(
-  db: Database,
-  env: PipelineEnv,
-  movieId: number,
-  posterUrl: string
-): Promise<void> {
-  const existing = await db
-    .select({ id: images.id })
-    .from(images)
-    .where(
-      and(
-        eq(images.domain, 'watching'),
-        eq(images.entityType, 'movies'),
-        eq(images.entityId, String(movieId))
-      )
-    )
-    .limit(1);
-  if (existing[0]) return;
-
-  try {
-    await runPipeline(db, env, {
-      domain: 'watching',
-      entityType: 'movies',
-      entityId: String(movieId),
-      directImageUrl: posterUrl,
-    });
-  } catch (error) {
-    console.log(
-      `[ERROR] Letterboxd poster pipeline failed for movie ${movieId}: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
 }
 
 /**
@@ -206,7 +147,7 @@ export async function syncLetterboxd(
   env: {
     LETTERBOXD_USERNAME: string;
     TMDB_API_KEY: string;
-  } & Partial<PipelineEnv>
+  }
 ): Promise<{ synced: number; skipped: number }> {
   const startedAt = new Date().toISOString();
 
@@ -225,12 +166,6 @@ export async function syncLetterboxd(
     const tmdbClient = new TmdbClient(env.TMDB_API_KEY);
     const entries = await fetchLetterboxdFeed(env.LETTERBOXD_USERNAME);
 
-    // Pipeline env is only set when the caller (cron / admin endpoint)
-    // bound the IMAGES + IMAGE_TRANSFORMS bindings — guards local tests
-    // that mock a partial env.
-    const pipelineEnv: PipelineEnv | null =
-      env.IMAGES && env.IMAGE_TRANSFORMS ? (env as PipelineEnv) : null;
-
     let synced = 0;
     let skipped = 0;
     const newWatches: Array<{
@@ -241,12 +176,7 @@ export async function syncLetterboxd(
     }> = [];
 
     for (const entry of entries) {
-      const movieId = await resolveMovieFromLetterboxd(
-        db,
-        entry,
-        tmdbClient,
-        pipelineEnv
-      );
+      const movieId = await resolveMovieFromLetterboxd(db, entry, tmdbClient);
 
       if (!movieId) {
         skipped++;

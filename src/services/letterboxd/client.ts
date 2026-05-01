@@ -23,13 +23,6 @@ export interface LetterboxdEntry {
    * RSS gives series-level watches without episode info.
    */
   tmdbTvId: number | null;
-  /**
-   * Poster URL embedded in the entry's <description> CDATA. Letterboxd
-   * always includes a poster <img> as the first child of the description.
-   * Used as a fallback when TMDB doesn't have the title (e.g. TMDB-orphan
-   * TV docs) so the watch still renders with a thumbnail.
-   */
-  posterUrl: string | null;
 }
 
 /**
@@ -89,11 +82,9 @@ export function parseLetterboxdRss(xml: string): LetterboxdEntry[] {
     // Items without watchedDate are reviews or list entries
     if (!watchedDate) continue;
 
-    // Extract review text + poster URL from <description> CDATA
+    // Extract review text from <description> CDATA
     // Format: <p><img src="...poster..."/></p> <p>Review text here.</p>
-    const description = extractTag(itemXml, 'description');
-    const review = extractReviewTextFromDescription(description);
-    const posterUrl = extractPosterUrlFromDescription(description);
+    const review = extractReviewText(itemXml);
 
     entries.push({
       guid,
@@ -108,7 +99,6 @@ export function parseLetterboxdRss(xml: string): LetterboxdEntry[] {
       review,
       tmdbMovieId: tmdbMovieIdStr ? parseInt(tmdbMovieIdStr, 10) : null,
       tmdbTvId: tmdbTvIdStr ? parseInt(tmdbTvIdStr, 10) : null,
-      posterUrl,
     });
   }
 
@@ -120,9 +110,8 @@ export function parseLetterboxdRss(xml: string): LetterboxdEntry[] {
  * The description contains an optional poster image followed by review paragraphs.
  * Returns null if only a poster image is present (no actual review text).
  */
-function extractReviewTextFromDescription(
-  description: string | null
-): string | null {
+function extractReviewText(itemXml: string): string | null {
+  const description = extractTag(itemXml, 'description');
   if (!description) return null;
 
   // Remove all HTML tags
@@ -138,19 +127,6 @@ function extractReviewTextFromDescription(
 
   // If empty after stripping tags (poster-only entries), return null
   return text.length > 0 ? text : null;
-}
-
-/**
- * Extract the poster image URL from the RSS <description> CDATA block.
- * Letterboxd embeds the poster as the first <img src="..."> in description.
- * Used as a TMDB-poster fallback when TMDB doesn't carry the title.
- */
-function extractPosterUrlFromDescription(
-  description: string | null
-): string | null {
-  if (!description) return null;
-  const match = description.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
-  return match?.[1] ?? null;
 }
 
 /**
