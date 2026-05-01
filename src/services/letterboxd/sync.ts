@@ -1,6 +1,6 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
-import { watchHistory } from '../../db/schema/watching.js';
+import { movies, watchHistory } from '../../db/schema/watching.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { TmdbClient } from '../watching/tmdb.js';
 import { resolveMovie } from '../watching/resolve-movie.js';
@@ -10,20 +10,100 @@ import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 
 /**
- * Resolve a movie from a Letterboxd entry using the unified resolution function.
+ * Resolve a movie from a Letterboxd entry using the unified resolution
+ * function. Letterboxd RSS uses tmdb:tvId for series-shaped entries
+ * (e.g. multi-part docs); we treat those as movie-equivalent because the
+ * RSS only carries series-level watches without episode info. TV-shaped
+ * rows go into `movies` with tmdb_id = NULL — SQLite UNIQUE allows
+ * multiple NULLs, and dedupe is handled by (title, year, tmdb_id IS NULL)
+ * so subsequent watches of the same TV show reuse the same row.
  */
 async function resolveMovieFromLetterboxd(
   db: Database,
   entry: LetterboxdEntry,
   tmdbClient: TmdbClient
 ): Promise<number | null> {
-  const result = await resolveMovie(db, tmdbClient, {
-    tmdbId: entry.tmdbMovieId ?? undefined,
-    title: entry.filmTitle,
-    year: entry.filmYear,
-  });
+  if (entry.tmdbMovieId !== null || !entry.tmdbTvId) {
+    const result = await resolveMovie(db, tmdbClient, {
+      tmdbId: entry.tmdbMovieId ?? undefined,
+      title: entry.filmTitle,
+      year: entry.filmYear,
+    });
+    return result?.id ?? null;
+  }
 
-  return result?.id ?? null;
+  return await resolveTvAsMovie(db, entry, tmdbClient);
+}
+
+/**
+ * Insert (or find) a movies row representing a Letterboxd TV-series watch.
+ * tmdb_id is NULL to avoid colliding with movie TMDB IDs in the unique
+ * constraint; dedupe is by (title, year, tmdb_id IS NULL).
+ */
+async function resolveTvAsMovie(
+  db: Database,
+  entry: LetterboxdEntry,
+  tmdbClient: TmdbClient
+): Promise<number | null> {
+  // Dedupe: another Letterboxd TV watch may have already created this row.
+  const existing = await db
+    .select({ id: movies.id })
+    .from(movies)
+    .where(
+      and(
+        eq(movies.title, entry.filmTitle),
+        entry.filmYear === null
+          ? isNull(movies.year)
+          : eq(movies.year, entry.filmYear),
+        isNull(movies.tmdbId)
+      )
+    )
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+
+  // Fetch TV-show metadata from TMDB (different endpoint from movies).
+  let title = entry.filmTitle;
+  let year = entry.filmYear;
+  let summary: string | null = null;
+  let posterPath: string | null = null;
+  let backdropPath: string | null = null;
+  let contentRating: string | null = null;
+  let tmdbRating: number | null = null;
+  if (entry.tmdbTvId) {
+    try {
+      const detail = await tmdbClient.getTvShowDetail(entry.tmdbTvId);
+      title = detail.title;
+      year = detail.year;
+      summary = detail.summary;
+      posterPath = detail.posterPath;
+      backdropPath = detail.backdropPath;
+      contentRating = detail.contentRating;
+      tmdbRating = detail.tmdbRating;
+    } catch (error) {
+      console.log(
+        `[ERROR] TMDB TV fetch failed for ${entry.tmdbTvId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  const [inserted] = await db
+    .insert(movies)
+    .values({
+      title,
+      year,
+      tmdbId: null,
+      summary,
+      posterPath,
+      backdropPath,
+      contentRating,
+      tmdbRating,
+    })
+    .returning({ id: movies.id });
+
+  console.log(
+    `[INFO] Created movie row from Letterboxd TV entry: ${title} (${year}) [tmdb-tv:${entry.tmdbTvId}]`
+  );
+  return inserted.id;
 }
 
 /**
