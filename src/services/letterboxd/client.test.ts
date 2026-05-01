@@ -37,26 +37,13 @@ const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
     <guid isPermaLink="false">letterboxd-list-123</guid>
     <pubDate>Fri, 6 Mar 2026 12:00:00 +1200</pubDate>
   </item>
-  <item>
-    <title>The History of the Seattle Mariners, 2020 - ★★★★★</title>
-    <link>https://letterboxd.com/patdugan/film/the-history-of-the-seattle-mariners/</link>
-    <guid isPermaLink="false">letterboxd-review-1299202796</guid>
-    <pubDate>Fri, 1 May 2026 12:13:14 +1200</pubDate>
-    <letterboxd:watchedDate>2026-04-30</letterboxd:watchedDate>
-    <letterboxd:rewatch>Yes</letterboxd:rewatch>
-    <letterboxd:filmTitle>The History of the Seattle Mariners</letterboxd:filmTitle>
-    <letterboxd:filmYear>2020</letterboxd:filmYear>
-    <letterboxd:memberRating>5.0</letterboxd:memberRating>
-    <tmdb:tvId>103643</tmdb:tvId>
-  </item>
 </channel>
 </rss>`;
 
 describe('parseLetterboxdRss', () => {
   it('parses diary entries from RSS feed', () => {
     const entries = parseLetterboxdRss(SAMPLE_RSS);
-    // Inception, Dark Knight, Mariners — list entry skipped
-    expect(entries).toHaveLength(3);
+    expect(entries).toHaveLength(2);
   });
 
   it('extracts film title and year', () => {
@@ -86,22 +73,6 @@ describe('parseLetterboxdRss', () => {
     const entries = parseLetterboxdRss(SAMPLE_RSS);
     expect(entries[0].tmdbMovieId).toBe(27205);
     expect(entries[1].tmdbMovieId).toBe(155);
-  });
-
-  it('extracts TMDB tv ID for series-shaped entries', () => {
-    const entries = parseLetterboxdRss(SAMPLE_RSS);
-    const mariners = entries.find((e) =>
-      e.filmTitle.startsWith('The History of the Seattle Mariners')
-    );
-    expect(mariners).toBeDefined();
-    expect(mariners?.tmdbMovieId).toBeNull();
-    expect(mariners?.tmdbTvId).toBe(103643);
-  });
-
-  it('leaves tmdbTvId null on movie-shaped entries', () => {
-    const entries = parseLetterboxdRss(SAMPLE_RSS);
-    expect(entries[0].tmdbTvId).toBeNull();
-    expect(entries[1].tmdbTvId).toBeNull();
   });
 
   it('extracts guid', () => {
@@ -140,6 +111,5 @@ describe('parseLetterboxdRss', () => {
     expect(entries[0].memberRating).toBeNull();
     expect(entries[0].rewatch).toBe(false);
     expect(entries[0].tmdbMovieId).toBeNull();
-    expect(entries[0].tmdbTvId).toBeNull();
   });
 });

@@ -15,14 +15,6 @@ export interface LetterboxdEntry {
   rewatch: boolean;
   review: string | null;
   tmdbMovieId: number | null;
-  /**
-   * Letterboxd marks some entries as TV series (e.g. multi-part docs like
-   * "The History of the Seattle Mariners"). The RSS uses tmdb:tvId
-   * instead of tmdb:movieId for these. Only ever set when tmdbMovieId
-   * is null. Treated as movie-equivalent in the watching pipeline since
-   * RSS gives series-level watches without episode info.
-   */
-  tmdbTvId: number | null;
 }
 
 /**
@@ -76,7 +68,6 @@ export function parseLetterboxdRss(xml: string): LetterboxdEntry[] {
     const memberRatingStr = extractTag(itemXml, 'letterboxd:memberRating');
     const rewatchStr = extractTag(itemXml, 'letterboxd:rewatch');
     const tmdbMovieIdStr = extractTag(itemXml, 'tmdb:movieId');
-    const tmdbTvIdStr = extractTag(itemXml, 'tmdb:tvId');
 
     // Only include diary entries (those with a watched date)
     // Items without watchedDate are reviews or list entries
@@ -98,7 +89,6 @@ export function parseLetterboxdRss(xml: string): LetterboxdEntry[] {
       rewatch: rewatchStr === 'Yes',
       review,
       tmdbMovieId: tmdbMovieIdStr ? parseInt(tmdbMovieIdStr, 10) : null,
-      tmdbTvId: tmdbTvIdStr ? parseInt(tmdbTvIdStr, 10) : null,
     });
   }
 
