@@ -370,6 +370,13 @@ export async function processReadingImages(
         )`
       )
     )
+    // Newest first: each cron tick processes 50 items and the historical
+    // backfill is ~7k articles deep. Without an explicit order the engine
+    // returns them in id-asc, so recent saves never get images until the
+    // backfill (~35 days at 200/day) clears. id-desc means new articles
+    // get pictures within hours of being saved while the backfill grinds
+    // in the background.
+    .orderBy(desc(readingItems.id))
     .limit(maxItems);
 
   const articleItems: SourceSearchParams[] = articleRows.map((a) => ({
