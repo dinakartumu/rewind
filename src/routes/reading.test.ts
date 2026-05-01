@@ -162,6 +162,63 @@ describe('reading routes', () => {
       const res = await SELF.fetch('http://localhost/v1/reading/recent');
       expect(res.status).toBe(401);
     });
+
+    it('hides bulk-archive ghosts (finished_at == saved_at && progress=1)', async () => {
+      // Genuine recent save — no finish, should appear.
+      await seedArticle({
+        source_id: 'real-save',
+        title: 'Genuine Recent Save',
+        saved_at: '2025-06-01T10:00:00.000Z',
+        finished_at: null,
+        status: 'unread',
+        progress: 0,
+      });
+      // Bulk-archive ghost — finished_at == saved_at, progress=1.
+      await seedArticle({
+        source_id: 'bulk-ghost',
+        title: 'Bulk Archive Ghost',
+        saved_at: '2025-06-02T10:00:00.000Z',
+        finished_at: '2025-06-02T10:00:00.000Z',
+        status: 'finished',
+        progress: 1,
+        folder: 'archive',
+      });
+      // Genuine read — saved one day, finished the next.
+      await seedArticle({
+        source_id: 'real-read',
+        title: 'Genuine Finished Read',
+        saved_at: '2025-06-03T10:00:00.000Z',
+        finished_at: '2025-06-04T15:00:00.000Z',
+        status: 'finished',
+        progress: 1,
+        folder: 'archive',
+      });
+
+      const res = await authFetch('/v1/reading/recent');
+      const body = (await res.json()) as any;
+      const titles = body.data.map((a: any) => a.title);
+      expect(titles).toContain('Genuine Recent Save');
+      expect(titles).toContain('Genuine Finished Read');
+      expect(titles).not.toContain('Bulk Archive Ghost');
+    });
+
+    it('include_bulk_archived=1 surfaces ghosts when explicitly requested', async () => {
+      await seedArticle({
+        source_id: 'ghost-opt-in',
+        title: 'Ghost Surfaceable On Demand',
+        saved_at: '2025-06-02T10:00:00.000Z',
+        finished_at: '2025-06-02T10:00:00.000Z',
+        status: 'finished',
+        progress: 1,
+        folder: 'archive',
+      });
+
+      const res = await authFetch('/v1/reading/recent?include_bulk_archived=1');
+      const body = (await res.json()) as any;
+      expect(body.data.map((a: any) => a.title)).toContain(
+        'Ghost Surfaceable On Demand'
+      );
+    });
   });
 
   // ─── GET /v1/reading/articles ───────────────────────────────────────

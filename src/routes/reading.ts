@@ -202,6 +202,21 @@ const recentRoute = createRoute({
           .optional()
           .default(0)
           .openapi({ example: 0 }),
+        // Bulk-archive operations on Instapaper (or our backfill of
+        // historical bookmarks) overwrite the bookmark `time` field on
+        // many old items at once, leaving them with finished_at == saved_at
+        // and progress == 1 — a signature impossible for genuine reading
+        // (you can't finish 60 articles in 2 minutes). These items
+        // pollute "recent reads" because they sort on saved_at. Hide by
+        // default; pass include_bulk_archived=1 to surface them anyway.
+        include_bulk_archived: z.coerce
+          .number()
+          .int()
+          .min(0)
+          .max(1)
+          .optional()
+          .default(0)
+          .openapi({ example: 0 }),
       })
       .merge(DateFilterQuery),
   },
@@ -1016,7 +1031,15 @@ function formatArticle(
 reading.openapi(recentRoute, async (c) => {
   setCache(c, 'short');
   const db = createDb(c.env.DB);
-  const { limit, page, date, from, to, include_no_body } = c.req.valid('query');
+  const {
+    limit,
+    page,
+    date,
+    from,
+    to,
+    include_no_body,
+    include_bulk_archived,
+  } = c.req.valid('query');
   const offset = (page - 1) * limit;
 
   const conditions = [eq(readingItems.userId, 1)];
@@ -1031,6 +1054,16 @@ reading.openapi(recentRoute, async (c) => {
   if (!include_no_body) {
     conditions.push(
       sql`(${readingItems.enrichmentStatus} IS NULL OR ${readingItems.enrichmentStatus} != 'no_body')`
+    );
+  }
+  // Hide bulk-archive ghosts: items where Instapaper's `time` field got
+  // overwritten by a bulk operation (mass-archive, account migration,
+  // etc.), leaving finished_at == saved_at on items the user didn't
+  // actually read in that moment. The `progress = 1` filter avoids
+  // hiding genuinely-unread items that just happen to share a saved_at.
+  if (!include_bulk_archived) {
+    conditions.push(
+      sql`NOT (${readingItems.finishedAt} IS NOT NULL AND ${readingItems.finishedAt} = ${readingItems.savedAt} AND ${readingItems.progress} >= 1)`
     );
   }
 
