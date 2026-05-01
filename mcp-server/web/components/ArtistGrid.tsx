@@ -273,7 +273,7 @@ const sparklineStyle: CSSProperties = {
   // basis reliably on mobile.
   width: 64,
   flexShrink: 0,
-  opacity: 0.7,
+  opacity: 0.4,
   paddingRight: 8,
 };
 

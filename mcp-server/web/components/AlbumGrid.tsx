@@ -273,7 +273,7 @@ const rowSparklineStyle: CSSProperties = {
   height: ROW_THUMB_PX,
   width: 64,
   flexShrink: 0,
-  opacity: 0.7,
+  opacity: 0.4,
   paddingRight: 8,
 };
 
