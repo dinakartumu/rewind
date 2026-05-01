@@ -267,9 +267,13 @@ const sparklineStyle: CSSProperties = {
   justifyContent: 'flex-end',
   alignItems: 'center',
   height: THUMB_PX,
-  opacity: 0.2,
-  // Trailing breathing room so the sparkline doesn't crash into the
-  // Listen pill in the next column.
+  // Explicit width + flex-shrink:0 so iOS WebKit doesn't collapse the
+  // <span> when the row's text column claims all the free space — the
+  // SVG's intrinsic width attribute alone doesn't establish the flex
+  // basis reliably on mobile.
+  width: 64,
+  flexShrink: 0,
+  opacity: 0.7,
   paddingRight: 8,
 };
 

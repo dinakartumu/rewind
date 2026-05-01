@@ -271,6 +271,8 @@ const rowSparklineStyle: CSSProperties = {
   justifyContent: 'flex-end',
   alignItems: 'center',
   height: ROW_THUMB_PX,
+  width: 64,
+  flexShrink: 0,
   opacity: 0.7,
   paddingRight: 8,
 };
