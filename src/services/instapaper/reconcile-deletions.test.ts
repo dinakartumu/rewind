@@ -60,17 +60,23 @@ describe('reconcileReadingDeletions', () => {
   });
 
   it('purges items missing from every folder; keeps items present in any folder', async () => {
-    await seedDb([100, 200, 300, 400]);
+    // Seed 30 items; archive holds 100-127, item 400 is the deleted ghost.
+    // 1/30 ≈ 3.3% deletion rate stays under the 10% safety guard.
+    const seedIds = [
+      ...Array.from({ length: 28 }, (_, i) => 100 + i),
+      300,
+      400,
+    ];
+    await seedDb(seedIds);
 
-    // Mock Instapaper API responses by URL pattern.
     // - folders/list returns one custom folder (id=99)
-    // - bookmarks/list responses keyed by folder
-    //   * unread returns [100]
-    //   * starred returns []
-    //   * archive returns [200, 300]
-    //   * folder 99 returns []
+    // - unread returns [300] (one item)
+    // - archive returns the 28 sequential items
+    // - folder 99 returns []
     // → 400 is in DB but missing everywhere → must be purged.
-    // → verifyChunk re-asks each folder for the candidate(s); 400 stays missing.
+    const archiveBookmarks = Array.from({ length: 28 }, (_, i) =>
+      bookmark(100 + i)
+    );
     const responseFor = (url: string, body: string) => {
       if (url.endsWith('/folders/list')) {
         return JSON.stringify([{ folder_id: 99, title: 'Custom' }]);
@@ -80,11 +86,11 @@ describe('reconcileReadingDeletions', () => {
         const folder = params.get('folder_id');
         switch (folder) {
           case 'unread':
-            return JSON.stringify([bookmark(100)]);
+            return JSON.stringify([bookmark(300)]);
           case 'starred':
             return JSON.stringify([]);
           case 'archive':
-            return JSON.stringify([bookmark(200), bookmark(300)]);
+            return JSON.stringify(archiveBookmarks);
           case '99':
             return JSON.stringify([]);
           default:
@@ -104,15 +110,16 @@ describe('reconcileReadingDeletions', () => {
     const result = await reconcileReadingDeletions(db, ENV);
 
     expect(result.foldersScanned).toBe(4);
-    expect(result.bookmarksSeen).toBe(3);
+    expect(result.bookmarksSeen).toBe(29);
     expect(result.candidates).toBe(1);
     expect(result.deleted).toBe(1);
+    expect(result.abortedReason).toBeUndefined();
 
     const remaining = await db
       .select({ sourceId: readingItems.sourceId })
       .from(readingItems);
-    const sourceIds = remaining.map((r) => r.sourceId).sort();
-    expect(sourceIds).toEqual(['100', '200', '300']);
+    expect(remaining.find((r) => r.sourceId === '400')).toBeUndefined();
+    expect(remaining).toHaveLength(29);
   });
 
   it('keeps items that appear in any folder during pagination but not in the verify pass', async () => {
@@ -157,6 +164,32 @@ describe('reconcileReadingDeletions', () => {
       .from(readingItems);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].sourceId).toBe('500');
+  });
+
+  it('aborts with safety_abort if more than 10% of items are flagged for deletion', async () => {
+    // Seed 20 items; pretend Instapaper API returns nothing → all 20
+    // would be candidates. Safety guard must abort before any DELETE.
+    await seedDb(Array.from({ length: 20 }, (_, i) => i + 1));
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/folders/list'))
+        return new Response('[]', { status: 200 });
+      // Every bookmarks/list returns empty → everything looks deleted
+      return new Response('[]', { status: 200 });
+    }) as typeof globalThis.fetch;
+
+    const db = drizzle(env.DB);
+    const result = await reconcileReadingDeletions(db, ENV);
+
+    expect(result.candidates).toBe(20);
+    expect(result.deleted).toBe(0);
+    expect(result.abortedReason).toMatch(/safety_abort/);
+
+    const remaining = await db
+      .select({ sourceId: readingItems.sourceId })
+      .from(readingItems);
+    expect(remaining).toHaveLength(20);
   });
 
   it('no-ops cleanly when DB is empty', async () => {

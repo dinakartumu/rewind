@@ -37,6 +37,15 @@ const HAVE_CHUNK = 1000;
 // Worker invocation on a single misbehaving folder. 80 * 500 = 40k items,
 // well over realistic account sizes.
 const MAX_PAGES_PER_FOLDER = 80;
+// D1 caps bound parameters per query at 100. Chunk DELETE statements
+// well under that — we burn 2 slots on the domain/entity_type filters,
+// leaving 98 for the IN list. Round down to leave headroom.
+const DELETE_CHUNK = 80;
+// Refuse to delete more than this fraction of the user's reading_items
+// in a single reconcile pass — guards against algorithm bugs (like the
+// have=-without-hash bug that mass-flagged 95% of items as missing).
+// If we hit this, abort with a clear error rather than silently wipe.
+const MAX_PURGE_FRACTION = 0.1;
 
 export interface ReconcileResult {
   foldersScanned: number;
@@ -46,12 +55,17 @@ export interface ReconcileResult {
   deleted: number;
   imagesDeleted: number;
   tookMs: number;
+  abortedReason?: string;
 }
 
 /**
  * Walk every bookmark in a single folder using have= as a pagination
- * cursor. Each page returns up to 500 bookmarks not already in `have=`;
- * we add them to `have` and request again until the response is short.
+ * cursor. The Instapaper `have=` parameter is a comma-separated list of
+ * `id:hash` pairs; the server omits items from the response whose hash
+ * matches what the client already has. We capture each returned
+ * bookmark's hash so subsequent pages naturally exclude what we've
+ * already seen — without the hash, the server would re-send the same
+ * 500 items every page and pagination would never advance.
  *
  * Returns the set of source_ids found in this folder.
  */
@@ -59,11 +73,16 @@ async function paginateFolder(
   client: InstapaperClient,
   folderId: string
 ): Promise<{ ids: Set<string>; pages: number }> {
-  const seen = new Set<string>();
+  const seen = new Map<string, string>(); // bookmark_id -> hash
   let pages = 0;
 
   for (let page = 0; page < MAX_PAGES_PER_FOLDER; page++) {
-    const haveStr = seen.size === 0 ? undefined : Array.from(seen).join(',');
+    const haveStr =
+      seen.size === 0
+        ? undefined
+        : Array.from(seen.entries())
+            .map(([id, hash]) => `${id}:${hash}`)
+            .join(',');
     const result = await client.listBookmarks({
       folderId,
       limit: PAGE_SIZE,
@@ -73,15 +92,23 @@ async function paginateFolder(
 
     if (result.bookmarks.length === 0) break;
 
+    let newCount = 0;
     for (const b of result.bookmarks) {
-      seen.add(String(b.bookmark_id));
+      const id = String(b.bookmark_id);
+      if (!seen.has(id)) newCount++;
+      seen.set(id, b.hash);
     }
+
+    // Defensive: if a page returned only items we already had (could happen
+    // if a server-side change made hashes mismatch and the API re-sent
+    // unchanged items), bail to avoid an infinite loop.
+    if (newCount === 0) break;
 
     // Last page: server returned fewer than the cap → no more to fetch.
     if (result.bookmarks.length < PAGE_SIZE) break;
   }
 
-  return { ids: seen, pages };
+  return { ids: new Set(seen.keys()), pages };
 }
 
 /**
@@ -191,37 +218,53 @@ export async function reconcileReadingDeletions(
   );
   let deleted = 0;
   let imagesDeleted = 0;
-  if (toDeleteSourceIds.length > 0) {
+  let abortedReason: string | undefined;
+
+  // Safety guard: if reconciliation flags more than MAX_PURGE_FRACTION of
+  // the DB for deletion, something is wrong with the algorithm or the
+  // Instapaper API responses. Bail rather than wipe the user's archive.
+  const purgeFraction =
+    dbBySourceId.size === 0 ? 0 : toDeleteSourceIds.length / dbBySourceId.size;
+  if (purgeFraction > MAX_PURGE_FRACTION) {
+    abortedReason = `safety_abort: ${toDeleteSourceIds.length}/${dbBySourceId.size} items (${(purgeFraction * 100).toFixed(1)}%) flagged for deletion exceeds MAX_PURGE_FRACTION=${MAX_PURGE_FRACTION * 100}%; refusing to purge`;
+  } else if (toDeleteSourceIds.length > 0) {
+    // Chunk DELETE statements to stay under D1's 100-bound-param cap.
     const toDeleteRowIds = toDeleteSourceIds
       .map((sid) => dbBySourceId.get(sid))
       .filter((id): id is number => id !== undefined);
     const toDeleteRowIdStrs = toDeleteRowIds.map(String);
 
-    const imgResult = await db
-      .delete(images)
-      .where(
-        and(
-          eq(images.domain, 'reading'),
-          eq(images.entityType, 'articles'),
-          inArray(images.entityId, toDeleteRowIdStrs)
-        )
+    for (let i = 0; i < toDeleteRowIdStrs.length; i += DELETE_CHUNK) {
+      const chunk = toDeleteRowIdStrs.slice(i, i + DELETE_CHUNK);
+      const imgResult = await db
+        .delete(images)
+        .where(
+          and(
+            eq(images.domain, 'reading'),
+            eq(images.entityType, 'articles'),
+            inArray(images.entityId, chunk)
+          )
+        );
+      imagesDeleted += Number(
+        (imgResult as { meta?: { changes?: number } }).meta?.changes ?? 0
       );
-    imagesDeleted = Number(
-      (imgResult as { meta?: { changes?: number } }).meta?.changes ?? 0
-    );
+    }
 
-    const itemResult = await db
-      .delete(readingItems)
-      .where(
-        and(
-          eq(readingItems.source, 'instapaper'),
-          eq(readingItems.userId, 1),
-          inArray(readingItems.sourceId, toDeleteSourceIds)
-        )
+    for (let i = 0; i < toDeleteSourceIds.length; i += DELETE_CHUNK) {
+      const chunk = toDeleteSourceIds.slice(i, i + DELETE_CHUNK);
+      const itemResult = await db
+        .delete(readingItems)
+        .where(
+          and(
+            eq(readingItems.source, 'instapaper'),
+            eq(readingItems.userId, 1),
+            inArray(readingItems.sourceId, chunk)
+          )
+        );
+      deleted += Number(
+        (itemResult as { meta?: { changes?: number } }).meta?.changes ?? 0
       );
-    deleted = Number(
-      (itemResult as { meta?: { changes?: number } }).meta?.changes ?? 0
-    );
+    }
   }
 
   return {
@@ -232,6 +275,7 @@ export async function reconcileReadingDeletions(
     deleted,
     imagesDeleted,
     tookMs: Date.now() - t0,
+    ...(abortedReason ? { abortedReason } : {}),
   };
 }
 

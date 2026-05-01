@@ -18990,6 +18990,9 @@
                     },
                     "took_ms": {
                       "type": "number"
+                    },
+                    "aborted_reason": {
+                      "type": "string"
                     }
                   },
                   "required": [

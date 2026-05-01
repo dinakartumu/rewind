@@ -1973,6 +1973,7 @@ const reconcileDeletionsRoute = createRoute({
             deleted: z.number(),
             images_deleted: z.number(),
             took_ms: z.number(),
+            aborted_reason: z.string().optional(),
           }),
         },
       },
@@ -1993,6 +1994,7 @@ reading.openapi(reconcileDeletionsRoute, async (c) => {
       deleted: result.deleted,
       images_deleted: result.imagesDeleted,
       took_ms: result.tookMs,
+      ...(result.abortedReason ? { aborted_reason: result.abortedReason } : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
