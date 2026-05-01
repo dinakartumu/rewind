@@ -1450,6 +1450,8 @@ watching.openapi(movieDetailRoute, async (c) => {
       user_rating: h.userRating,
       percent_complete: h.percentComplete,
       rewatch: h.rewatch === 1,
+      review: h.review,
+      review_url: h.reviewUrl,
     })),
   }) as any;
 });
