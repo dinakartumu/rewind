@@ -114,7 +114,7 @@ describe('listening routes', () => {
       expect(total).toBe(5);
     });
 
-    it('omits sparkline for unsupported period 7day', async () => {
+    it('returns 7 daily buckets for period=7day', async () => {
       const recentScrobble = new Date(
         Date.now() - 60 * 60 * 1000
       ).toISOString();
@@ -126,7 +126,7 @@ describe('listening routes', () => {
       await db.delete(lastfmArtists);
 
       await seedArtistWithScrobbles({
-        name: 'Skip 7day',
+        name: '7day Artist',
         period: '7day',
         rank: 1,
         scrobbleAt: recentScrobble,
@@ -140,7 +140,15 @@ describe('listening routes', () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as any;
       expect(body.data).toHaveLength(1);
-      expect('sparkline' in body.data[0]).toBe(false);
+      const item = body.data[0];
+      expect(item.sparkline).toBeDefined();
+      expect(item.sparkline.granularity).toBe('day');
+      expect(item.sparkline.points).toHaveLength(7);
+      const total = item.sparkline.points.reduce(
+        (a: number, b: number) => a + b,
+        0
+      );
+      expect(total).toBe(3);
     });
 
     it('returns yearly buckets for period=overall', async () => {

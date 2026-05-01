@@ -304,12 +304,14 @@ export function registerListeningTools(
     {
       title: 'Top artists',
       description:
-        'Get top listened-to artists from Last.fm for a given time period, with top-N artist images and Apple Music links. In MCP Apps hosts, renders an interactive artist portrait grid inline.',
+        'Get top listened-to artists for a time window, with top-N artist images and Apple Music links. Use `period` for vague-recent queries ("lately", "this week") — defaults to \'1month\' (rolling 28 days). Use `date`/`from`/`to` for calendar queries ("in February", "last month", "this year") — date filter overrides period when both are supplied. In MCP Apps hosts, renders an interactive artist portrait grid inline.',
       inputSchema: {
         period: z
           .enum(PERIOD_ENUM)
           .default('1month')
-          .describe('Time period for rankings'),
+          .describe(
+            'Rolling time period for rankings. Use for "lately"/"this week" style queries. Ignored when date/from/to is supplied.'
+          ),
         limit: z
           .number()
           .min(1)
@@ -321,12 +323,13 @@ export function registerListeningTools(
           .min(1)
           .default(1)
           .describe('Page number for pagination'),
+        ...dateFilterParams,
         ...includeImagesParam,
         include_sparklines: z
           .boolean()
           .default(true)
           .describe(
-            'When true (default), attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted otherwise. Set false to keep responses small.'
+            'When true (default), attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported for period in {7day, 1month, 3month, 6month, 12month}. Set false to keep responses small.'
           ),
       },
       annotations: READ_ONLY_ANNOTATIONS,
@@ -335,7 +338,16 @@ export function registerListeningTools(
         'ui/resourceUri': 'ui://rewind/top-artists.html',
       },
     },
-    async ({ period, limit, page, include_images, include_sparklines }) =>
+    async ({
+      period,
+      limit,
+      page,
+      date,
+      from,
+      to,
+      include_images,
+      include_sparklines,
+    }) =>
       withRichResponse(async () => {
         const data = await client.get<{ period: string; data: TopItem[] }>(
           '/listening/top/artists',
@@ -343,6 +355,9 @@ export function registerListeningTools(
             period,
             limit,
             page,
+            date,
+            from,
+            to,
             ...(include_sparklines ? { include_sparklines: 'true' } : {}),
           }
         );
@@ -480,12 +495,14 @@ export function registerListeningTools(
     {
       title: 'Top tracks',
       description:
-        "Top listened-to tracks from Last.fm for a given time period, with top-N Apple Music links. Optional `artist_id` or `artist_name` filters to a single artist's catalog — useful for 'what X songs have I been listening to lately' queries. Use after get_artist_details if a longer ranked list is needed; otherwise the embedded top_tracks[] from get_artist_details (capped at 10) is sufficient. In MCP Apps hosts, renders an interactive top-tracks card with a List | By album toggle.",
+        'Top listened-to tracks for a time window, with top-N Apple Music links. Optional `artist_id` or `artist_name` filters to a single artist\'s catalog — useful for \'what X songs have I been listening to lately\' queries. Use `period` for vague-recent queries ("lately", "this week") — defaults to \'1month\' (rolling 28 days). Use `date`/`from`/`to` for calendar queries ("in February", "last month", "this year") — date filter overrides period when both are supplied. In MCP Apps hosts, renders an interactive top-tracks card with a List | By album toggle.',
       inputSchema: {
         period: z
           .enum(PERIOD_ENUM)
           .default('1month')
-          .describe('Time period for rankings'),
+          .describe(
+            'Rolling time period for rankings. Use for "lately"/"this week" style queries. Ignored when date/from/to is supplied.'
+          ),
         limit: z
           .number()
           .min(1)
@@ -503,7 +520,7 @@ export function registerListeningTools(
           .positive()
           .optional()
           .describe(
-            'Filter to a single artist. Stable id from get_artist_details or get_top_artists. Composes with period.'
+            'Filter to a single artist. Stable id from get_artist_details or get_top_artists. Composes with period and date filters.'
           ),
         artist_name: z
           .string()
@@ -512,6 +529,7 @@ export function registerListeningTools(
           .describe(
             'Substring match against artist names (case-insensitive). Resolves to the highest-playcount match. Use only if no artist_id is available; passing both is a 400.'
           ),
+        ...dateFilterParams,
       },
       annotations: READ_ONLY_ANNOTATIONS,
       _meta: {
@@ -519,7 +537,7 @@ export function registerListeningTools(
         'ui/resourceUri': 'ui://rewind/top-tracks.html',
       },
     },
-    async ({ period, limit, page, artist_id, artist_name }) =>
+    async ({ period, limit, page, artist_id, artist_name, date, from, to }) =>
       withRichResponse(async () => {
         const data = await client.get<{
           period: string;
@@ -529,6 +547,9 @@ export function registerListeningTools(
           period,
           limit,
           page,
+          date,
+          from,
+          to,
           ...(artist_id !== undefined ? { artist_id } : {}),
           ...(artist_name !== undefined ? { artist_name } : {}),
         });

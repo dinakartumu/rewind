@@ -3,10 +3,16 @@ import type { Database } from '../db/client.js';
 import { lastfmScrobbles, lastfmTracks } from '../db/schema/lastfm.js';
 
 export type SparklineGranularity = 'day' | 'week' | 'month' | 'year';
-export type SparklinePeriod = '1month' | '3month' | '6month' | '12month';
+export type SparklinePeriod =
+  | '7day'
+  | '1month'
+  | '3month'
+  | '6month'
+  | '12month';
 export type SparklineEntity = 'artist' | 'album' | 'track';
 
 export const SPARKLINE_PERIODS: readonly SparklinePeriod[] = [
+  '7day',
   '1month',
   '3month',
   '6month',
@@ -21,6 +27,7 @@ const PERIOD_CONFIG: Record<
   SparklinePeriod,
   { granularity: SparklineGranularity; bucketCount: number }
 > = {
+  '7day': { granularity: 'day', bucketCount: 7 },
   '1month': { granularity: 'day', bucketCount: 28 },
   '3month': { granularity: 'week', bucketCount: 13 },
   '6month': { granularity: 'week', bucketCount: 26 },

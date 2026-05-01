@@ -141,15 +141,15 @@ const includeSparklinesField = z.coerce.boolean().optional().openapi({
   example: false,
 });
 
-const TopArtistsQuery = PeriodQuery.extend({
+const TopArtistsQuery = PeriodQuery.merge(DateFilterQuery).extend({
   include_sparklines: includeSparklinesField,
 });
 
-const TopAlbumsQuery = PeriodQuery.extend({
+const TopAlbumsQuery = PeriodQuery.merge(DateFilterQuery).extend({
   include_sparklines: includeSparklinesField,
 });
 
-const TopTracksQuery = PeriodQuery.extend({
+const TopTracksQuery = PeriodQuery.merge(DateFilterQuery).extend({
   include_sparklines: includeSparklinesField,
   // Optional artist filter — returns this user's top tracks BY a single
   // artist. Composes with `period` and the date filters. Either `artist_id`
@@ -159,7 +159,7 @@ const TopTracksQuery = PeriodQuery.extend({
   // join to lastfm_tracks.artist_id.
   artist_id: z.coerce.number().int().positive().optional().openapi({
     description:
-      "Filter top tracks to a single artist's catalog. Stable id from `get_artist_details` or `get_top_artists`. Composes with `period`.",
+      "Filter top tracks to a single artist's catalog. Stable id from `get_artist_details` or `get_top_artists`. Composes with `period` and date filters.",
     example: 189,
   }),
   artist_name: z.string().min(1).optional().openapi({
@@ -1913,32 +1913,102 @@ listening.openapi(topArtistsRoute, async (c) => {
   const includeSparklines =
     includeSparklinesParam === 'true' || includeSparklinesParam === '1';
 
-  const [{ count: total }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(lastfmTopArtists)
-    .innerJoin(lastfmArtists, eq(lastfmTopArtists.artistId, lastfmArtists.id))
-    .where(
-      and(eq(lastfmTopArtists.period, period), eq(lastfmArtists.isFiltered, 0))
-    );
+  // Date filter present → live aggregate from scrobbles (precomputed
+  // top-artists table only carries Last.fm's canonical periods). Without
+  // a date filter, use the precomputed table for speed.
+  const dateCondition = buildDateCondition(lastfmScrobbles.scrobbledAt, {
+    date: c.req.query('date'),
+    from: c.req.query('from'),
+    to: c.req.query('to'),
+  });
 
-  const items = await db
-    .select({
-      rank: lastfmTopArtists.rank,
-      playcount: lastfmTopArtists.playcount,
-      artistId: lastfmArtists.id,
-      artistName: lastfmArtists.name,
-      artistUrl: lastfmArtists.url,
-      artistGenre: lastfmArtists.genre,
-      artistAppleMusicUrl: lastfmArtists.appleMusicUrl,
-    })
-    .from(lastfmTopArtists)
-    .innerJoin(lastfmArtists, eq(lastfmTopArtists.artistId, lastfmArtists.id))
-    .where(
-      and(eq(lastfmTopArtists.period, period), eq(lastfmArtists.isFiltered, 0))
-    )
-    .orderBy(asc(lastfmTopArtists.rank))
-    .limit(limit)
-    .offset(offset);
+  type ArtistRow = {
+    rank: number;
+    playcount: number;
+    artistId: number;
+    artistName: string;
+    artistUrl: string | null;
+    artistGenre: string | null;
+    artistAppleMusicUrl: string | null;
+  };
+
+  let total: number;
+  let items: ArtistRow[];
+
+  if (dateCondition) {
+    const liveConditions = [eq(lastfmTracks.isFiltered, 0), dateCondition];
+
+    const [{ count: countResult }] = await db
+      .select({
+        count: sql<number>`count(distinct ${lastfmTracks.artistId})`,
+      })
+      .from(lastfmScrobbles)
+      .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
+      .where(and(...liveConditions));
+    total = countResult;
+
+    const aggregated = await db
+      .select({
+        artistId: lastfmArtists.id,
+        artistName: lastfmArtists.name,
+        artistUrl: lastfmArtists.url,
+        artistGenre: lastfmArtists.genre,
+        artistAppleMusicUrl: lastfmArtists.appleMusicUrl,
+        playcount: sql<number>`count(${lastfmScrobbles.id})`,
+      })
+      .from(lastfmScrobbles)
+      .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
+      .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
+      .where(and(...liveConditions))
+      .groupBy(lastfmArtists.id)
+      .orderBy(desc(sql`count(${lastfmScrobbles.id})`))
+      .limit(limit)
+      .offset(offset);
+
+    items = aggregated.map((row, i) => ({
+      rank: offset + i + 1,
+      playcount: row.playcount,
+      artistId: row.artistId,
+      artistName: row.artistName,
+      artistUrl: row.artistUrl,
+      artistGenre: row.artistGenre,
+      artistAppleMusicUrl: row.artistAppleMusicUrl,
+    }));
+  } else {
+    const [{ count: countResult }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(lastfmTopArtists)
+      .innerJoin(lastfmArtists, eq(lastfmTopArtists.artistId, lastfmArtists.id))
+      .where(
+        and(
+          eq(lastfmTopArtists.period, period),
+          eq(lastfmArtists.isFiltered, 0)
+        )
+      );
+    total = countResult;
+
+    items = await db
+      .select({
+        rank: lastfmTopArtists.rank,
+        playcount: lastfmTopArtists.playcount,
+        artistId: lastfmArtists.id,
+        artistName: lastfmArtists.name,
+        artistUrl: lastfmArtists.url,
+        artistGenre: lastfmArtists.genre,
+        artistAppleMusicUrl: lastfmArtists.appleMusicUrl,
+      })
+      .from(lastfmTopArtists)
+      .innerJoin(lastfmArtists, eq(lastfmTopArtists.artistId, lastfmArtists.id))
+      .where(
+        and(
+          eq(lastfmTopArtists.period, period),
+          eq(lastfmArtists.isFiltered, 0)
+        )
+      )
+      .orderBy(asc(lastfmTopArtists.rank))
+      .limit(limit)
+      .offset(offset);
+  }
 
   const artistIdStrings = items.map((i) => String(i.artistId));
   const numericArtistIds = items.map((i) => i.artistId);
@@ -2123,10 +2193,23 @@ listening.openapi(topTracksRoute, async (c) => {
     resolvedArtistId = matches[0].id;
   }
 
-  // Two query paths: with an artist filter we aggregate scrobbles directly
-  // (the precomputed lastfm_top_tracks table only carries the user's global
-  // top-N, so most per-artist tracks are missing from it). Without a filter
-  // we use the precomputed table — fast, matches existing behavior.
+  // Three query paths:
+  //   1. date filter present (date|from|to) → live aggregate from scrobbles
+  //      with the user-supplied date range. Composes with the optional
+  //      artist filter. Precomputed top-list isn't useful for arbitrary
+  //      ranges (it only carries the canonical Last.fm periods).
+  //   2. artist filter present (no date filter) → live aggregate from
+  //      scrobbles with the period-derived window (the precomputed
+  //      lastfm_top_tracks table only carries the user's global top-N,
+  //      so most per-artist tracks are missing from it).
+  //   3. neither → use the precomputed lastfm_top_tracks table — fast,
+  //      matches existing behavior.
+  const dateCondition = buildDateCondition(lastfmScrobbles.scrobbledAt, {
+    date: c.req.query('date'),
+    from: c.req.query('from'),
+    to: c.req.query('to'),
+  });
+
   type ItemRow = {
     rank: number;
     playcount: number;
@@ -2146,29 +2229,37 @@ listening.openapi(topTracksRoute, async (c) => {
   let total: number;
   let items: ItemRow[];
 
-  if (resolvedArtistId !== null) {
-    // Aggregate from scrobbles. Filter by date range derived from `period`.
-    // For artist-filtered queries the precomputed top-list isn't useful.
-    const periodWindow = await resolveTopListSparklineWindow(db, period);
-    const periodConditions = [
-      eq(lastfmTracks.isFiltered, 0),
-      eq(lastfmTracks.artistId, resolvedArtistId),
-    ];
-    if (periodWindow) {
-      periodConditions.push(
-        gte(lastfmScrobbles.scrobbledAt, periodWindow.from),
-        lte(lastfmScrobbles.scrobbledAt, periodWindow.to)
-      );
+  const useLiveAggregation =
+    dateCondition !== undefined || resolvedArtistId !== null;
+
+  if (useLiveAggregation) {
+    // Live aggregate from scrobbles. Date filter wins over period when both
+    // are supplied; otherwise derive a period window. The artist filter, if
+    // present, narrows further.
+    const liveConditions = [eq(lastfmTracks.isFiltered, 0)];
+    if (resolvedArtistId !== null) {
+      liveConditions.push(eq(lastfmTracks.artistId, resolvedArtistId));
+    }
+    if (dateCondition) {
+      liveConditions.push(dateCondition);
+    } else {
+      const periodWindow = await resolveTopListSparklineWindow(db, period);
+      if (periodWindow) {
+        liveConditions.push(
+          gte(lastfmScrobbles.scrobbledAt, periodWindow.from),
+          lte(lastfmScrobbles.scrobbledAt, periodWindow.to)
+        );
+      }
     }
 
-    // Count distinct tracks for this artist in the period.
+    // Count distinct tracks in the window.
     const [{ count: countResult }] = await db
       .select({
         count: sql<number>`count(distinct ${lastfmTracks.id})`,
       })
       .from(lastfmScrobbles)
       .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
-      .where(and(...periodConditions));
+      .where(and(...liveConditions));
     total = countResult;
 
     // Aggregate scrobble counts per track + join album/artist for display.
@@ -2191,7 +2282,7 @@ listening.openapi(topTracksRoute, async (c) => {
       .innerJoin(lastfmTracks, eq(lastfmScrobbles.trackId, lastfmTracks.id))
       .innerJoin(lastfmArtists, eq(lastfmTracks.artistId, lastfmArtists.id))
       .leftJoin(lastfmAlbums, eq(lastfmTracks.albumId, lastfmAlbums.id))
-      .where(and(...periodConditions))
+      .where(and(...liveConditions))
       .groupBy(lastfmTracks.id)
       .orderBy(desc(sql`count(${lastfmScrobbles.id})`))
       .limit(limit)

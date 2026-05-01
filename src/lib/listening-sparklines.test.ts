@@ -26,9 +26,10 @@ describe('isSparklinePeriod', () => {
     }
   });
 
-  it('rejects 7day and overall', () => {
-    expect(isSparklinePeriod('7day')).toBe(false);
+  it('rejects overall and unknown values', () => {
     expect(isSparklinePeriod('overall')).toBe(false);
+    expect(isSparklinePeriod('5day')).toBe(false);
+    expect(isSparklinePeriod('')).toBe(false);
   });
 });
 

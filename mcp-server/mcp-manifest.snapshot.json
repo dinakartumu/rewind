@@ -935,7 +935,7 @@
     },
     {
       "name": "get_top_artists",
-      "description": "Get top listened-to artists from Last.fm for a given time period, with top-N artist images and Apple Music links. In MCP Apps hosts, renders an interactive artist portrait grid inline.",
+      "description": "Get top listened-to artists for a time window, with top-N artist images and Apple Music links. Use `period` for vague-recent queries (\"lately\", \"this week\") — defaults to '1month' (rolling 28 days). Use `date`/`from`/`to` for calendar queries (\"in February\", \"last month\", \"this year\") — date filter overrides period when both are supplied. In MCP Apps hosts, renders an interactive artist portrait grid inline.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -950,7 +950,7 @@
               "overall"
             ],
             "default": "1month",
-            "description": "Time period for rankings"
+            "description": "Rolling time period for rankings. Use for \"lately\"/\"this week\" style queries. Ignored when date/from/to is supplied."
           },
           "limit": {
             "type": "number",
@@ -965,6 +965,18 @@
             "default": 1,
             "description": "Page number for pagination"
           },
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          },
           "include_images": {
             "type": "boolean",
             "default": true,
@@ -973,7 +985,7 @@
           "include_sparklines": {
             "type": "boolean",
             "default": true,
-            "description": "When true (default), attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported only for period in {1month, 3month, 6month, 12month}; omitted otherwise. Set false to keep responses small."
+            "description": "When true (default), attach a `sparkline` (granularity + zero-filled play-count points) to each artist. Supported for period in {7day, 1month, 3month, 6month, 12month}. Set false to keep responses small."
           }
         },
         "additionalProperties": false,
@@ -982,7 +994,7 @@
     },
     {
       "name": "get_top_tracks",
-      "description": "Top listened-to tracks from Last.fm for a given time period, with top-N Apple Music links. Optional `artist_id` or `artist_name` filters to a single artist's catalog — useful for 'what X songs have I been listening to lately' queries. Use after get_artist_details if a longer ranked list is needed; otherwise the embedded top_tracks[] from get_artist_details (capped at 10) is sufficient. In MCP Apps hosts, renders an interactive top-tracks card with a List | By album toggle.",
+      "description": "Top listened-to tracks for a time window, with top-N Apple Music links. Optional `artist_id` or `artist_name` filters to a single artist's catalog — useful for 'what X songs have I been listening to lately' queries. Use `period` for vague-recent queries (\"lately\", \"this week\") — defaults to '1month' (rolling 28 days). Use `date`/`from`/`to` for calendar queries (\"in February\", \"last month\", \"this year\") — date filter overrides period when both are supplied. In MCP Apps hosts, renders an interactive top-tracks card with a List | By album toggle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -997,7 +1009,7 @@
               "overall"
             ],
             "default": "1month",
-            "description": "Time period for rankings"
+            "description": "Rolling time period for rankings. Use for \"lately\"/\"this week\" style queries. Ignored when date/from/to is supplied."
           },
           "limit": {
             "type": "number",
@@ -1015,12 +1027,24 @@
           "artist_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Filter to a single artist. Stable id from get_artist_details or get_top_artists. Composes with period."
+            "description": "Filter to a single artist. Stable id from get_artist_details or get_top_artists. Composes with period and date filters."
           },
           "artist_name": {
             "type": "string",
             "minLength": 1,
             "description": "Substring match against artist names (case-insensitive). Resolves to the highest-playcount match. Use only if no artist_id is available; passing both is a 400."
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
           }
         },
         "additionalProperties": false,
