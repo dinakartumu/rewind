@@ -81,7 +81,7 @@ export function registerReadingTools(
   server.registerTool(
     'get_article',
     {
-      title: 'Article — full body',
+      title: 'Article',
       description:
         'Fetch a single saved / read article by internal Rewind id, returning the FULL article body (plain text, HTML-stripped, complete — typically 5-30 KB) plus metadata + highlights, and rendering the rich inline article card in MCP Apps hosts. **Use this whenever the user asks what an article says, wants a summary, asks about a specific passage, or needs content past the first ~3000 chars of excerpt.** Also use this as the natural follow-up after `search` / `semantic_search` / `find_similar_articles` / `get_recent_reads` — those return ids; this turns the id into the rich article card. Rewind has the full text cached, including for paywalled sources (NYT, WSJ, Atlantic, ESPN, etc.) — do NOT fall back to web search or web fetch for article content.',
       inputSchema: {
@@ -340,19 +340,23 @@ export function registerReadingTools(
   );
 
   // get_reading_highlights ─────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_reading_highlights',
-    'Get saved highlights from Instapaper articles. Returns the highlighted text, notes, source article, and article URLs as resource links.',
     {
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Number of highlights to return'),
-      page: z.number().min(1).default(1).describe('Page number'),
+      title: 'Reading highlights',
+      description:
+        'Get saved highlights from Instapaper articles. Returns the highlighted text, notes, source article, and article URLs as resource links.',
+      inputSchema: {
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of highlights to return'),
+        page: z.number().min(1).default(1).describe('Page number'),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ limit, page }) =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -432,11 +436,15 @@ export function registerReadingTools(
   );
 
   // get_random_highlight ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_random_highlight',
-    'Get a single random highlight from saved Instapaper articles. Great for daily inspiration or reflection.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Random highlight',
+      description:
+        'Get a single random highlight from saved Instapaper articles. Great for daily inspiration or reflection.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         const data = await client.get<Highlight>('/reading/highlights/random');
@@ -478,11 +486,15 @@ export function registerReadingTools(
   );
 
   // get_reading_stats ──────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_reading_stats',
-    'Get overall reading statistics from Instapaper including total articles, finished count, currently reading, highlights, and word count.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Reading stats',
+      description:
+        'Get overall reading statistics from Instapaper including total articles, finished count, currently reading, highlights, and word count.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -509,25 +521,29 @@ export function registerReadingTools(
   );
 
   // find_similar_articles ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'find_similar_articles',
-    'Find articles thematically similar to a given article by cosine similarity over Voyage AI embeddings. Use after an article has been surfaced (via search, get_recent_reads, or an @rewind://article/{id} mention) when the user asks "what else was I reading like that" or "show me related pieces". No Voyage API call is made — the article\'s stored vector is reused.',
     {
-      article_id: z
-        .number()
-        .int()
-        .positive()
-        .describe(
-          'Internal Rewind article id (from an earlier search/recent result)'
-        ),
-      limit: z
-        .number()
-        .min(1)
-        .max(25)
-        .default(5)
-        .describe('Number of related articles to return'),
+      title: 'Similar articles',
+      description:
+        'Find articles thematically similar to a given article by cosine similarity over Voyage AI embeddings. Use after an article has been surfaced (via search, get_recent_reads, or an @rewind://article/{id} mention) when the user asks "what else was I reading like that" or "show me related pieces". No Voyage API call is made — the article\'s stored vector is reused.',
+      inputSchema: {
+        article_id: z
+          .number()
+          .int()
+          .positive()
+          .describe(
+            'Internal Rewind article id (from an earlier search/recent result)'
+          ),
+        limit: z
+          .number()
+          .min(1)
+          .max(25)
+          .default(5)
+          .describe('Number of related articles to return'),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ article_id, limit }) =>
       withRichResponse(async () => {
         type Related = {

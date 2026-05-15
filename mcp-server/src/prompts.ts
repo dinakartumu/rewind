@@ -3,10 +3,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export function registerPrompts(server: McpServer): void {
   // Weekly summary prompt
-  server.prompt(
+  server.registerPrompt(
     'weekly-summary',
-    'Generate a summary of activity across all domains for the past week',
-    {},
+    {
+      title: 'Weekly summary',
+      description:
+        'Generate a summary of activity across all domains for the past week',
+      argsSchema: {},
+    },
     () => ({
       messages: [
         {
@@ -32,11 +36,15 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Year in review prompt
-  server.prompt(
+  server.registerPrompt(
     'year-in-review',
-    'Generate a comprehensive year-in-review for a given year across all domains',
     {
-      year: z.string().describe('The year to review (e.g. 2025)'),
+      title: 'Year in review',
+      description:
+        'Generate a comprehensive year-in-review for a given year across all domains',
+      argsSchema: {
+        year: z.string().describe('The year to review (e.g. 2025)'),
+      },
     },
     ({ year }) => ({
       messages: [
@@ -70,16 +78,20 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Letterboxd review draft
-  server.prompt(
+  server.registerPrompt(
     'letterboxd-review-draft',
-    'Draft a Letterboxd-style review for a recently watched film that I have rated but not yet reviewed.',
     {
-      title: z
-        .string()
-        .optional()
-        .describe(
-          'Optional film title to review. If omitted, picks the most recent unreviewed watch.'
-        ),
+      title: 'Letterboxd review draft',
+      description:
+        'Draft a Letterboxd-style review for a recently watched film that I have rated but not yet reviewed.',
+      argsSchema: {
+        title: z
+          .string()
+          .optional()
+          .describe(
+            'Optional film title to review. If omitted, picks the most recent unreviewed watch.'
+          ),
+      },
     },
     ({ title }) => ({
       messages: [
@@ -109,14 +121,18 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Training report
-  server.prompt(
+  server.registerPrompt(
     'training-report',
-    'Analyze the past 7-14 days of running activity and produce a coach-style training report.',
     {
-      days: z
-        .string()
-        .optional()
-        .describe('Number of days to analyze (default 7).'),
+      title: 'Training report',
+      description:
+        'Analyze the past 7-14 days of running activity and produce a coach-style training report.',
+      argsSchema: {
+        days: z
+          .string()
+          .optional()
+          .describe('Number of days to analyze (default 7).'),
+      },
     },
     ({ days }) => ({
       messages: [
@@ -151,16 +167,20 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Film diet
-  server.prompt(
+  server.registerPrompt(
     'film-diet',
-    'Characterize the shape of my movie-watching taste: genre mix, decade distribution, top directors, rewatch rate, and where I lean vs drift.',
     {
-      period: z
-        .string()
-        .optional()
-        .describe(
-          "Optional period scope (e.g. '12month', '2025'). Default: lifetime."
-        ),
+      title: 'Film diet',
+      description:
+        'Characterize the shape of my movie-watching taste: genre mix, decade distribution, top directors, rewatch rate, and where I lean vs drift.',
+      argsSchema: {
+        period: z
+          .string()
+          .optional()
+          .describe(
+            "Optional period scope (e.g. '12month', '2025'). Default: lifetime."
+          ),
+      },
     },
     ({ period }) => ({
       messages: [
@@ -193,25 +213,29 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Compare periods prompt
-  server.prompt(
+  server.registerPrompt(
     'compare-periods',
-    'Compare activity between two time periods for a specific domain',
     {
-      domain: z
-        .string()
-        .describe(
-          'Domain to compare (listening, running, watching, collecting, reading)'
-        ),
-      period1: z
-        .string()
-        .describe(
-          "First period description (e.g. 'January 2025', 'last month')"
-        ),
-      period2: z
-        .string()
-        .describe(
-          "Second period description (e.g. 'January 2024', 'this month')"
-        ),
+      title: 'Compare periods',
+      description:
+        'Compare activity between two time periods for a specific domain',
+      argsSchema: {
+        domain: z
+          .string()
+          .describe(
+            'Domain to compare (listening, running, watching, collecting, reading)'
+          ),
+        period1: z
+          .string()
+          .describe(
+            "First period description (e.g. 'January 2025', 'last month')"
+          ),
+        period2: z
+          .string()
+          .describe(
+            "Second period description (e.g. 'January 2024', 'this month')"
+          ),
+      },
     },
     ({ domain, period1, period2 }) => ({
       messages: [
@@ -239,15 +263,19 @@ export function registerPrompts(server: McpServer): void {
   );
 
   // Find a half-remembered article
-  server.prompt(
+  server.registerPrompt(
     'find-article',
-    'Recover an article the user only half-remembers, using hybrid keyword + semantic search, then surface related pieces',
     {
-      description: z
-        .string()
-        .describe(
-          'Whatever the user remembers about the article: topic, person mentioned, feeling, rough time period, etc.'
-        ),
+      title: 'Find an article',
+      description:
+        'Recover an article the user only half-remembers, using hybrid keyword + semantic search, then surface related pieces',
+      argsSchema: {
+        description: z
+          .string()
+          .describe(
+            'Whatever the user remembers about the article: topic, person mentioned, feeling, rough time period, etc.'
+          ),
+      },
     },
     ({ description }) => ({
       messages: [

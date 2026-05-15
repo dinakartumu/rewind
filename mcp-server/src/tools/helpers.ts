@@ -255,12 +255,16 @@ export const includeImagesParam = {
     ),
 };
 
-/** Standard annotations for all Rewind tools (read-only, open-world). */
+/**
+ * Standard annotations for all Rewind tools. Read-only and closed-world:
+ * every tool reads the user's own bounded archive via api.rewind.rest, never
+ * an unbounded external space at call time.
+ */
 export const READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true as const,
   destructiveHint: false as const,
   idempotentHint: true as const,
-  openWorldHint: true as const,
+  openWorldHint: false as const,
 };
 
 export type { RewindClient };

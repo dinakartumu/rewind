@@ -149,11 +149,15 @@ export function registerListeningTools(
   client: RewindClient
 ): void {
   // get_now_playing ────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_now_playing',
-    'Get the track currently playing (or most recently scrobbled) on Last.fm. Returns track + artist + album, album cover image, and Apple Music resource link.',
-    { ...includeImagesParam },
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Now playing',
+      description:
+        'Get the track currently playing (or most recently scrobbled) on Last.fm. Returns track + artist + album, album cover image, and Apple Music resource link.',
+      inputSchema: { ...includeImagesParam },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async ({ include_images }) =>
       withRichResponse(async () => {
         const data = await client.get<NowPlaying>('/listening/now-playing');
@@ -194,27 +198,31 @@ export function registerListeningTools(
   );
 
   // get_recent_listens ─────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_recent_listens',
-    'Get recently scrobbled tracks from Last.fm, with top-N album covers and Apple Music resource links. Supports date filtering.',
     {
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Number of recent tracks to return (default 10, max 50)'),
-      page: z
-        .number()
-        .min(1)
-        .default(1)
-        .describe(
-          'Page number for pagination. Combine with limit to page through longer windows.'
-        ),
-      ...dateFilterParams,
-      ...includeImagesParam,
+      title: 'Recent listens',
+      description:
+        'Get recently scrobbled tracks from Last.fm, with top-N album covers and Apple Music resource links. Supports date filtering.',
+      inputSchema: {
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of recent tracks to return (default 10, max 50)'),
+        page: z
+          .number()
+          .min(1)
+          .default(1)
+          .describe(
+            'Page number for pagination. Combine with limit to page through longer windows.'
+          ),
+        ...dateFilterParams,
+        ...includeImagesParam,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ limit, page, date, from, to, include_images }) =>
       withRichResponse(async () => {
         const { data } = await client.get<{ data: Scrobble[] }>(
@@ -264,11 +272,15 @@ export function registerListeningTools(
   );
 
   // get_listening_stats ────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_listening_stats',
-    'Get overall listening statistics from Last.fm including total scrobbles, unique artists, albums, tracks, and daily average. Supports date filtering.',
-    { ...dateFilterParams },
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Listening stats',
+      description:
+        'Get overall listening statistics from Last.fm including total scrobbles, unique artists, albums, tracks, and daily average. Supports date filtering.',
+      inputSchema: { ...dateFilterParams },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async ({ date, from, to }) =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -595,11 +607,15 @@ export function registerListeningTools(
   );
 
   // get_listening_streaks ──────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_listening_streaks',
-    'Get listening streak data from Last.fm -- current consecutive days with scrobbles and the longest streak ever.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Listening streaks',
+      description:
+        'Get listening streak data from Last.fm -- current consecutive days with scrobbles and the longest streak ever.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -648,7 +664,7 @@ export function registerListeningTools(
   server.registerTool(
     'get_artist_details',
     {
-      title: 'Artist — detail',
+      title: 'Artist',
       description:
         "Detailed listening profile for a single artist by ID: bio, total scrobbles, all-time rank, first/last played, top tracks, top albums, similar artists you've also listened to, and a yearly sparkline of plays. Use for natural-language queries like 'tell me about my X listening history'. In MCP Apps hosts, renders an interactive artist card inline.",
       inputSchema: {
@@ -782,11 +798,18 @@ export function registerListeningTools(
   );
 
   // get_album_details ──────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_album_details',
-    'Get detailed information about a specific album by ID: artist, play count, track listing, cover art, and Apple Music link.',
-    { id: z.number().describe('Album ID'), ...includeImagesParam },
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Album',
+      description:
+        'Get detailed information about a specific album by ID: artist, play count, track listing, cover art, and Apple Music link.',
+      inputSchema: {
+        id: z.number().describe('Album ID'),
+        ...includeImagesParam,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async ({ id, include_images }) =>
       withRichResponse(async () => {
         const data = await client.get<AlbumDetail>(`/listening/albums/${id}`);
@@ -828,25 +851,29 @@ export function registerListeningTools(
   );
 
   // get_listening_genres ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_listening_genres',
-    'Get genre breakdown over time from Last.fm listening history, grouped by week/month/year. Designed for stacked chart visualization.',
     {
-      group_by: z
-        .enum(['week', 'month', 'year'])
-        .default('month')
-        .describe('Grouping period (default: month)'),
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe(
-          'Max genres to return -- rest grouped as "Other" (default 10)'
-        ),
-      ...dateFilterParams,
+      title: 'Listening genres',
+      description:
+        'Get genre breakdown over time from Last.fm listening history, grouped by week/month/year. Designed for stacked chart visualization.',
+      inputSchema: {
+        group_by: z
+          .enum(['week', 'month', 'year'])
+          .default('month')
+          .describe('Grouping period (default: month)'),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe(
+            'Max genres to return -- rest grouped as "Other" (default 10)'
+          ),
+        ...dateFilterParams,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ group_by, limit, date, from, to }) =>
       withRichResponse(async () => {
         type GenrePeriod = {

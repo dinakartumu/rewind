@@ -162,60 +162,64 @@ export function registerAttendingTools(
   client: RewindClient
 ): void {
   // get_attended_events ─────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_attended_events',
-    'List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, venue, and team. Includes events you bought tickets for but did not attend (attended=false). Use `team` (substring match like "mariners" or "huskies") for natural-language queries; `team_id` for stable integer-keyed lookups. When the user asks about a SINGLE specific event ("last Mariners game I went to", "the Springsteen show I attended"), call this with the appropriate filter + `limit: 1` to find the id, then follow up with `get_attended_event(id)` to render the rich inline card — do not stop at the list-tool text response.',
     {
-      page: z.number().min(1).default(1).describe('Page number, 1-indexed.'),
-      limit: z
-        .number()
-        .min(1)
-        .max(100)
-        .default(20)
-        .describe('Items per page (max 100).'),
-      category: z
-        .enum(['sports', 'music', 'arts'])
-        .optional()
-        .describe('Top-level category filter.'),
-      event_type: z
-        .string()
-        .optional()
-        .describe('Specific type, e.g. "mlb_game", "concert", "ncaaf_game".'),
-      season: z
-        .number()
-        .int()
-        .optional()
-        .describe('Sports season year (e.g. 2024).'),
-      year: z
-        .number()
-        .int()
-        .optional()
-        .describe('Calendar year filter on event_date.'),
-      venue_id: z.number().int().optional().describe('Filter by venue id.'),
-      attended: z
-        .number()
-        .int()
-        .min(0)
-        .max(1)
-        .optional()
-        .describe(
-          '1 = only attended, 0 = only unattended (purchased but missed). Omit to return both.'
-        ),
-      team: z
-        .string()
-        .optional()
-        .describe(
-          'Case-insensitive substring match against either team name in event_data. e.g. "mariners", "huskies", "storm". Returns games where this team was either home or away.'
-        ),
-      team_id: z
-        .number()
-        .int()
-        .optional()
-        .describe(
-          'Exact match on the league-native team id. e.g. 136 = Seattle Mariners (MLB), 264 = Washington Huskies (ESPN). Use when the natural-language `team` substring is ambiguous.'
-        ),
+      title: 'Attended events',
+      description:
+        'List events you bought tickets for: sports games, concerts, theater. Filterable by category (sports/music/arts), event_type (mlb_game, concert, etc.), season, year, venue, and team. Includes events you bought tickets for but did not attend (attended=false). Use `team` (substring match like "mariners" or "huskies") for natural-language queries; `team_id` for stable integer-keyed lookups. When the user asks about a SINGLE specific event ("last Mariners game I went to", "the Springsteen show I attended"), call this with the appropriate filter + `limit: 1` to find the id, then follow up with `get_attended_event(id)` to render the rich inline card — do not stop at the list-tool text response.',
+      inputSchema: {
+        page: z.number().min(1).default(1).describe('Page number, 1-indexed.'),
+        limit: z
+          .number()
+          .min(1)
+          .max(100)
+          .default(20)
+          .describe('Items per page (max 100).'),
+        category: z
+          .enum(['sports', 'music', 'arts'])
+          .optional()
+          .describe('Top-level category filter.'),
+        event_type: z
+          .string()
+          .optional()
+          .describe('Specific type, e.g. "mlb_game", "concert", "ncaaf_game".'),
+        season: z
+          .number()
+          .int()
+          .optional()
+          .describe('Sports season year (e.g. 2024).'),
+        year: z
+          .number()
+          .int()
+          .optional()
+          .describe('Calendar year filter on event_date.'),
+        venue_id: z.number().int().optional().describe('Filter by venue id.'),
+        attended: z
+          .number()
+          .int()
+          .min(0)
+          .max(1)
+          .optional()
+          .describe(
+            '1 = only attended, 0 = only unattended (purchased but missed). Omit to return both.'
+          ),
+        team: z
+          .string()
+          .optional()
+          .describe(
+            'Case-insensitive substring match against either team name in event_data. e.g. "mariners", "huskies", "storm". Returns games where this team was either home or away.'
+          ),
+        team_id: z
+          .number()
+          .int()
+          .optional()
+          .describe(
+            'Exact match on the league-native team id. e.g. 136 = Seattle Mariners (MLB), 264 = Washington Huskies (ESPN). Use when the natural-language `team` substring is ambiguous.'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({
       page,
       limit,
@@ -280,7 +284,7 @@ export function registerAttendingTools(
   server.registerTool(
     'get_attended_season',
     {
-      title: 'Attended sports season',
+      title: 'Sports season',
       description:
         'Get every game you attended (or hold tickets for) in a given league + season, with W/L record. league is a slug like "mlb", "nfl", "ncaaf", "nba", "wnba". In MCP Apps hosts, renders an interactive season grid with score, attendance, and notable performers.',
       inputSchema: {
@@ -341,42 +345,46 @@ export function registerAttendingTools(
   // Search across the players-you-have-watched-play list. Supports name
   // substring lookup so the model can resolve "Julio" -> player id without
   // the user having to know the integer id.
-  server.tool(
+  server.registerTool(
     'get_attended_players',
-    'Search the list of players (MLB, NFL, NCAAF, NBA, etc.) you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn. When the user asks about a SPECIFIC player ("how\'s JP Crawford playing this year", "what are Cal Raleigh\'s stats", "tell me about Kirby"), call this to resolve the name to an id, then follow up with `get_attended_player(id)` to render the rich inline athlete card with current-season stats — do not stop at the search-result text response.',
     {
-      page: z
-        .number()
-        .int()
-        .min(1)
-        .default(1)
-        .describe('Page number, 1-indexed.'),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Items per page (max 50).'),
-      name: z
-        .string()
-        .optional()
-        .describe(
-          'Case-insensitive substring match on full name. e.g. "julio", "kirby", "will smith".'
-        ),
-      league: z
-        .string()
-        .optional()
-        .describe('Filter by league slug, e.g. "mlb", "nfl", "ncaaf".'),
-      team_id: z
-        .number()
-        .int()
-        .optional()
-        .describe(
-          'Filter by primary team id (league-native, e.g. 136 = Mariners in MLB).'
-        ),
+      title: 'Attended players',
+      description:
+        'Search the list of players (MLB, NFL, NCAAF, NBA, etc.) you have watched play in person. Use `name` (substring, case-insensitive) to resolve a player by name. Use `league` and/or `team_id` to filter further. Common names like "Will Smith" return multiple matches — disambiguate via `primary_team.abbreviation` and `primary_position` on each result without a follow-up turn. When the user asks about a SPECIFIC player ("how\'s JP Crawford playing this year", "what are Cal Raleigh\'s stats", "tell me about Kirby"), call this to resolve the name to an id, then follow up with `get_attended_player(id)` to render the rich inline athlete card with current-season stats — do not stop at the search-result text response.',
+      inputSchema: {
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .default(1)
+          .describe('Page number, 1-indexed.'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Items per page (max 50).'),
+        name: z
+          .string()
+          .optional()
+          .describe(
+            'Case-insensitive substring match on full name. e.g. "julio", "kirby", "will smith".'
+          ),
+        league: z
+          .string()
+          .optional()
+          .describe('Filter by league slug, e.g. "mlb", "nfl", "ncaaf".'),
+        team_id: z
+          .number()
+          .int()
+          .optional()
+          .describe(
+            'Filter by primary team id (league-native, e.g. 136 = Mariners in MLB).'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ page, limit, name, league, team_id }) =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -428,7 +436,7 @@ export function registerAttendingTools(
   server.registerTool(
     'get_attended_player',
     {
-      title: 'Athlete — detail',
+      title: 'Player',
       description:
         'Detailed athlete card for an MLB / NFL / NCAAF / NBA player you\'ve watched play in person. **Use this whenever the user asks how a specific player is performing this season, what their batting average / ERA / current stats are, how their career has gone, or how they\'ve played in the games you attended** — e.g. "how\'s JP Crawford playing this year", "what are Cal Raleigh\'s numbers", "show me Kirby\'s stats", "tell me about Julio Rodriguez". Returns bio (position, jersey, debut, height/weight, college, awards), team logo, current-season stats (live MLB Stats API for MLB players, KV-cached 1h), career-by-season table, home/away/L-R splits, the **season_attended_summary** (this player\'s line in only the games you attended this season — use this to answer "how has he done in the games I\'ve been to this year"), the **attended_summary** (career line across every game you\'ve ever seen this player in), and the 10 most recent attended appearances. Trust season_attended_summary.games_attended as the count of games you\'ve attended this season — do NOT derive it by filtering attended_appearances yourself; that array is capped at 10 most-recent and will undercount for players you see often. MLB-only for the live-stats panel — non-MLB players surface as supported:false. In MCP Apps hosts, renders the rich inline athlete card. If you do not have the player id, first call `get_attended_players` with `name` to resolve the id, then call this to render the card.',
       inputSchema: {
@@ -739,25 +747,29 @@ export function registerAttendingTools(
           my_team_won: boolean | null;
         }>;
       };
-  server.tool(
+  server.registerTool(
     'get_attended_player_stats',
-    'Aggregate stats for one player across the games you attended. MLB players get a hitter slash line + counting stats, or a pitcher line + ERA / WHIP / decisions, depending on which stat lines exist on their appearances. Non-MLB players (NFL, NCAAF, NBA, etc.) return supported=false with appearance summaries (final scores, opponents) — full stat-line parsing for those leagues is on the roadmap. \n\n**Use career (omit `season`) by default.** Single-season slices are tiny — max 50 PAs across the entire dataset; career is where meaningful samples live (Cal Raleigh ~130 PAs / 32 attended games; Kirby ~238 BFs / 10 attended starts). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing the answer so the user can judge confidence.',
     {
-      id: z
-        .number()
-        .int()
-        .describe(
-          'Player id (from get_attended_players or get_attended_player).'
-        ),
-      season: z
-        .number()
-        .int()
-        .optional()
-        .describe(
-          'Optional. Single-season slice. Omit for career across all attended games (recommended — see tool description).'
-        ),
+      title: 'Player stats',
+      description:
+        'Aggregate stats for one player across the games you attended. MLB players get a hitter slash line + counting stats, or a pitcher line + ERA / WHIP / decisions, depending on which stat lines exist on their appearances. Non-MLB players (NFL, NCAAF, NBA, etc.) return supported=false with appearance summaries (final scores, opponents) — full stat-line parsing for those leagues is on the roadmap. \n\n**Use career (omit `season`) by default.** Single-season slices are tiny — max 50 PAs across the entire dataset; career is where meaningful samples live (Cal Raleigh ~130 PAs / 32 attended games; Kirby ~238 BFs / 10 attended starts). Always cite `pa` (hitter) or `bf` (pitcher) and `games` when phrasing the answer so the user can judge confidence.',
+      inputSchema: {
+        id: z
+          .number()
+          .int()
+          .describe(
+            'Player id (from get_attended_players or get_attended_player).'
+          ),
+        season: z
+          .number()
+          .int()
+          .optional()
+          .describe(
+            'Optional. Single-season slice. Omit for career across all attended games (recommended — see tool description).'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ id, season }) =>
       withRichResponse<PlayerStatsResp>(async () => {
         const data = await client.get<PlayerStatsResp>(
@@ -845,11 +857,15 @@ export function registerAttendingTools(
   );
 
   // get_attending_stats ─────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_attending_stats',
-    'Aggregate counts of attended events broken down by category, event_type, and year.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Attendance stats',
+      description:
+        'Aggregate counts of attended events broken down by category, event_type, and year.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         const data = await client.get<AttendingStats>('/attending/stats');
@@ -886,7 +902,7 @@ export function registerAttendingTools(
   server.registerTool(
     'get_attended_event',
     {
-      title: 'Attended event',
+      title: 'Event',
       description:
         'Get a single attended event (sports game, concert, theater show) in full detail, including venue, tickets, and per-player stat lines for sports games. Renders the rich inline event card — linescore, top performers with photos, ticket info — in MCP Apps hosts. Use this when the user asks about ONE specific event: "tell me about my last Mariners game," "who pitched in that Phillies game," "the Springsteen show I went to," "what happened at that game." If you do not have the event id, first call `get_attended_events` with a `team` / `event_type` filter (and `limit: 1` if the user asked for the most recent) to find the id, then call this to render the card.',
       inputSchema: {
@@ -948,13 +964,17 @@ export function registerAttendingTools(
   );
 
   // get_attending_year_in_review ────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_attending_year_in_review',
-    'Year-in-review summary for attended events: totals, monthly breakdown, top venues, top concert performers, and the full event list. Use this when the user asks "what shows did I see in 2024" or "best year for games".',
     {
-      year: z.number().int().describe('Calendar year, e.g. 2024.'),
+      title: 'Attendance — year in review',
+      description:
+        'Year-in-review summary for attended events: totals, monthly breakdown, top venues, top concert performers, and the full event list. Use this when the user asks "what shows did I see in 2024" or "best year for games".',
+      inputSchema: {
+        year: z.number().int().describe('Calendar year, e.g. 2024.'),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ year }) =>
       withRichResponse(async () => {
         const data = await client.get<AttendingYearInReview>(

@@ -94,11 +94,15 @@ export function createServer(client: RewindClient): McpServer {
   );
 
   // System tool
-  server.tool(
+  server.registerTool(
     'get_health',
-    'Check the health and sync status of the Rewind API. Returns API status and last sync times for each data domain.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'API health',
+      description:
+        'Check the health and sync status of the Rewind API. Returns API status and last sync times for each data domain.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () => {
       try {
         const health = await client.get<{

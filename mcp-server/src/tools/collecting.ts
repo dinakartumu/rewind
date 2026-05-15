@@ -76,45 +76,56 @@ export function registerCollectingTools(
   client: RewindClient
 ): void {
   // get_vinyl_collection ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_vinyl_collection',
-    'Browse the vinyl record collection from Discogs. Returns records with artist, title, year, format, and label, plus top-N cover art and Discogs resource links. Supports search, filters, sort, and pagination.',
     {
-      query: z
-        .string()
-        .optional()
-        .describe(
-          "Optional: search by artist or album title (e.g. 'Beastie Boys', 'Dark Side')"
-        ),
-      format: z
-        .string()
-        .optional()
-        .describe(
-          "Optional: filter by format (e.g. 'Vinyl', 'CD', 'Cassette')"
-        ),
-      genre: z.string().optional().describe('Optional: filter by genre'),
-      artist: z.string().optional().describe('Optional: filter by artist name'),
-      sort: z
-        .string()
-        .optional()
-        .describe(
-          'Optional: sort field (default: date_added). Options: date_added, title, year, artist'
-        ),
-      order: z
-        .enum(['asc', 'desc'])
-        .optional()
-        .describe('Optional: sort order (default: desc)'),
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Number of records to return'),
-      page: z.number().min(1).default(1).describe('Page number for pagination'),
-      ...dateFilterParams,
-      ...includeImagesParam,
+      title: 'Vinyl collection',
+      description:
+        'Browse the vinyl record collection from Discogs. Returns records with artist, title, year, format, and label, plus top-N cover art and Discogs resource links. Supports search, filters, sort, and pagination.',
+      inputSchema: {
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "Optional: search by artist or album title (e.g. 'Beastie Boys', 'Dark Side')"
+          ),
+        format: z
+          .string()
+          .optional()
+          .describe(
+            "Optional: filter by format (e.g. 'Vinyl', 'CD', 'Cassette')"
+          ),
+        genre: z.string().optional().describe('Optional: filter by genre'),
+        artist: z
+          .string()
+          .optional()
+          .describe('Optional: filter by artist name'),
+        sort: z
+          .string()
+          .optional()
+          .describe(
+            'Optional: sort field (default: date_added). Options: date_added, title, year, artist'
+          ),
+        order: z
+          .enum(['asc', 'desc'])
+          .optional()
+          .describe('Optional: sort order (default: desc)'),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of records to return'),
+        page: z
+          .number()
+          .min(1)
+          .default(1)
+          .describe('Page number for pagination'),
+        ...dateFilterParams,
+        ...includeImagesParam,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({
       query,
       format,
@@ -205,11 +216,15 @@ export function registerCollectingTools(
   );
 
   // get_collecting_stats ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_collecting_stats',
-    'Get overall collection statistics including total items, format breakdown (vinyl, CD, cassette), unique artists, genre data, and year range. Supports date filtering.',
-    { ...dateFilterParams },
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Collection stats',
+      description:
+        'Get overall collection statistics including total items, format breakdown (vinyl, CD, cassette), unique artists, genre data, and year range. Supports date filtering.',
+      inputSchema: { ...dateFilterParams },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async ({ date, from, to }) =>
       withRichResponse(async () => {
         type Stats = {
@@ -263,30 +278,38 @@ export function registerCollectingTools(
   );
 
   // get_physical_media ─────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_physical_media',
-    'Browse the physical media collection (Blu-ray, 4K UHD, HD DVD). Search by title, filter by format. Returns top-N cover art and pagination.',
     {
-      query: z
-        .string()
-        .optional()
-        .describe(
-          "Optional: search by title (e.g. 'Princess Bride', 'Kubrick')"
-        ),
-      media_type: z
-        .enum(['bluray', 'uhd_bluray', 'hddvd'])
-        .optional()
-        .describe('Optional: filter by format (bluray, uhd_bluray, hddvd)'),
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Number of items to return'),
-      page: z.number().min(1).default(1).describe('Page number for pagination'),
-      ...includeImagesParam,
+      title: 'Physical media',
+      description:
+        'Browse the physical media collection (Blu-ray, 4K UHD, HD DVD). Search by title, filter by format. Returns top-N cover art and pagination.',
+      inputSchema: {
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "Optional: search by title (e.g. 'Princess Bride', 'Kubrick')"
+          ),
+        media_type: z
+          .enum(['bluray', 'uhd_bluray', 'hddvd'])
+          .optional()
+          .describe('Optional: filter by format (bluray, uhd_bluray, hddvd)'),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of items to return'),
+        page: z
+          .number()
+          .min(1)
+          .default(1)
+          .describe('Page number for pagination'),
+        ...includeImagesParam,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ query, media_type, limit, page, include_images }) =>
       withRichResponse(async () => {
         const data = await client.get<{
@@ -338,11 +361,15 @@ export function registerCollectingTools(
   );
 
   // get_physical_media_stats ───────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_physical_media_stats',
-    'Get statistics for the physical media collection including total items and breakdown by format (Blu-ray, 4K UHD, HD DVD).',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Physical media stats',
+      description:
+        'Get statistics for the physical media collection including total items and breakdown by format (Blu-ray, 4K UHD, HD DVD).',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         const { data } = await client.get<{

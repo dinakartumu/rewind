@@ -9,7 +9,7 @@ export function registerDebugTools(server: McpServer): void {
   server.registerTool(
     'ui_hello_debug',
     {
-      title: 'UI Hello (debug)',
+      title: 'UI hello — debug',
       description:
         'Show the Rewind MCP Apps diagnostic UI. Invoke this to verify the MCP Apps pipeline end-to-end against a known-working minimal React app.',
       inputSchema: {},

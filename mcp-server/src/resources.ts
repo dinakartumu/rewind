@@ -8,10 +8,11 @@ export function registerResources(
   client: RewindClient
 ): void {
   // Sync status resource
-  server.resource(
+  server.registerResource(
     'sync-status',
     'rewind://sync/status',
     {
+      title: 'Sync status',
       description:
         'Current sync health and last sync times for each data domain',
     },
@@ -50,12 +51,13 @@ export function registerResources(
   );
 
   // Listening year-in-review
-  server.resource(
+  server.registerResource(
     'listening-year',
     new ResourceTemplate('rewind://listening/year/{year}', {
       list: undefined,
     }),
     {
+      title: 'Listening — year in review',
       description: 'Listening year-in-review statistics for a given year',
     },
     async (uri, params) => {
@@ -77,12 +79,13 @@ export function registerResources(
   );
 
   // Running year-in-review
-  server.resource(
+  server.registerResource(
     'running-year',
     new ResourceTemplate('rewind://running/year/{year}', {
       list: undefined,
     }),
     {
+      title: 'Running — year in review',
       description: 'Running year-in-review statistics for a given year',
     },
     async (uri, params) => {
@@ -104,12 +107,13 @@ export function registerResources(
   );
 
   // Watching year-in-review
-  server.resource(
+  server.registerResource(
     'watching-year',
     new ResourceTemplate('rewind://watching/year/{year}', {
       list: undefined,
     }),
     {
+      title: 'Watching — year in review',
       description: 'Watching year-in-review statistics for a given year',
     },
     async (uri, params) => {
@@ -131,10 +135,11 @@ export function registerResources(
   );
 
   // Movie entity
-  server.resource(
+  server.registerResource(
     'movie',
     new ResourceTemplate('rewind://movie/{id}', { list: undefined }),
     {
+      title: 'Movie',
       description:
         'Full detail for a single movie by internal Rewind id: metadata, watch history, ratings, and Letterboxd review URLs.',
     },
@@ -157,10 +162,11 @@ export function registerResources(
   );
 
   // Show entity
-  server.resource(
+  server.registerResource(
     'show',
     new ResourceTemplate('rewind://show/{id}', { list: undefined }),
     {
+      title: 'TV show',
       description:
         'Full detail for a single TV show by internal Rewind id: metadata, seasons, and watched-episode counts.',
     },
@@ -183,10 +189,11 @@ export function registerResources(
   );
 
   // Album entity
-  server.resource(
+  server.registerResource(
     'album',
     new ResourceTemplate('rewind://album/{id}', { list: undefined }),
     {
+      title: 'Album',
       description:
         'Full detail for a single album by internal Rewind id: artist, play count, track listing, cover art metadata, and Apple Music URL.',
     },
@@ -209,10 +216,11 @@ export function registerResources(
   );
 
   // Artist entity
-  server.resource(
+  server.registerResource(
     'artist',
     new ResourceTemplate('rewind://artist/{id}', { list: undefined }),
     {
+      title: 'Artist',
       description:
         'Full detail for a single artist by internal Rewind id: play count, genre, top albums, top tracks, image metadata, and Apple Music URL.',
     },
@@ -235,10 +243,11 @@ export function registerResources(
   );
 
   // Vinyl record entity
-  server.resource(
+  server.registerResource(
     'vinyl',
     new ResourceTemplate('rewind://vinyl/{id}', { list: undefined }),
     {
+      title: 'Vinyl record',
       description:
         'Full detail for a single vinyl record (or other Discogs collection item) by internal Rewind id: title, artists, formats, genres, cover art, Discogs URL, community stats.',
     },
@@ -261,10 +270,11 @@ export function registerResources(
   );
 
   // Physical media entity
-  server.resource(
+  server.registerResource(
     'physical-media',
     new ResourceTemplate('rewind://physical-media/{id}', { list: undefined }),
     {
+      title: 'Physical media',
       description:
         'Full detail for a single physical media item (Blu-ray / 4K UHD / HD DVD) by internal Rewind id: title, year, format, resolution, HDR, audio, watch history.',
     },
@@ -287,10 +297,11 @@ export function registerResources(
   );
 
   // Article entity
-  server.resource(
+  server.registerResource(
     'article',
     new ResourceTemplate('rewind://article/{id}', { list: undefined }),
     {
+      title: 'Article',
       description:
         'Full detail for a saved Instapaper article: title, author, domain, word count, read progress, tags, source URL, Instapaper URLs, embedded highlights, AND the full article body. The `content` field is the complete plain-text body (HTML-stripped, typically 5-30 KB); `excerpt` is the first ~3000 chars. Fetch this resource whenever the user asks about article specifics past the excerpt — do NOT fall back to web search or try to fetch the source URL (often paywalled). The `content` field has the full article text including for paywalled sources.',
     },
@@ -313,10 +324,11 @@ export function registerResources(
   );
 
   // Activity entity
-  server.resource(
+  server.registerResource(
     'activity',
     new ResourceTemplate('rewind://activity/{id}', { list: undefined }),
     {
+      title: 'Run',
       description:
         'Full detail for a single running activity by internal Rewind id: distance, pace, elevation, HR, cadence, calories, location, and Strava URL.',
     },
@@ -339,10 +351,11 @@ export function registerResources(
   );
 
   // Highlight entity
-  server.resource(
+  server.registerResource(
     'highlight',
     new ResourceTemplate('rewind://highlight/{id}', { list: undefined }),
     {
+      title: 'Highlight',
       description:
         'Full detail for a single Instapaper highlight by internal Rewind id: highlighted text, optional note, and nested parent-article context (title, author, domain, source URL).',
     },

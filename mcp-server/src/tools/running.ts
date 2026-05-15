@@ -53,11 +53,15 @@ export function registerRunningTools(
   client: RewindClient
 ): void {
   // get_running_stats ──────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_running_stats',
-    'Get overall running statistics from Strava including total runs, distance, elevation, duration, average pace, and Eddington number.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Running stats',
+      description:
+        'Get overall running statistics from Strava including total runs, distance, elevation, duration, average pace, and Eddington number.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         type Stats = {
@@ -93,26 +97,30 @@ export function registerRunningTools(
   );
 
   // get_recent_runs ────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_recent_runs',
-    'Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, and Strava activity resource links for top-N.',
     {
-      limit: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe('Number of recent runs to return (max 50)'),
-      page: z
-        .number()
-        .min(1)
-        .default(1)
-        .describe(
-          'Page number for pagination. Combine with limit to page through longer windows.'
-        ),
-      ...dateFilterParams,
+      title: 'Recent runs',
+      description:
+        'Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, and Strava activity resource links for top-N.',
+      inputSchema: {
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of recent runs to return (max 50)'),
+        page: z
+          .number()
+          .min(1)
+          .default(1)
+          .describe(
+            'Page number for pagination. Combine with limit to page through longer windows.'
+          ),
+        ...dateFilterParams,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ limit, page, date, from, to }) =>
       withRichResponse(async () => {
         const { data } = await client.get<{ data: Activity[] }>(
@@ -152,11 +160,15 @@ export function registerRunningTools(
   );
 
   // get_personal_records ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_personal_records',
-    'Get personal running records (PRs) from Strava -- fastest times at standard distances like mile, 5K, 10K, half marathon, marathon.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Personal records',
+      description:
+        'Get personal running records (PRs) from Strava -- fastest times at standard distances like mile, 5K, 10K, half marathon, marathon.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         type PR = {
@@ -202,11 +214,15 @@ export function registerRunningTools(
   );
 
   // get_running_streaks ────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_running_streaks',
-    'Get running streak data from Strava -- current consecutive days with runs and the longest streak ever.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Running streaks',
+      description:
+        'Get running streak data from Strava -- current consecutive days with runs and the longest streak ever.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         type Streaks = {
@@ -238,15 +254,21 @@ export function registerRunningTools(
   );
 
   // get_activity_details ───────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_activity_details',
-    'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, and a Strava resource link.',
     {
-      id: z
-        .number()
-        .describe('Activity ID (from get_recent_runs or get_personal_records)'),
+      title: 'Run',
+      description:
+        'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, and a Strava resource link.',
+      inputSchema: {
+        id: z
+          .number()
+          .describe(
+            'Activity ID (from get_recent_runs or get_personal_records)'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
       withRichResponse(async () => {
         const data = await client.get<ActivityDetail>(
@@ -289,15 +311,21 @@ export function registerRunningTools(
   );
 
   // get_activity_splits ────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_activity_splits',
-    'Get per-mile splits for a running activity. Shows pace, elevation, and heart rate for each mile. Get the activity ID from get_recent_runs.',
     {
-      id: z
-        .number()
-        .describe('Activity ID (from get_recent_runs or get_personal_records)'),
+      title: 'Run splits',
+      description:
+        'Get per-mile splits for a running activity. Shows pace, elevation, and heart rate for each mile. Get the activity ID from get_recent_runs.',
+      inputSchema: {
+        id: z
+          .number()
+          .describe(
+            'Activity ID (from get_recent_runs or get_personal_records)'
+          ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    READ_ONLY_ANNOTATIONS,
     async ({ id }) =>
       withRichResponse(async () => {
         type Split = {
@@ -338,11 +366,15 @@ export function registerRunningTools(
   );
 
   // get_running_years ──────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     'get_running_years',
-    'Get per-year summary of running activity: total runs, distance, elevation, duration, average pace, longest run, and race count for every year on record.',
-    {},
-    READ_ONLY_ANNOTATIONS,
+    {
+      title: 'Running by year',
+      description:
+        'Get per-year summary of running activity: total runs, distance, elevation, duration, average pace, longest run, and race count for every year on record.',
+      inputSchema: {},
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
     async () =>
       withRichResponse(async () => {
         type YearSummary = {
