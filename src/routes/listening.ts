@@ -15,6 +15,7 @@ import {
   lastfmYearlyStats,
 } from '../db/schema/lastfm.js';
 import { setCache } from '../lib/cache.js';
+import { requireAuth } from '../lib/auth.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
 import { notFound, badRequest, serverError } from '../lib/errors.js';
 import { getImageAttachment, getImageAttachmentBatch } from '../lib/images.js';
@@ -3805,6 +3806,11 @@ async function aggregateGenres(
 
 // POST /v1/admin/sync/listening -- moved to admin-sync.ts
 // Old path /v1/listening/admin/sync redirects via admin-sync.ts
+
+// All listening admin routes require an admin key. These live at
+// /v1/listening/admin/* (not /v1/admin/*), so the global gate in index.ts
+// does not catch them -- guard them here, as reading.ts does.
+listening.use('/admin/*', requireAuth('admin'));
 
 // GET /v1/admin/listening/filters
 listening.openapi(listFiltersRoute, async (c) => {

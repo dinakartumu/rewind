@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { eq, sql, desc, asc, and, count } from 'drizzle-orm';
 import { createDb } from '../db/client.js';
 import { setCache } from '../lib/cache.js';
+import { requireAuth } from '../lib/auth.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
 import { notFound, badRequest } from '../lib/errors.js';
 import {
@@ -2252,6 +2253,11 @@ watching.openapi(yearInReviewRoute, async (c) => {
 });
 
 // ─── Admin: Manual movie entry ───────────────────────────────────────
+
+// All watching admin routes require an admin key. These live at
+// /v1/watching/admin/* (not /v1/admin/*), so the global gate in index.ts
+// does not catch them -- guard them here, as reading.ts does.
+watching.use('/admin/*', requireAuth('admin'));
 
 watching.openapi(adminCreateMovieRoute, async (c) => {
   const db = createDb(c.env.DB);

@@ -164,3 +164,64 @@ describe('auth middleware', () => {
     });
   });
 });
+
+// Domain-scoped admin routes live at /v1/<domain>/admin/* rather than
+// /v1/admin/*, so the global gate in index.ts does not catch them. Each
+// domain router must guard its own /admin/* (listening, watching, reading).
+// A read key must never be able to reach these write/maintenance endpoints.
+describe('domain-scoped admin route gating', () => {
+  beforeAll(async () => {
+    await setupTestDb();
+  });
+
+  beforeEach(() => {
+    clearAuthCache();
+    resetRateLimitWindows();
+  });
+
+  const cases: Array<{ method: string; path: string; body?: unknown }> = [
+    { method: 'POST', path: '/v1/watching/admin/movies', body: { title: 'x' } },
+    { method: 'PUT', path: '/v1/watching/admin/movies/1', body: { rating: 5 } },
+    { method: 'DELETE', path: '/v1/watching/admin/movies/1' },
+    { method: 'POST', path: '/v1/listening/admin/filters', body: {} },
+    { method: 'GET', path: '/v1/listening/admin/filters' },
+    { method: 'DELETE', path: '/v1/listening/admin/filters/1' },
+  ];
+
+  for (const { method, path, body } of cases) {
+    it(`rejects a read key with 403 on ${method} ${path}`, async () => {
+      const readToken = await createTestApiKey({
+        scope: 'read',
+        name: `read-${method}-${path.replace(/\W+/g, '-')}`,
+      });
+      const res = await SELF.fetch(`http://localhost${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${readToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it(`does not return 403 for an admin key on ${method} ${path}`, async () => {
+      const adminToken = await createTestApiKey({
+        scope: 'admin',
+        name: `admin-${method}-${path.replace(/\W+/g, '-')}`,
+      });
+      const res = await SELF.fetch(`http://localhost${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      // Admin scope passes auth; status reflects the handler (e.g. 400/404),
+      // never an authorization rejection.
+      expect(res.status).not.toBe(403);
+      expect(res.status).not.toBe(401);
+    });
+  }
+});
