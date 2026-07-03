@@ -1,4 +1,4 @@
-import { FAVICON_ICO_B64, FAVICON_SVG } from './assets';
+import { FAVICON_ICO_B64, FAVICON_PNG_512_B64, FAVICON_SVG } from './assets';
 
 function b64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -8,6 +8,7 @@ function b64ToBytes(b64: string): Uint8Array {
 }
 
 const ICO_BYTES = b64ToBytes(FAVICON_ICO_B64);
+const PNG_512_BYTES = b64ToBytes(FAVICON_PNG_512_B64);
 
 const ICON_CACHE = 'public, max-age=86400, s-maxage=604800, immutable';
 const DOCS_ORIGIN = 'https://docs.rewind.rest';
@@ -22,6 +23,7 @@ const LANDING_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon.png">
 <title>Rewind</title>
 <style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5}</style>
 </head><body>
@@ -50,6 +52,16 @@ export default {
         return new Response(FAVICON_SVG, {
           headers: {
             'content-type': 'image/svg+xml',
+            'cache-control': ICON_CACHE,
+          },
+        });
+      // Large transparent PNG master. Google's favicon service otherwise only
+      // had a 23px SVG / 48px .ico to ingest and flattened the transparent
+      // margin onto white; a 512px source lets it keep the alpha at every size.
+      case '/icon.png':
+        return new Response(PNG_512_BYTES, {
+          headers: {
+            'content-type': 'image/png',
             'cache-control': ICON_CACHE,
           },
         });
