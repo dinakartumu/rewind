@@ -11,25 +11,25 @@
 
 const IMAGE = {
   artist: {
-    url: 'https://cdn.rewind.rest/listening/artists/189/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/artists/189/original.jpg?v=1',
     thumbhash: 'GggGBwDN+CSBp7VXcmVmlyZ2BgAAAAAA',
     dominant_color: '#191919',
     accent_color: '#7e7e7e',
   },
   album: {
-    url: 'https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/20/original.jpg?v=1',
     thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
     dominant_color: '#5c4a6d',
     accent_color: '#c4a8d4',
   },
   movie: {
-    url: 'https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1',
     thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
     dominant_color: '#2a2a2a',
     accent_color: '#c8a882',
   },
   vinyl: {
-    url: 'https://cdn.rewind.rest/collecting/releases/1234/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/collecting/releases/1234/original.jpg?v=1',
     thumbhash: 'GncKRwaU9niFd3dShlaJSFeJlYCYhGYA',
     dominant_color: '#222229',
     accent_color: '#9b31ed',

@@ -434,7 +434,7 @@ const nowPlayingRoute = createRoute({
                 id: 254,
                 name: "Short n' Sweet",
                 image: {
-                  url: 'https://cdn.rewind.rest/listening/albums/254/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/254/original.jpg?v=1',
                   thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
                   dominant_color: '#5c4a6d',
                   accent_color: '#c4a8d4',
@@ -504,7 +504,7 @@ const recentRoute = createRoute({
                   id: 20,
                   name: 'GUTS',
                   image: {
-                    url: 'https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/20/original.jpg?v=1',
                     thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
                     dominant_color: '#5c4a6d',
                     accent_color: '#c4a8d4',
@@ -575,7 +575,7 @@ const topArtistsRoute = createRoute({
                 playcount: 4011,
                 genre: 'Hip-Hop',
                 image: {
-                  url: 'https://cdn.rewind.rest/listening/artists/130/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/artists/130/original.jpg?v=1',
                   thumbhash: 'GggGBwDN+CSBp7VXcmVmlyZ2BgAAAAAA',
                   dominant_color: '#191919',
                   accent_color: '#7e7e7e',
@@ -655,7 +655,7 @@ const topAlbumsRoute = createRoute({
                 detail: 'Nirvana',
                 playcount: 428,
                 image: {
-                  url: 'https://cdn.rewind.rest/listening/albums/300/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/300/original.jpg?v=1',
                   thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
                   dominant_color: '#5c4a6d',
                   accent_color: '#c4a8d4',
@@ -854,7 +854,7 @@ const historyRoute = createRoute({
                   id: 20,
                   name: 'GUTS',
                   image: {
-                    url: 'https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/20/original.jpg?v=1',
                     thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
                     dominant_color: '#5c4a6d',
                     accent_color: '#c4a8d4',
@@ -933,7 +933,7 @@ const browseArtistsRoute = createRoute({
                 url: 'https://www.last.fm/music/Beastie+Boys',
                 apple_music_url: null,
                 image: {
-                  url: 'https://cdn.rewind.rest/listening/artists/130/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/artists/130/original.jpg?v=1',
                   thumbhash: 'GggGBwDN+CSBp7VXcmVmlyZ2BgAAAAAA',
                   dominant_color: '#191919',
                   accent_color: '#7e7e7e',
@@ -1085,7 +1085,7 @@ const artistDetailRoute = createRoute({
             bio_content: null,
             bio_synced_at: '2026-04-12T20:11:00.000Z',
             image: {
-              url: 'https://cdn.rewind.rest/listening/artists/189/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+              url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/artists/189/original.jpg?v=1',
               thumbhash: 'GggGBwDN+CSBp7VXcmVmlyZ2BgAAAAAA',
               dominant_color: '#191919',
               accent_color: '#7e7e7e',
@@ -1161,7 +1161,7 @@ const albumDetailRoute = createRoute({
             url: 'https://www.last.fm/music/Olivia+Rodrigo/GUTS',
             apple_music_url: null,
             image: {
-              url: 'https://cdn.rewind.rest/listening/albums/20/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+              url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/20/original.jpg?v=1',
               thumbhash: 'HBkKHQi694WIeIiAh3Z3d2eAd4B3',
               dominant_color: '#5c4a6d',
               accent_color: '#c4a8d4',

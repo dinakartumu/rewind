@@ -58,7 +58,8 @@ export function buildCdnUrl(
   imageVersion: number
 ): string {
   const preset = SIZE_PRESETS[size];
-  const originalUrl = `${CDN_BASE_URL}/${r2Key}?v=${imageVersion}`;
+  const encodedR2Key = r2Key.split('/').map(encodeURIComponent).join('/');
+  const originalUrl = `${CDN_BASE_URL}/${encodedR2Key}?v=${imageVersion}`;
 
   if (!preset || (preset.width === null && preset.height === null)) {
     return originalUrl;
@@ -74,7 +75,7 @@ export function buildCdnUrl(
     .filter(Boolean)
     .join(',');
 
-  return `${CDN_BASE_URL}/cdn-cgi/image/${options}/${r2Key}?v=${imageVersion}`;
+  return `${CDN_BASE_URL}/cdn-cgi/image/${options}/${encodedR2Key}?v=${imageVersion}`;
 }
 
 /**

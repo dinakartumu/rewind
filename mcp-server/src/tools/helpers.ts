@@ -94,24 +94,29 @@ export async function imageBlock(
 
 /**
  * Rewrite a Rewind CDN URL to use the Cloudflare Images transform path
- * (`/cdn-cgi/image/<opts>/<asset>`) at the requested pixel size. The raw
- * `cdn_url` field returned by the API points at the original (full-res) R2
- * object and does not honor width/height query params. Transform URLs do.
+ * (`/cdn-cgi/image/<opts>/<asset>`) at the requested pixel size. Raw R2 URLs
+ * are converted to transform URLs, and existing transform options are
+ * replaced while the source asset path and image version are preserved.
  *
- * Input:  https://cdn.rewind.rest/watching/movies/707/original.jpg?width=300&height=300&...&v=1
+ * Input:  https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/707/original.jpg?v=1
  * Output: https://cdn.rewind.rest/cdn-cgi/image/width=150,height=150,fit=cover,format=auto,quality=85/watching/movies/707/original.jpg?v=1
  *
- * Returns the input unchanged if it is not a valid URL or is already a
- * transform URL.
+ * Returns the input unchanged if it is not a valid URL.
  */
 function resizeCdnUrl(url: string, targetPx: number): string {
   try {
     const u = new URL(url);
-    if (u.pathname.startsWith('/cdn-cgi/image/')) return url;
     const opts = `width=${targetPx},height=${targetPx},fit=cover,format=auto,quality=85`;
+    const transformPrefix = '/cdn-cgi/image/';
+    let sourcePath = u.pathname;
+    if (sourcePath.startsWith(transformPrefix)) {
+      const optionsEnd = sourcePath.indexOf('/', transformPrefix.length);
+      if (optionsEnd === -1) return url;
+      sourcePath = sourcePath.slice(optionsEnd);
+    }
     const version = u.searchParams.get('v');
     const versionSuffix = version ? `?v=${version}` : '';
-    return `${u.origin}/cdn-cgi/image/${opts}${u.pathname}${versionSuffix}`;
+    return `${u.origin}/cdn-cgi/image/${opts}${sourcePath}${versionSuffix}`;
   } catch {
     return url;
   }

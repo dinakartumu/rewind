@@ -111,6 +111,27 @@ describe('helpers', () => {
 
       expect(block).toBeNull();
     });
+
+    it('rewrites an existing transform to the requested target size', async () => {
+      const client = new RewindClient('https://api.test', 'rw_test');
+      const spy = vi.spyOn(client, 'getBinaryFromUrl').mockResolvedValue({
+        bytes,
+        mimeType: 'image/jpeg',
+      });
+
+      await imageBlock(
+        client,
+        {
+          cdn_url:
+            'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?download=1&v=7',
+        },
+        150
+      );
+
+      expect(spy).toHaveBeenCalledWith(
+        'https://cdn.rewind.rest/cdn-cgi/image/width=150,height=150,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=7'
+      );
+    });
   });
 
   describe('withRichResponse()', () => {

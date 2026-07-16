@@ -63,6 +63,26 @@ describe('buildCdnUrl', () => {
       'https://cdn.rewind.rest/test/key.jpg?v=4'
     );
   });
+
+  it('encodes each R2 key segment in transformed URLs', () => {
+    expect(
+      buildCdnUrl(
+        'watching/movies/tmdb:15 #1/poster?final&crop=.jpg',
+        'poster-sm',
+        5
+      )
+    ).toBe(
+      'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/tmdb%3A15%20%231/poster%3Ffinal%26crop%3D.jpg?v=5'
+    );
+  });
+
+  it('encodes each R2 key segment in original URLs', () => {
+    expect(
+      buildCdnUrl('listening/albums/a+b=c/original #1.jpg', 'original', 6)
+    ).toBe(
+      'https://cdn.rewind.rest/listening/albums/a%2Bb%3Dc/original%20%231.jpg?v=6'
+    );
+  });
 });
 
 describe('buildR2Key', () => {

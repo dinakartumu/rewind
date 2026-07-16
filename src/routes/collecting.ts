@@ -391,7 +391,7 @@ const collectionListRoute = createRoute({
                 genres: ['Rock'],
                 styles: ['Folk Rock', 'Rock & Roll'],
                 image: {
-                  url: 'https://cdn.rewind.rest/collecting/releases/6872464/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/collecting/releases/6872464/original.jpg?v=1',
                   thumbhash: 'GncKRwaU9niFd3dShlaJSFeJlYCYhGYA',
                   dominant_color: '#222229',
                   accent_color: '#9b31ed',
@@ -479,7 +479,7 @@ const collectionRecentRoute = createRoute({
                 genres: ['Rock'],
                 styles: ['Grunge'],
                 image: {
-                  url: 'https://cdn.rewind.rest/collecting/releases/6872464/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/collecting/releases/6872464/original.jpg?v=1',
                   thumbhash: 'GncKRwaU9niFd3dShlaJSFeJlYCYhGYA',
                   dominant_color: '#222229',
                   accent_color: '#9b31ed',
@@ -528,7 +528,7 @@ const collectionDetailRoute = createRoute({
             genres: ['Rock'],
             styles: ['Grunge'],
             image: {
-              url: 'https://cdn.rewind.rest/collecting/releases/6872464/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+              url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/collecting/releases/6872464/original.jpg?v=1',
               thumbhash: 'GncKRwaU9niFd3dShlaJSFeJlYCYhGYA',
               dominant_color: '#222229',
               accent_color: '#9b31ed',
@@ -876,7 +876,7 @@ const mediaListRoute = createRoute({
                 tmdb_id: 361743,
                 imdb_id: 'tt1745960',
                 image: {
-                  url: 'https://cdn.rewind.rest/collecting/media/1/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/collecting/media/1/original.jpg?v=1',
                   thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
                   dominant_color: '#2a2a2a',
                   accent_color: '#c8a882',

@@ -11,7 +11,7 @@ const FIXTURE = {
   movieId: 710,
   title: "I'm Chevy Chase and You're Not",
   cdn_url:
-    'https://cdn.rewind.rest/watching/movies/710/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+    'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/710/original.jpg?v=1',
 };
 
 async function main() {
