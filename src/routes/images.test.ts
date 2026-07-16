@@ -13,8 +13,8 @@ describe('images route', () => {
       expect(VALID_SIZES).toContain('original');
     });
 
-    it('has 8 valid sizes', () => {
-      expect(VALID_SIZES).toHaveLength(8);
+    it('has 9 valid sizes', () => {
+      expect(VALID_SIZES).toHaveLength(9);
     });
   });
 
