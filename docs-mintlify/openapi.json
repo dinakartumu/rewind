@@ -9244,7 +9244,7 @@
                         "duration_min": 103,
                         "rating": "PG-13",
                         "image": {
-                          "url": "https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+                          "url": "https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1",
                           "thumbhash": "YRcKDQKadZh4d3Z4d3aHeAeAh4B3",
                           "dominant_color": "#2a2a2a",
                           "accent_color": "#c8a882"
@@ -9494,7 +9494,7 @@
                       "duration_min": 103,
                       "rating": "PG-13",
                       "image": {
-                        "url": "https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+                        "url": "https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1",
                         "thumbhash": "YRcKDQKadZh4d3Z4d3aHeAeAh4B3",
                         "dominant_color": "#2a2a2a",
                         "accent_color": "#c8a882"
@@ -9743,7 +9743,7 @@
                   "duration_min": 103,
                   "rating": "PG-13",
                   "image": {
-                    "url": "https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+                    "url": "https://cdn.rewind.rest/cdn-cgi/image/width=342,height=513,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1",
                     "thumbhash": "YRcKDQKadZh4d3Z4d3aHeAeAh4B3",
                     "dominant_color": "#2a2a2a",
                     "accent_color": "#c8a882"
@@ -10537,7 +10537,7 @@
                       "content_rating": "TV-MA",
                       "summary": "The story of Easy Company during WWII.",
                       "image": {
-                        "url": "https://cdn.rewind.rest/watching/shows/1/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+                        "url": "https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/watching/shows/1/original.jpg?v=1",
                         "thumbhash": "YRcKDQKadZh4d3Z4d3aHeAeAh4B3",
                         "dominant_color": "#2a2a2a",
                         "accent_color": "#c8a882"
@@ -10749,7 +10749,7 @@
                   "content_rating": "TV-MA",
                   "summary": "The story of Easy Company during WWII.",
                   "image": {
-                    "url": "https://cdn.rewind.rest/watching/shows/1/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1",
+                    "url": "https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/watching/shows/1/original.jpg?v=1",
                     "thumbhash": "YRcKDQKadZh4d3Z4d3aHeAeAh4B3",
                     "dominant_color": "#2a2a2a",
                     "accent_color": "#c8a882"

@@ -300,7 +300,7 @@ const recentRoute = createRoute({
                   duration_min: 103,
                   rating: 'PG-13',
                   image: {
-                    url: 'https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                    url: 'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1',
                     thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
                     dominant_color: '#2a2a2a',
                     accent_color: '#c8a882',
@@ -369,7 +369,7 @@ const moviesListRoute = createRoute({
                 duration_min: 103,
                 rating: 'PG-13',
                 image: {
-                  url: 'https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1',
                   thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
                   dominant_color: '#2a2a2a',
                   accent_color: '#c8a882',
@@ -436,7 +436,7 @@ const movieDetailRoute = createRoute({
             duration_min: 103,
             rating: 'PG-13',
             image: {
-              url: 'https://cdn.rewind.rest/watching/movies/15/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+              url: 'https://cdn.rewind.rest/cdn-cgi/image/width=342,height=513,fit=cover,format=auto,quality=85/watching/movies/15/original.jpg?v=1',
               thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
               dominant_color: '#2a2a2a',
               accent_color: '#c8a882',
@@ -701,7 +701,7 @@ const showsListRoute = createRoute({
                 content_rating: 'TV-MA',
                 summary: 'The story of Easy Company during WWII.',
                 image: {
-                  url: 'https://cdn.rewind.rest/watching/shows/1/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+                  url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/watching/shows/1/original.jpg?v=1',
                   thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
                   dominant_color: '#2a2a2a',
                   accent_color: '#c8a882',
@@ -772,7 +772,7 @@ const showDetailRoute = createRoute({
             content_rating: 'TV-MA',
             summary: 'The story of Easy Company during WWII.',
             image: {
-              url: 'https://cdn.rewind.rest/watching/shows/1/original.jpg?width=300&height=300&fit=cover&format=auto&quality=85&v=1',
+              url: 'https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/watching/shows/1/original.jpg?v=1',
               thumbhash: 'YRcKDQKadZh4d3Z4d3aHeAeAh4B3',
               dominant_color: '#2a2a2a',
               accent_color: '#c8a882',
@@ -1226,7 +1226,8 @@ watching.openapi(recentRoute, async (c) => {
     db,
     'watching',
     'movies',
-    movieIds
+    movieIds,
+    'poster-sm'
   );
 
   const data = await Promise.all(
@@ -1374,7 +1375,8 @@ watching.openapi(moviesListRoute, async (c) => {
     db,
     'watching',
     'movies',
-    movieIds
+    movieIds,
+    'poster-sm'
   );
 
   const data = await Promise.all(
@@ -1423,7 +1425,7 @@ watching.openapi(movieDetailRoute, async (c) => {
   const [genreRows, directorRows, image] = await Promise.all([
     getMovieGenres(db, id),
     getMovieDirectors(db, id),
-    getImageAttachment(db, 'watching', 'movies', String(id)),
+    getImageAttachment(db, 'watching', 'movies', String(id), 'poster'),
   ]);
 
   // Get watch history for this movie
@@ -2054,7 +2056,8 @@ watching.openapi(ratingsRoute, async (c) => {
     db,
     'watching',
     'movies',
-    movieIds
+    movieIds,
+    'poster-sm'
   );
 
   return c.json({
@@ -2121,7 +2124,8 @@ watching.openapi(reviewsRoute, async (c) => {
     db,
     'watching',
     'movies',
-    movieIds
+    movieIds,
+    'poster-sm'
   );
 
   return c.json({
@@ -2229,7 +2233,8 @@ watching.openapi(yearInReviewRoute, async (c) => {
     db,
     'watching',
     'movies',
-    movieIds
+    movieIds,
+    'poster-sm'
   );
 
   return c.json({

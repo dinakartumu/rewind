@@ -189,6 +189,7 @@ Cloudflare Images provides on-the-fly image transformation via the cf-images bin
 | small     | 150x150    | cover      | List items, compact grids       |
 | medium    | 300x300    | cover      | Card views, album grids         |
 | large     | 600x600    | cover      | Detail views, hero images       |
+| poster-sm | 240x360    | cover      | Movie poster collections        |
 | poster    | 342x513    | cover      | Movie poster cards (2:3 ratio)  |
 | poster-lg | 500x750    | cover      | Movie poster detail (2:3 ratio) |
 | backdrop  | 780x439    | cover      | Movie backdrop (16:9 ratio)     |
@@ -196,15 +197,17 @@ Cloudflare Images provides on-the-fly image transformation via the cf-images bin
 
 ### CDN URL Pattern
 
+Sized attachments use Cloudflare's /cdn-cgi/image/<options>/<R2 key>?v=<image version> path.
+The v query is only a cache-buster; width and height must not be expressed as raw query parameters on the R2 custom domain.
+
 ```text
-cdn.rewind.rest/{r2_key}?width={w}&height={h}&fit=cover&format=auto&quality=85
+cdn.rewind.rest/cdn-cgi/image/width={w},height={h},fit=cover,format=auto,quality=85/{r2_key}?v={image_version}
 ```
 
-Or via named variants:
+Original attachments omit the transform path:
 
 ```text
-cdn.rewind.rest/{r2_key}/medium
-cdn.rewind.rest/{r2_key}/poster
+cdn.rewind.rest/{r2_key}?v={image_version}
 ```
 
 ### Caching
@@ -268,7 +271,7 @@ All entity endpoints return a standardized `image` field (or `null` when no imag
 ```json
 {
   "image": {
-    "cdn_url": "https://cdn.rewind.rest/listening/albums/123/original.jpg?width=300&height=300&v=1",
+    "cdn_url": "https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/123/original.jpg?v=1",
     "thumbhash": "YJqGPQw7sFlslqhFafSE+Q6oJ1h2iA==",
     "dominant_color": "#1a2b3c",
     "accent_color": "#4d5e6f"
@@ -318,7 +321,7 @@ GET /v1/images/:domain/:entity_type/:entity_id/:size
 
 1. Parse domain, entity_type, entity_id, size from URL
 2. Look up image in images table by (domain, entity_type, entity_id)
-3. If found: redirect to cdn.rewind.rest/{r2_key}?{size_params}&v={image_version}
+3. If found: redirect to cdn.rewind.rest/cdn-cgi/image/{size_params}/{r2_key}?v={image_version}
 4. If not found: trigger pipeline
    a. Run source waterfall for the domain
    b. Fetch image from winning source
@@ -332,7 +335,7 @@ GET /v1/images/:domain/:entity_type/:entity_id/:size
 ### Response Headers
 
 ```text
-Location: https://cdn.rewind.rest/listening/albums/abc123/original.jpg?width=300&height=300&fit=cover&format=auto&v=1
+Location: https://cdn.rewind.rest/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/abc123/original.jpg?v=1
 X-ThumbHash: YJqGPQw7sFlslqhFafSE+Q6oJ1h2iA==
 X-Dominant-Color: #1a2b3c
 X-Accent-Color: #4d5e6f
