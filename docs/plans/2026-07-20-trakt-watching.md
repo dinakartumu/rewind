@@ -809,6 +809,48 @@ git add src/services/trakt/history-sync.ts src/services/trakt/history-sync.test.
 git commit -m "feat(trakt): sync movie watch history into watching domain"
 ```
 
+#### Amendment (post-Task-4 review)
+
+Code review of the Task 4 implementation found two critical defects in the
+original page-1-to-pageCount walk, fixed in
+`fix(trakt): walk history chronologically for correct rewatch flags and resumable backfill`:
+
+1. **Rewatch flags** — Trakt's `/sync/history/movies` returns events
+   newest-first. Inserting in fetch order means the per-item earlier-watch
+   count (`lt(watchedAt, item.watched_at)`) runs before the earlier watches
+   exist in the DB, so a full backfill marks every row `rewatch=0`
+   permanently (same bug when two watches of one movie land in a single
+   incremental window).
+2. **Resumability** — the incremental cursor is `max(watchedAt)` of
+   trakt-sourced rows. A newest-first walk that gets interrupted leaves only
+   the newest events inserted, so the next run's `start_at` silently skips
+   everything older than the crash point.
+
+**Required pattern (now implemented):** walk chronologically. Fetch page 1
+(`limit 100`) only to learn `pageCount`, then iterate pages from `pageCount`
+down to 1, processing items within each page in reverse (oldest first).
+Insert order becomes chronological, so the earlier-watch count is correct at
+insert time, and the cursor only ever covers completed work — an interrupted
+backfill naturally resumes. Page 1 is simply refetched when the loop reaches
+it; `traktHistoryId` dedup makes the reprocessing idempotent.
+
+Also from the review:
+
+- Dedup is batched per page: one `inArray(watchHistory.traktHistoryId, pageIds)`
+  select per page instead of one select per item.
+- The earlier-count query is additionally scoped by
+  `eq(watchHistory.userId, userId)`.
+- `movieCursor()` documents the retroactive-logging limitation: a watch
+  back-dated in Trakt to before the cursor after it advanced is missed by
+  incremental runs; a cursor-less full re-walk (idempotent via
+  `traktHistoryId` dedup) is the escape hatch — see the Task 7 amendment.
+- `syncMovieHistory` is exported so DB-backed tests can inject a fake
+  `TraktClient` and a dummy `TmdbClient` against a real migrated D1
+  (`setupTestDb`), with the movies pre-seeded by `tmdbId` so `resolveMovie`
+  never reaches TMDB. Tests cover: chronological inserts with correct
+  rewatch flags from a two-page newest-first backfill, dedup idempotence on
+  re-run, and cursor advancement to the newest event.
+
 ---
 
 ### Task 5: History sync — episodes
@@ -817,6 +859,18 @@ git commit -m "feat(trakt): sync movie watch history into watching domain"
 
 - Modify: `src/services/trakt/history-sync.ts`
 - Test: `src/services/trakt/history-sync.test.ts`
+
+> **Amendment (post-Task-4 review):** the episode sync MUST use the identical
+> pattern established by the amended Task 4: fetch page 1 to learn
+> `pageCount`, then a reverse page walk (`pageCount` → 1) with items
+> processed oldest-first within each page; page-level batched dedup via one
+> `inArray(watchHistory.traktHistoryId, pageIds)` select per page; the
+> earlier-count query scoped by `userId`; the same retroactive-logging
+> limitation comment on the episode cursor; and equivalent DB-backed tests
+> (real migrated D1 via `setupTestDb`, fake `TraktClient`, dummy
+> `TmdbClient`, pre-seeded shows so no TMDB fetch happens) asserting
+> chronological inserts/rewatch flags, dedup idempotence, and cursor
+> advancement. Export the internal episode sync function for test injection.
 
 **Step 1: Write the failing tests**
 
@@ -1184,6 +1238,14 @@ git commit -m "feat(trakt): apply movie ratings to watch history"
 
 - Modify: `src/index.ts` (the `'0 */6 * * *'` case, ~line 322)
 - Modify: `src/routes/admin-sync.ts` (WatchingSyncQuery + handler, ~lines 69-284)
+
+> **Amendment (post-Task-4 review):** the admin sync route should accept an
+> optional `full=true` query param that ignores the incremental cursor and
+> performs a full idempotent re-walk of Trakt history (safe thanks to
+> `traktHistoryId` dedup). This is the escape hatch for the
+> retroactive-logging limitation documented on `movieCursor()`: watches
+> back-dated in Trakt to before an already-advanced cursor are only picked
+> up by a cursor-less full re-walk.
 
 **Step 1: Wire the cron**
 

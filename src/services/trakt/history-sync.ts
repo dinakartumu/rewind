@@ -1,4 +1,4 @@
-import { eq, and, sql, count, lt } from 'drizzle-orm';
+import { eq, and, sql, count, lt, inArray } from 'drizzle-orm';
 import { createDb, type Database } from '../../db/client.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { watchHistory } from '../../db/schema/watching.js';
@@ -37,6 +37,12 @@ export function shouldMarkRewatch(earlierWatchCount: number): boolean {
 /**
  * Most recent Trakt-sourced movie watch, used as the incremental cursor.
  * Returns undefined on first run (full history walk).
+ *
+ * Known limitation: a watch back-dated in Trakt to before this cursor after
+ * the cursor has already advanced will never fall inside an incremental
+ * window and is silently missed. The escape hatch is a cursor-less full
+ * re-walk, which is idempotent thanks to traktHistoryId dedup — an admin
+ * full-resync option (`full=true`) arrives in Task 7.
  */
 async function movieCursor(
   db: Database,
@@ -51,7 +57,7 @@ async function movieCursor(
   return row?.max ?? undefined;
 }
 
-async function syncMovieHistory(
+export async function syncMovieHistory(
   db: Database,
   client: TraktClient,
   tmdbClient: TmdbClient,
@@ -66,31 +72,51 @@ async function syncMovieHistory(
   let skipped = 0;
   const newWatches: SyncedWatch[] = [];
 
-  let page = 1;
-  let pageCount: number;
-  do {
+  // Trakt returns history newest-first. Walk pages from last to first, and
+  // items within each page in reverse, so inserts happen chronologically:
+  // the earlier-watch count for the rewatch flag is correct at insert time,
+  // and the cursor (max watchedAt of trakt rows) only ever covers completed
+  // work, so an interrupted backfill resumes without gaps. The page-1 fetch
+  // below only discovers pageCount; the loop refetches page 1 when it gets
+  // there, and traktHistoryId dedup keeps the reprocessing idempotent.
+  const first = await client.getMovieHistory({
+    startAt,
+    page: 1,
+    limit: PAGE_LIMIT,
+  });
+
+  for (let page = first.pageCount; page >= 1; page--) {
     const result = await client.getMovieHistory({
       startAt,
       page,
       limit: PAGE_LIMIT,
     });
-    pageCount = result.pageCount;
 
-    for (const item of result.items) {
-      const tmdbId = item.movie.ids.tmdb;
-      if (!tmdbId) {
-        console.log(`[INFO] Skipping ${item.movie.title} - no TMDb ID`);
+    // Oldest first within the page
+    const items = [...result.items].reverse();
+
+    // Batched dedup on Trakt's per-event history ID
+    const pageIds = items.map((item) => item.id);
+    const existingIds = new Set<number>();
+    if (pageIds.length > 0) {
+      const existingRows = await db
+        .select({ traktHistoryId: watchHistory.traktHistoryId })
+        .from(watchHistory)
+        .where(inArray(watchHistory.traktHistoryId, pageIds));
+      for (const row of existingRows) {
+        if (row.traktHistoryId !== null) existingIds.add(row.traktHistoryId);
+      }
+    }
+
+    for (const item of items) {
+      if (existingIds.has(item.id)) {
         skipped++;
         continue;
       }
 
-      // Dedup on Trakt's per-event history ID
-      const [existing] = await db
-        .select({ id: watchHistory.id })
-        .from(watchHistory)
-        .where(eq(watchHistory.traktHistoryId, item.id))
-        .limit(1);
-      if (existing) {
+      const tmdbId = item.movie.ids.tmdb;
+      if (!tmdbId) {
+        console.log(`[INFO] Skipping ${item.movie.title} - no TMDb ID`);
         skipped++;
         continue;
       }
@@ -110,6 +136,7 @@ async function syncMovieHistory(
         .from(watchHistory)
         .where(
           and(
+            eq(watchHistory.userId, userId),
             eq(watchHistory.movieId, resolved.id),
             lt(watchHistory.watchedAt, item.watched_at)
           )
@@ -132,9 +159,7 @@ async function syncMovieHistory(
       });
       synced++;
     }
-
-    page++;
-  } while (page <= pageCount);
+  }
 
   return { synced, skipped, newWatches };
 }
