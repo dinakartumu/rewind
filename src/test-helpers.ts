@@ -7,17 +7,6 @@ export async function setupTestDb() {
   if (Array.isArray(migrations) && migrations.length > 0) {
     await applyD1Migrations(env.DB, migrations);
   }
-  // TEMPORARY: bridge schema drift until the trakt_watching migration lands.
-  // Drizzle inserts emit every schema column, so watch_history inserts fail
-  // against a migrations-built DB missing trakt_history_id. No-op (caught)
-  // once the migration exists -- remove this block when it does.
-  try {
-    await env.DB.exec(
-      'ALTER TABLE watch_history ADD COLUMN trakt_history_id integer'
-    );
-  } catch {
-    // Column already exists (migration applied)
-  }
 }
 
 export async function setupTestDbWithFts5() {
