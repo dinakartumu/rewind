@@ -68,6 +68,14 @@ const ListeningSyncBody = z.object({
     .openapi({ example: 'scrobbles' }),
 });
 
+const RunningSyncQuery = z.object({
+  full: z.enum(['true', 'false', '1', '0']).optional().openapi({
+    description:
+      'Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.',
+    example: 'true',
+  }),
+});
+
 const WatchingSyncQuery = z.object({
   source: z
     .enum(['plex', 'letterboxd', 'trakt'])
@@ -212,21 +220,27 @@ const syncRunningRoute = createRoute({
   'x-hidden': true,
   tags: ['Admin'],
   summary: 'Trigger Strava sync',
-  description: 'Manually trigger a Strava running activities sync.',
+  description:
+    'Manually trigger a Strava activities sync (all sport types). Pass full=true to ignore the incremental cursor and re-walk the entire activity history.',
+  request: {
+    query: RunningSyncQuery,
+  },
   responses: {
     200: {
       content: { 'application/json': { schema: SyncCompletedResponse } },
       description: 'Sync completed successfully',
     },
-    ...errorResponses(401, 500),
+    ...errorResponses(400, 401, 500),
   },
 });
 
 adminSync.openapi(syncRunningRoute, async (c) => {
   const db = createDb(c.env.DB);
+  const query = c.req.valid('query');
+  const full = query.full === 'true' || query.full === '1';
 
   try {
-    const itemsSynced = await syncRunning(c.env, db);
+    const itemsSynced = await syncRunning(c.env, db, { full });
     return c.json({
       status: 'completed' as const,
       items_synced: itemsSynced,

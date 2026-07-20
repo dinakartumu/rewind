@@ -23,19 +23,31 @@ import {
   calculateEddington,
   metersToMiles,
   formatPace,
+  isRunSport,
+  RUN_SPORT_TYPES,
 } from './transforms.js';
 
 /**
  * Run incremental Strava sync: fetch new activities since last sync,
- * upsert them, sync gear, and recompute stats.
+ * upsert them, sync gear, and recompute stats. All sport types are
+ * imported (Run, Ride, Hike, Walk, ...).
+ *
+ * Pass `full: true` to ignore the incremental cursor and walk the entire
+ * history from the beginning (after=1). Already-imported activities are
+ * skipped before the per-activity detail fetch, so a full re-walk costs
+ * roughly one list call per 200 already-imported activities.
  */
-export async function syncRunning(env: Env, db: Database): Promise<number> {
+export async function syncRunning(
+  env: Env,
+  db: Database,
+  options: { full?: boolean } = {}
+): Promise<number> {
   const startedAt = new Date().toISOString();
   const [syncRun] = await db
     .insert(syncRuns)
     .values({
       domain: 'running',
-      syncType: 'incremental',
+      syncType: options.full ? 'full' : 'incremental',
       status: 'running',
       startedAt,
     })
@@ -65,10 +77,13 @@ export async function syncRunning(env: Env, db: Database): Promise<number> {
     // oldest-first when `after` is set, newest-first otherwise. Oldest-first
     // makes an interrupted first backfill resumable from the cursor —
     // newest-first would advance the cursor past never-fetched history and
-    // silently truncate it.
-    const after = lastActivity
-      ? Math.floor(new Date(lastActivity.startDate).getTime() / 1000)
-      : 1;
+    // silently truncate it. A full sync ignores the cursor entirely and
+    // re-walks from the beginning (needed after the run-only filter was
+    // removed: older non-run activities were paged past and never stored).
+    const after =
+      !options.full && lastActivity
+        ? Math.floor(new Date(lastActivity.startDate).getTime() / 1000)
+        : 1;
 
     // Fetch activities page by page
     let page = 1;
@@ -87,13 +102,19 @@ export async function syncRunning(env: Env, db: Database): Promise<number> {
       }
 
       for (const activity of activities) {
-        // Only sync runs
-        if (
-          activity.sport_type !== 'Run' &&
-          activity.type !== 'Run' &&
-          activity.sport_type !== 'TrailRun' &&
-          activity.sport_type !== 'VirtualRun'
-        ) {
+        // Quota saver: skip the per-activity detail fetch when the activity
+        // is already imported (and not soft-deleted). Updates arrive via
+        // webhooks, so the bulk sync only needs to fill gaps.
+        const [existing] = await db
+          .select({
+            id: stravaActivities.id,
+            isDeleted: stravaActivities.isDeleted,
+          })
+          .from(stravaActivities)
+          .where(eq(stravaActivities.stravaId, activity.id))
+          .limit(1);
+
+        if (existing && existing.isDeleted === 0) {
           continue;
         }
 
@@ -295,6 +316,7 @@ async function recomputeYearSummaries(
 
   const yearInputs = activities.map((a) => ({
     year: new Date(a.startDateLocal).getFullYear(),
+    sportType: a.sportType,
     distanceMiles: a.distanceMiles,
     movingTimeSeconds: a.movingTimeSeconds,
     elevationFeet: a.totalElevationGainFeet,
@@ -359,15 +381,32 @@ async function recomputeLifetimeFromSummaries(db: Database): Promise<void> {
     (sum, s) => sum + s.totalDurationSeconds,
     0
   );
-  const avgPaceMinPerMile =
-    totalDistanceMiles > 0 ? totalDurationSeconds / 60 / totalDistanceMiles : 0;
   const yearsActive = summaries.length;
+
+  // Pace is run-only, but the summary totals include all sports — aggregate
+  // run distance/duration directly from activities.
+  const runOnlyCondition = and(
+    eq(stravaActivities.isDeleted, 0),
+    inArray(stravaActivities.sportType, RUN_SPORT_TYPES)
+  );
+  const [runAgg] = await db
+    .select({
+      distanceMiles: sql<number>`coalesce(sum(${stravaActivities.distanceMiles}), 0)`,
+      durationSeconds: sql<number>`coalesce(sum(${stravaActivities.movingTimeSeconds}), 0)`,
+    })
+    .from(stravaActivities)
+    .where(runOnlyCondition);
+
+  const avgPaceMinPerMile =
+    runAgg && runAgg.distanceMiles > 0
+      ? runAgg.durationSeconds / 60 / runAgg.distanceMiles
+      : 0;
 
   // First run and streaks still need activity data, but we can query efficiently
   const [firstActivity] = await db
     .select({ startDateLocal: stravaActivities.startDateLocal })
     .from(stravaActivities)
-    .where(eq(stravaActivities.isDeleted, 0))
+    .where(runOnlyCondition)
     .orderBy(stravaActivities.startDate)
     .limit(1);
 
@@ -377,12 +416,12 @@ async function recomputeLifetimeFromSummaries(db: Database): Promise<void> {
   const runDateRows = await db
     .select({ startDateLocal: stravaActivities.startDateLocal })
     .from(stravaActivities)
-    .where(eq(stravaActivities.isDeleted, 0))
+    .where(runOnlyCondition)
     .orderBy(stravaActivities.startDate);
 
   const streaks = calculateStreaks(runDateRows.map((r) => r.startDateLocal));
 
-  // Eddington: need daily distance totals
+  // Eddington: need daily distance totals (runs only)
   const dailyMilesMap = new Map<string, number>();
   const distanceRows = await db
     .select({
@@ -390,7 +429,7 @@ async function recomputeLifetimeFromSummaries(db: Database): Promise<void> {
       distanceMiles: stravaActivities.distanceMiles,
     })
     .from(stravaActivities)
-    .where(eq(stravaActivities.isDeleted, 0));
+    .where(runOnlyCondition);
 
   for (const r of distanceRows) {
     const date = r.startDateLocal.substring(0, 10);
@@ -461,6 +500,7 @@ async function recomputeFull(db: Database): Promise<void> {
   // Year summaries from all activities
   const yearInputs = activities.map((a) => ({
     year: new Date(a.startDateLocal).getFullYear(),
+    sportType: a.sportType,
     distanceMiles: a.distanceMiles,
     movingTimeSeconds: a.movingTimeSeconds,
     elevationFeet: a.totalElevationGainFeet,
@@ -487,8 +527,11 @@ async function recomputeFull(db: Database): Promise<void> {
       });
   }
 
-  // Lifetime stats
-  const totalRuns = activities.length;
+  // Lifetime stats: totals include all sports, run-only fields (pace,
+  // streaks, Eddington, first run) are scoped to run sport types.
+  const runs = activities.filter((a) => isRunSport(a.sportType));
+
+  const totalRuns = runs.length;
   const totalDistanceMiles = activities.reduce(
     (sum, a) => sum + a.distanceMiles,
     0
@@ -501,19 +544,24 @@ async function recomputeFull(db: Database): Promise<void> {
     (sum, a) => sum + a.movingTimeSeconds,
     0
   );
+  const runDistanceMiles = runs.reduce((sum, a) => sum + a.distanceMiles, 0);
+  const runDurationSeconds = runs.reduce(
+    (sum, a) => sum + a.movingTimeSeconds,
+    0
+  );
   const avgPaceMinPerMile =
-    totalDistanceMiles > 0 ? totalDurationSeconds / 60 / totalDistanceMiles : 0;
+    runDistanceMiles > 0 ? runDurationSeconds / 60 / runDistanceMiles : 0;
 
   const years = new Set(
     activities.map((a) => new Date(a.startDateLocal).getFullYear())
   );
-  const firstRun = activities[0]?.startDateLocal ?? null;
+  const firstRun = runs[0]?.startDateLocal ?? null;
 
-  const runDates = activities.map((a) => a.startDateLocal);
+  const runDates = runs.map((a) => a.startDateLocal);
   const streaks = calculateStreaks(runDates);
 
   const dailyMilesMap = new Map<string, number>();
-  for (const a of activities) {
+  for (const a of runs) {
     const date = a.startDateLocal.substring(0, 10);
     dailyMilesMap.set(date, (dailyMilesMap.get(date) ?? 0) + a.distanceMiles);
   }
@@ -566,19 +614,6 @@ export async function syncSingleActivity(
   const client = new StravaClient(env, db);
   const activity = await client.getActivity(stravaId);
 
-  // Only sync runs
-  if (
-    activity.sport_type !== 'Run' &&
-    activity.type !== 'Run' &&
-    activity.sport_type !== 'TrailRun' &&
-    activity.sport_type !== 'VirtualRun'
-  ) {
-    console.log(
-      `[INFO] Skipping non-run activity ${stravaId} (${activity.sport_type})`
-    );
-    return;
-  }
-
   const transformed = transformActivity(activity);
 
   await db.insert(stravaActivities).values(transformed).onConflictDoUpdate({
@@ -598,8 +633,9 @@ export async function syncSingleActivity(
     }
   }
 
-  // Extract and upsert PRs from best_efforts
-  if (activity.best_efforts?.length) {
+  // Extract and upsert PRs from best_efforts (run-only: distance PRs are
+  // pace records and must not be polluted by rides or other sports)
+  if (activity.best_efforts?.length && isRunSport(transformed.sportType)) {
     const prs = extractPersonalRecords([
       {
         bestEfforts: activity.best_efforts,

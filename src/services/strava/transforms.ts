@@ -1,5 +1,17 @@
 import type { StravaActivity, StravaBestEffort } from './client.js';
 
+// --- Sport type scoping ---
+
+/**
+ * Sport types that count as runs. Run-only derived data (PRs, pace stats,
+ * streaks, Eddington, first run) is scoped to these; totals include all sports.
+ */
+export const RUN_SPORT_TYPES: string[] = ['Run', 'TrailRun', 'VirtualRun'];
+
+export function isRunSport(sportType: string): boolean {
+  return RUN_SPORT_TYPES.includes(sportType);
+}
+
 // --- Unit conversions ---
 
 export function metersToMiles(meters: number): number {
@@ -267,6 +279,7 @@ export function extractPersonalRecords(
 
 export interface YearSummaryInput {
   year: number;
+  sportType: string;
   distanceMiles: number;
   movingTimeSeconds: number;
   elevationFeet: number;
@@ -276,6 +289,8 @@ export interface YearSummaryInput {
 
 /**
  * Compute year summaries from activity data grouped by year.
+ * Distance/duration/elevation totals include all sport types; run-only
+ * fields (totalRuns, avgPace, longestRun) are scoped to run sport types.
  */
 export function computeYearSummaries(activities: YearSummaryInput[]): Map<
   number,
@@ -311,7 +326,9 @@ export function computeYearSummaries(activities: YearSummaryInput[]): Map<
   >();
 
   for (const [year, yearActivities] of byYear.entries()) {
-    const totalRuns = yearActivities.length;
+    const yearRuns = yearActivities.filter((a) => isRunSport(a.sportType));
+
+    const totalRuns = yearRuns.length;
     const totalDistanceMiles = yearActivities.reduce(
       (sum, a) => sum + a.distanceMiles,
       0
@@ -324,15 +341,23 @@ export function computeYearSummaries(activities: YearSummaryInput[]): Map<
       (sum, a) => sum + a.movingTimeSeconds,
       0
     );
-    const longestRunMiles = Math.max(
-      ...yearActivities.map((a) => a.longestRunMiles)
-    );
+    const longestRunMiles =
+      yearRuns.length > 0
+        ? Math.max(...yearRuns.map((a) => a.longestRunMiles))
+        : 0;
     const raceCount = yearActivities.filter((a) => a.isRace).length;
 
+    // Pace is a run-only concept: exclude rides/hikes/etc.
+    const runDistanceMiles = yearRuns.reduce(
+      (sum, a) => sum + a.distanceMiles,
+      0
+    );
+    const runDurationSeconds = yearRuns.reduce(
+      (sum, a) => sum + a.movingTimeSeconds,
+      0
+    );
     const avgPaceMinPerMile =
-      totalDistanceMiles > 0
-        ? totalDurationSeconds / 60 / totalDistanceMiles
-        : 0;
+      runDistanceMiles > 0 ? runDurationSeconds / 60 / runDistanceMiles : 0;
     const avgPaceFormatted = formatPace(
       avgPaceMinPerMile > 0 ? avgPaceMinPerMile : null
     );

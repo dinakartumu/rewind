@@ -76,6 +76,19 @@ describe('admin-sync endpoints', () => {
     });
   });
 
+  describe('POST /v1/admin/sync/running', () => {
+    it('rejects an invalid full query value', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/running?full=bogus',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /v1/admin/running/recompute', () => {
     it('requires admin auth', async () => {
       const res = await SELF.fetch(

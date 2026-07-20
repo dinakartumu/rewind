@@ -311,6 +311,7 @@ describe('computeYearSummaries', () => {
     const activities = [
       {
         year: 2024,
+        sportType: 'Run',
         distanceMiles: 5.0,
         movingTimeSeconds: 2400,
         elevationFeet: 100,
@@ -319,6 +320,7 @@ describe('computeYearSummaries', () => {
       },
       {
         year: 2024,
+        sportType: 'Run',
         distanceMiles: 10.0,
         movingTimeSeconds: 4800,
         elevationFeet: 200,
@@ -327,6 +329,7 @@ describe('computeYearSummaries', () => {
       },
       {
         year: 2023,
+        sportType: 'Run',
         distanceMiles: 3.0,
         movingTimeSeconds: 1500,
         elevationFeet: 50,
@@ -349,6 +352,63 @@ describe('computeYearSummaries', () => {
     const y2023 = summaries.get(2023);
     expect(y2023).toBeDefined();
     expect(y2023!.totalRuns).toBe(1);
+  });
+
+  it('scopes run-only fields to run sport types while totals include all sports', () => {
+    const activities = [
+      {
+        year: 2024,
+        sportType: 'Run',
+        distanceMiles: 5.0,
+        movingTimeSeconds: 2400,
+        elevationFeet: 100,
+        isRace: false,
+        longestRunMiles: 5.0,
+      },
+      {
+        year: 2024,
+        sportType: 'Ride',
+        distanceMiles: 20.0,
+        movingTimeSeconds: 3600,
+        elevationFeet: 500,
+        isRace: false,
+        longestRunMiles: 20.0,
+      },
+    ];
+
+    const summaries = computeYearSummaries(activities);
+    const y2024 = summaries.get(2024)!;
+
+    // Totals include all sports
+    expect(y2024.totalDistanceMiles).toBe(25.0);
+    expect(y2024.totalDurationSeconds).toBe(6000);
+    expect(y2024.totalElevationFeet).toBe(600);
+    // Run-only fields exclude the ride
+    expect(y2024.totalRuns).toBe(1);
+    expect(y2024.avgPaceFormatted).toBe('8:00/mi');
+    expect(y2024.longestRunMiles).toBe(5.0);
+  });
+
+  it('handles a year with no runs at all', () => {
+    const activities = [
+      {
+        year: 2024,
+        sportType: 'Ride',
+        distanceMiles: 20.0,
+        movingTimeSeconds: 3600,
+        elevationFeet: 500,
+        isRace: false,
+        longestRunMiles: 20.0,
+      },
+    ];
+
+    const summaries = computeYearSummaries(activities);
+    const y2024 = summaries.get(2024)!;
+
+    expect(y2024.totalRuns).toBe(0);
+    expect(y2024.totalDistanceMiles).toBe(20.0);
+    expect(y2024.longestRunMiles).toBe(0);
+    expect(y2024.avgPaceFormatted).toBe('0:00/mi');
   });
 });
 

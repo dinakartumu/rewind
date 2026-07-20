@@ -6406,6 +6406,9 @@
                         "total_runs": {
                           "type": "number"
                         },
+                        "total_activities": {
+                          "type": "number"
+                        },
                         "total_distance_mi": {
                           "type": "number"
                         },
@@ -6436,6 +6439,7 @@
                       },
                       "required": [
                         "total_runs",
+                        "total_activities",
                         "total_distance_mi",
                         "total_elevation_ft",
                         "total_duration",
@@ -6453,6 +6457,7 @@
                 "example": {
                   "data": {
                     "total_runs": 1350,
+                    "total_activities": 1520,
                     "total_distance_mi": 6069.88,
                     "total_elevation_ft": 238690.03,
                     "total_duration": "828:56:08",
@@ -6905,6 +6910,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -6988,6 +6996,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -7019,6 +7028,7 @@
                       "id": 17748681520,
                       "strava_id": 17748681520,
                       "name": "Monday Evening Run",
+                      "sport_type": "Run",
                       "date": "2026-03-16T17:00:05Z",
                       "distance_mi": 4.49,
                       "duration": "36:02",
@@ -7200,6 +7210,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -7283,6 +7296,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -7338,6 +7352,7 @@
                       "id": 17748681520,
                       "strava_id": 17748681520,
                       "name": "Monday Evening Run",
+                      "sport_type": "Run",
                       "date": "2026-03-16T17:00:05Z",
                       "distance_mi": 4.49,
                       "duration": "36:02",
@@ -7413,6 +7428,9 @@
                       "type": "number"
                     },
                     "name": {
+                      "type": "string"
+                    },
+                    "sport_type": {
                       "type": "string"
                     },
                     "date": {
@@ -7498,6 +7516,7 @@
                     "id",
                     "strava_id",
                     "name",
+                    "sport_type",
                     "date",
                     "distance_mi",
                     "duration",
@@ -7521,6 +7540,7 @@
                   "id": 17748681520,
                   "strava_id": 17748681520,
                   "name": "Monday Evening Run",
+                  "sport_type": "Run",
                   "date": "2026-03-16T17:00:05Z",
                   "distance_mi": 4.49,
                   "duration": "36:02",
@@ -8544,6 +8564,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -8627,6 +8650,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -8658,6 +8682,7 @@
                       "id": 12345,
                       "strava_id": 12345,
                       "name": "Portland Marathon",
+                      "sport_type": "Run",
                       "date": "2024-10-06",
                       "distance_mi": 26.2,
                       "duration": "3:45:00",
@@ -8861,6 +8886,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -8944,6 +8972,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -9008,6 +9037,7 @@
                       "id": 12345,
                       "strava_id": 12345,
                       "name": "Portland Half Marathon",
+                      "sport_type": "Run",
                       "date": "2025-10-06",
                       "distance_mi": 13.1,
                       "duration": "1:45:00",
@@ -25190,7 +25220,26 @@
           "Admin"
         ],
         "summary": "Trigger Strava sync",
-        "description": "Manually trigger a Strava running activities sync.",
+        "description": "Manually trigger a Strava activities sync (all sport types). Pass full=true to ignore the incremental cursor and re-walk the entire activity history.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ],
+              "description": "Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.",
+              "example": "true"
+            },
+            "required": false,
+            "description": "Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.",
+            "name": "full",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Sync completed successfully",
@@ -25198,6 +25247,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SyncCompletedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
