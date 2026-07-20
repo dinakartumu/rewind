@@ -13,8 +13,8 @@ import {
   movieDirectors,
   watchHistory,
   watchStats,
-  plexShows,
-  plexEpisodesWatched,
+  shows,
+  episodesWatched,
 } from '../db/schema/watching.js';
 import { computeWatchStats } from '../services/plex/sync.js';
 import { TmdbClient } from '../services/watching/tmdb.js';
@@ -1812,22 +1812,20 @@ watching.openapi(showsListRoute, async (c) => {
   const sort = c.req.query('sort') || 'title';
   const order = c.req.query('order') || 'asc';
 
-  const [totalResult] = await db.select({ total: count() }).from(plexShows);
+  const [totalResult] = await db.select({ total: count() }).from(shows);
 
   const total = totalResult?.total || 0;
 
   let orderByClause;
   if (sort === 'year') {
-    orderByClause =
-      order === 'asc' ? asc(plexShows.year) : desc(plexShows.year);
+    orderByClause = order === 'asc' ? asc(shows.year) : desc(shows.year);
   } else {
-    orderByClause =
-      order === 'asc' ? asc(plexShows.title) : desc(plexShows.title);
+    orderByClause = order === 'asc' ? asc(shows.title) : desc(shows.title);
   }
 
   const showRows = await db
     .select()
-    .from(plexShows)
+    .from(shows)
     .orderBy(orderByClause)
     .limit(limit)
     .offset(offset);
@@ -1844,8 +1842,8 @@ watching.openapi(showsListRoute, async (c) => {
     showRows.map(async (show) => {
       const [epCount] = await db
         .select({ total: count() })
-        .from(plexEpisodesWatched)
-        .where(eq(plexEpisodesWatched.showId, show.id));
+        .from(episodesWatched)
+        .where(eq(episodesWatched.showId, show.id));
 
       return {
         id: show.id,
@@ -1880,25 +1878,21 @@ watching.openapi(showDetailRoute, async (c) => {
     return badRequest(c, 'Invalid show ID') as any;
   }
 
-  const [show] = await db
-    .select()
-    .from(plexShows)
-    .where(eq(plexShows.id, id))
-    .limit(1);
+  const [show] = await db.select().from(shows).where(eq(shows.id, id)).limit(1);
 
   if (!show) {
     return notFound(c, 'Show not found') as any;
   }
 
   // Get episodes and image metadata in parallel
-  const [episodesWatched, image] = await Promise.all([
+  const [episodeRows, image] = await Promise.all([
     db
       .select()
-      .from(plexEpisodesWatched)
-      .where(eq(plexEpisodesWatched.showId, id))
+      .from(episodesWatched)
+      .where(eq(episodesWatched.showId, id))
       .orderBy(
-        asc(plexEpisodesWatched.seasonNumber),
-        asc(plexEpisodesWatched.episodeNumber)
+        asc(episodesWatched.seasonNumber),
+        asc(episodesWatched.episodeNumber)
       ),
     getImageAttachment(db, 'watching', 'shows', String(id)),
   ]);
@@ -1914,7 +1908,7 @@ watching.openapi(showDetailRoute, async (c) => {
     }[]
   > = {};
 
-  for (const ep of episodesWatched) {
+  for (const ep of episodeRows) {
     if (!seasons[ep.seasonNumber]) {
       seasons[ep.seasonNumber] = [];
     }
@@ -1927,7 +1921,7 @@ watching.openapi(showDetailRoute, async (c) => {
   }
 
   const firstWatchedAt =
-    episodesWatched.length > 0 ? episodesWatched[0].watchedAt : null;
+    episodeRows.length > 0 ? episodeRows[0].watchedAt : null;
 
   return c.json({
     id: show.id,
@@ -1941,7 +1935,7 @@ watching.openapi(showDetailRoute, async (c) => {
     first_watched_at: firstWatchedAt,
     total_seasons: show.totalSeasons,
     total_episodes: show.totalEpisodes,
-    episodes_watched: episodesWatched.length,
+    episodes_watched: episodeRows.length,
     seasons: Object.entries(seasons).map(([seasonNum, episodes]) => ({
       season_number: parseInt(seasonNum),
       episodes_watched: episodes.length,
@@ -1962,32 +1956,28 @@ watching.openapi(seasonDetailRoute, async (c) => {
     return badRequest(c, 'Invalid show ID or season number') as any;
   }
 
-  const [show] = await db
-    .select()
-    .from(plexShows)
-    .where(eq(plexShows.id, id))
-    .limit(1);
+  const [show] = await db.select().from(shows).where(eq(shows.id, id)).limit(1);
 
   if (!show) {
     return notFound(c, 'Show not found') as any;
   }
 
-  const episodesWatched = await db
+  const episodeRows = await db
     .select()
-    .from(plexEpisodesWatched)
+    .from(episodesWatched)
     .where(
       and(
-        eq(plexEpisodesWatched.showId, id),
-        eq(plexEpisodesWatched.seasonNumber, season)
+        eq(episodesWatched.showId, id),
+        eq(episodesWatched.seasonNumber, season)
       )
     )
-    .orderBy(asc(plexEpisodesWatched.episodeNumber));
+    .orderBy(asc(episodesWatched.episodeNumber));
 
   return c.json({
     show_id: show.id,
     show_title: show.title,
     season_number: season,
-    episodes: episodesWatched.map((ep) => ({
+    episodes: episodeRows.map((ep) => ({
       season: ep.seasonNumber,
       episode: ep.episodeNumber,
       title: ep.title,
@@ -2524,20 +2514,20 @@ watching.openapi(adminBackfillImagesRoute, async (c) => {
     // Get shows with tmdb_id; force mode includes shows that already have images
     const showRows = await db
       .select({
-        id: plexShows.id,
-        title: plexShows.title,
-        tmdbId: plexShows.tmdbId,
+        id: shows.id,
+        title: shows.title,
+        tmdbId: shows.tmdbId,
       })
-      .from(plexShows)
+      .from(shows)
       .where(
         force
-          ? sql`${plexShows.tmdbId} IS NOT NULL`
-          : sql`${plexShows.tmdbId} IS NOT NULL AND ${plexShows.id} NOT IN (
+          ? sql`${shows.tmdbId} IS NOT NULL`
+          : sql`${shows.tmdbId} IS NOT NULL AND ${shows.id} NOT IN (
             SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
             WHERE ${images.domain} = 'watching' AND ${images.entityType} = 'shows'
           )`
       )
-      .orderBy(asc(plexShows.id))
+      .orderBy(asc(shows.id))
       .offset(itemOffset)
       .limit(maxItems);
 

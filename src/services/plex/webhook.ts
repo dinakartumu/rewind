@@ -7,8 +7,8 @@ import {
   directors,
   movieDirectors,
   watchHistory,
-  plexShows,
-  plexEpisodesWatched,
+  shows,
+  episodesWatched,
 } from '../../db/schema/watching.js';
 import { webhookEvents } from '../../db/schema/system.js';
 import {
@@ -337,7 +337,7 @@ async function handleEpisodeScrobble(
 
   // Insert episode watch
   await db
-    .insert(plexEpisodesWatched)
+    .insert(episodesWatched)
     .values({
       showId,
       seasonNumber: metadata.parentIndex || 0,
@@ -365,9 +365,9 @@ async function upsertShowFromPlex(
 
   // Check if show exists
   const existing = await db
-    .select({ id: plexShows.id })
-    .from(plexShows)
-    .where(eq(plexShows.plexRatingKey, showRatingKey))
+    .select({ id: shows.id })
+    .from(shows)
+    .where(eq(shows.plexRatingKey, showRatingKey))
     .limit(1);
 
   if (existing.length > 0) {
@@ -410,7 +410,7 @@ async function upsertShowFromPlex(
   }
 
   const [inserted] = await db
-    .insert(plexShows)
+    .insert(shows)
     .values({
       plexRatingKey: showRatingKey,
       title: showTitle,
@@ -424,7 +424,7 @@ async function upsertShowFromPlex(
       totalSeasons,
       totalEpisodes,
     })
-    .returning({ id: plexShows.id });
+    .returning({ id: shows.id });
 
   return inserted.id;
 }
@@ -545,7 +545,7 @@ export async function handlePlexWebhook(
   // Look up tmdbId for image pipeline
   let tmdbId: string | undefined;
   if (result.success && imageEntityId !== 'undefined') {
-    const table = mediaType === 'movie' ? movies : plexShows;
+    const table = mediaType === 'movie' ? movies : shows;
     const [row] = await db
       .select({ tmdbId: table.tmdbId })
       .from(table)

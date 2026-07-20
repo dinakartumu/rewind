@@ -4,8 +4,8 @@ import {
   movies,
   watchHistory,
   watchStats,
-  plexShows,
-  plexEpisodesWatched,
+  shows,
+  episodesWatched,
 } from '../../db/schema/watching.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { TmdbClient, resolveTmdbId } from '../watching/tmdb.js';
@@ -293,9 +293,9 @@ async function syncShows(
       showId = cachedShowId;
     } else {
       const existingShow = await db
-        .select({ id: plexShows.id })
-        .from(plexShows)
-        .where(eq(plexShows.plexRatingKey, episode.grandparentRatingKey))
+        .select({ id: shows.id })
+        .from(shows)
+        .where(eq(shows.plexRatingKey, episode.grandparentRatingKey))
         .limit(1);
 
       if (existingShow.length > 0) {
@@ -342,7 +342,7 @@ async function syncShows(
         }
 
         const [inserted] = await db
-          .insert(plexShows)
+          .insert(shows)
           .values({
             plexRatingKey: episode.grandparentRatingKey,
             title: episode.grandparentTitle || episode.title,
@@ -356,7 +356,7 @@ async function syncShows(
             totalSeasons,
             totalEpisodes,
           })
-          .returning({ id: plexShows.id });
+          .returning({ id: shows.id });
 
         showId = inserted.id;
         showCache.set(episode.grandparentRatingKey, showId);
@@ -369,7 +369,7 @@ async function syncShows(
       : new Date().toISOString();
 
     await db
-      .insert(plexEpisodesWatched)
+      .insert(episodesWatched)
       .values({
         showId,
         seasonNumber: episode.parentIndex || 0,
@@ -411,19 +411,17 @@ export async function computeWatchStats(db: Database): Promise<void> {
     );
 
   // TV stats
-  const [totalShowsResult] = await db
-    .select({ total: count() })
-    .from(plexShows);
+  const [totalShowsResult] = await db.select({ total: count() }).from(shows);
 
   const [totalEpisodesResult] = await db
     .select({ total: count() })
-    .from(plexEpisodesWatched);
+    .from(episodesWatched);
 
   const [episodesThisYearResult] = await db
     .select({ total: count() })
-    .from(plexEpisodesWatched)
+    .from(episodesWatched)
     .where(
-      sql`substr(${plexEpisodesWatched.watchedAt}, 1, 4) = ${String(currentYear)}`
+      sql`substr(${episodesWatched.watchedAt}, 1, 4) = ${String(currentYear)}`
     );
 
   // Upsert stats

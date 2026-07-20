@@ -28,7 +28,7 @@ import {
 } from '../services/images/pipeline.js';
 import type { SourceSearchParams } from '../services/images/sources/types.js';
 import { eq } from 'drizzle-orm';
-import { movies, plexShows } from '../db/schema/watching.js';
+import { movies, shows } from '../db/schema/watching.js';
 
 const VALID_DOMAINS = ['listening', 'watching', 'collecting', 'reading'];
 const VALID_ENTITY_TYPES = [
@@ -178,7 +178,7 @@ imagesRoute.openapi(getImageRoute, async (c) => {
 
     // For watching domain, look up tmdbId from DB to avoid using entityId as TMDB ID
     if (domain === 'watching' && !searchParams.tmdbId) {
-      const table = entity_type === 'movies' ? movies : plexShows;
+      const table = entity_type === 'movies' ? movies : shows;
       const [row] = await db
         .select({ tmdbId: table.tmdbId })
         .from(table)

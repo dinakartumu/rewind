@@ -7,7 +7,7 @@
 import { and, eq, desc, isNotNull, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { lastfmAlbums, lastfmArtists } from '../../db/schema/lastfm.js';
-import { movies, plexShows } from '../../db/schema/watching.js';
+import { movies, shows } from '../../db/schema/watching.js';
 import {
   discogsReleases,
   discogsArtists,
@@ -257,12 +257,12 @@ export async function processWatchingImages(
   // Shows without images
   const showRows = await db
     .select({
-      id: plexShows.id,
-      tmdbId: plexShows.tmdbId,
+      id: shows.id,
+      tmdbId: shows.tmdbId,
     })
-    .from(plexShows)
+    .from(shows)
     .where(
-      sql`${plexShows.tmdbId} IS NOT NULL AND ${plexShows.id} NOT IN (
+      sql`${shows.tmdbId} IS NOT NULL AND ${shows.id} NOT IN (
         SELECT CAST(${images.entityId} AS INTEGER) FROM ${images}
         WHERE ${images.domain} = 'watching' AND ${images.entityType} = 'shows'
       )`
