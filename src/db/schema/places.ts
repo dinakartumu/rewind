@@ -9,8 +9,10 @@ import {
 
 /**
  * Foursquare/Swarm check-ins. The unique foursquare_id makes the
- * oldest-first offset walk idempotent: an interrupted batch resumes from
- * COUNT(checkins) and any overlap deduplicates on conflict.
+ * end-anchored offset walk idempotent: an interrupted batch resumes from
+ * COUNT(checkins) and any overlap deduplicates on conflict. Venueless
+ * legacy check-ins are stored with null venue fields so the count cursor
+ * tracks the API total exactly.
  */
 export const checkins = sqliteTable(
   'checkins',

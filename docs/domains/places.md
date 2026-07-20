@@ -22,7 +22,7 @@ Foursquare/Swarm check-in history synced via the Foursquare v2 API. Each check-i
 | ------ | ----------------------- | ---------------------------- |
 | GET    | /v2/users/self/checkins | Check-in history (paginated) |
 
-Query params: `oauth_token`, `v`, `sort=oldestfirst`, `limit` (max 250), `offset`.
+Query params: `oauth_token`, `v`, `limit` (max 250), `offset`. The API ignores its `sort` parameter -- the feed is always newest-first -- so the client does not send one.
 
 ### Auth
 
@@ -30,10 +30,11 @@ The v2 user token is obtained once via the browser OAuth flow and stored as the 
 
 ## Sync Strategy
 
-- `sort=oldestfirst` + `offset` gives a natively resumable oldest-first walk: the cursor is simply the local `COUNT(checkins)` for the user.
-- Bounded batches: `syncPlaces(env, { maxPages })` walks up to 8 pages of 250 per run and returns `{ synced, remaining }`; the admin route's caller loops until `remaining: 0`.
-- Dedup: unique `foursquare_id` index + `onConflictDoNothing`, with `meta.changes` guarding counts so overlap re-fetches report as skipped, not synced.
-- Legacy check-ins with no venue are skipped and counted; the resulting slight cursor lag causes a harmless deduplicated overlap on the next run.
+- The feed is always newest-first (the API ignores `sort`), so the walk is end-anchored: each batch fetches `offset = apiCount - localCount - limit` (limit clamped at the offset-0 boundary), processing from the deepest offset toward 0. Page items are sorted by `createdAt` ascending before insert so insert order stays chronological. The cursor is simply the local `COUNT(checkins)` for the user.
+- Bounded batches: `syncPlaces(env, { maxPages })` walks up to 8 pages of 250 per run (plus one count probe) and returns `{ synced, remaining }` with `remaining = max(0, apiCount - localCount)`; the admin route's caller loops until `remaining: 0`.
+- Dedup: unique `foursquare_id` index + `onConflictDoNothing`, with `meta.changes` guarding counts so interleaved re-fetches report as skipped, not synced.
+- Legacy check-ins with no venue are inserted with null venue fields (`venue_name` falls back to the shout or "Unknown venue") but emit no feed/search items -- storing them keeps the count cursor tracking the API frontier exactly.
+- New check-ins prepend at offset 0 and do not shift the end-anchored tail offsets, so a mid-walk arrival cannot desync the walk; a final-batch interleave dedups on `foursquare_id`.
 - sync_runs domain `places`, syncType `foursquare`.
 - afterSync: feed items (`checkin` events, sourceId `foursquare:checkin:{id}`) and search items (entityType `venue`).
 - Cron: every 6 hours, guarded on `env.FOURSQUARE_ACCESS_TOKEN`.

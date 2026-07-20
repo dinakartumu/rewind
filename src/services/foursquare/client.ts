@@ -33,7 +33,10 @@ export interface FoursquareCheckin {
   /** Epoch seconds. */
   createdAt: number;
   shout?: string;
-  /** Missing on some legacy checkins — the sync skips and counts those. */
+  /**
+   * Missing on some legacy checkins — the sync stores those with null
+   * venue fields so the local count tracks the API frontier.
+   */
   venue?: FoursquareVenue;
 }
 
@@ -91,8 +94,11 @@ export class FoursquareClient {
   }
 
   /**
-   * Get a page of the user's checkin history, oldest first. The
-   * oldestfirst sort makes `offset` a natively resumable cursor.
+   * Get a page of the user's checkin history. The feed is ALWAYS
+   * newest-first: the v2 API ignores its sort parameter (verified
+   * empirically — sort=oldestfirst and sort=newestfirst both return the
+   * newest items first), so no sort is sent and callers paginate with
+   * `offset` counted from the newest checkin.
    */
   async getCheckins(
     options: FoursquareCheckinsOptions = {}
@@ -100,7 +106,6 @@ export class FoursquareClient {
     const params = new URLSearchParams({
       oauth_token: this.accessToken,
       v: API_VERSION,
-      sort: 'oldestfirst',
       limit: String(options.limit ?? 250),
       offset: String(options.offset ?? 0),
     });

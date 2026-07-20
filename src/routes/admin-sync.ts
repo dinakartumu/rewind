@@ -439,7 +439,7 @@ const syncPlacesRoute = createRoute({
   tags: ['Admin'],
   summary: 'Trigger Foursquare check-in sync',
   description:
-    'Runs one bounded batch of the Foursquare check-in walk (oldest first, resumable). Re-run until remaining: 0.',
+    'Runs one bounded batch of the Foursquare check-in walk (end-anchored on the newest-first feed, resumable). Re-run until remaining: 0.',
   responses: {
     200: {
       content: { 'application/json': { schema: PlacesSyncResponse } },

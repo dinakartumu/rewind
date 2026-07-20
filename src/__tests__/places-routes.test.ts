@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { env, SELF } from 'cloudflare:test';
+import {
+  env,
+  SELF,
+  createExecutionContext,
+  waitOnExecutionContext,
+} from 'cloudflare:test';
+import app from '../index.js';
 import { createDb } from '../db/client.js';
 import { checkins } from '../db/schema/places.js';
 import { setupTestDb, createTestApiKey } from '../test-helpers.js';
+import type { Env } from '../types/env.js';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -189,12 +196,24 @@ describe('Places endpoints', () => {
     });
 
     it('returns a 500 error envelope when the Foursquare token is missing', async () => {
-      // Test env has no FOURSQUARE_ACCESS_TOKEN; the route surfaces the
-      // sync failure as the standard error envelope.
-      const res = await SELF.fetch('http://localhost/v1/admin/sync/places', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
+      // Call the app with an env that explicitly strips the token: the
+      // local .dev.vars may define FOURSQUARE_ACCESS_TOKEN, and this test
+      // must neither depend on that nor make a live API call. The route
+      // surfaces the sync failure as the standard error envelope.
+      const tokenlessEnv = {
+        ...env,
+        FOURSQUARE_ACCESS_TOKEN: undefined,
+      } as unknown as Env;
+      const ctx = createExecutionContext();
+      const res = await app.fetch(
+        new Request('http://localhost/v1/admin/sync/places', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        }),
+        tokenlessEnv,
+        ctx
+      );
+      await waitOnExecutionContext(ctx);
       expect(res.status).toBe(500);
       const body = (await res.json()) as { error: string; status: number };
       expect(body.status).toBe(500);

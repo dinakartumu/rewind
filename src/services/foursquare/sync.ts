@@ -39,6 +39,8 @@ function primaryCategory(item: FoursquareCheckin): string | null {
 
 export interface CheckinSyncOptions {
   maxPages?: number;
+  /** Batch size for the offset walk. Defaults to the API max of 250. */
+  pageSize?: number;
 }
 
 export interface CheckinSyncResult {
@@ -49,14 +51,24 @@ export interface CheckinSyncResult {
 }
 
 /**
- * Bounded, resumable oldest-first walk of the Foursquare checkin history.
+ * Bounded, resumable end-anchored walk of the Foursquare checkin history.
  *
- * The cursor is simply the local COUNT of stored checkins for the user:
- * `sort=oldestfirst` + offset means an interrupted batch resumes exactly
- * where it stopped. Legacy checkins with no venue are skipped without
- * insert, so the cursor can lag the API offset slightly — the resulting
- * overlap re-fetch is deduplicated by the unique foursquare_id index,
- * with `meta.changes` guarding the counts (the episode-sync lesson).
+ * The v2 checkins feed is ALWAYS newest-first — the API ignores its sort
+ * parameter (verified empirically) — so the walk anchors to the END of
+ * the feed. Each batch fetches the oldest not-yet-stored window,
+ * `offset = apiCount - localCount - limit` (limit clamped at the offset-0
+ * boundary so windows never overlap), and moves from the deepest offset
+ * toward 0. Page items arrive newest-first and are sorted by createdAt
+ * ascending before insert so insert order stays chronological.
+ *
+ * The cursor is simply the local COUNT of stored checkins for the user.
+ * Legacy checkins with no venue are inserted too (null venue fields,
+ * excluded from feed/search output) so the count tracks the API frontier
+ * exactly. New checkins arriving mid-walk prepend at offset 0 and do not
+ * shift end-anchored offsets (apiCount refreshes from every response);
+ * the final offset-0 batch may still interleave with a brand-new checkin,
+ * in which case the unique foursquare_id index dedups the re-fetch, with
+ * `meta.changes` guarding the counts (the episode-sync lesson).
  */
 export async function syncCheckins(
   db: Database,
@@ -65,74 +77,94 @@ export async function syncCheckins(
   options: CheckinSyncOptions = {}
 ): Promise<CheckinSyncResult> {
   const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+  const pageSize = options.pageSize ?? PAGE_SIZE;
 
   const [cursor] = await db
     .select({ count: sql<number>`count(*)` })
     .from(checkins)
     .where(eq(checkins.userId, userId));
-  let offset = cursor?.count ?? 0;
+  let localCount = cursor?.count ?? 0;
 
-  console.log(`[SYNC] Foursquare checkins walk from offset ${offset}`);
+  // Probe the newest page for the API's total count; items are ignored.
+  const probe = await client.getCheckins({ offset: 0, limit: 1 });
+  let apiCount = probe.count;
+
+  console.log(
+    `[SYNC] Foursquare end-anchored walk: ${localCount} stored of ${apiCount} total`
+  );
 
   let synced = 0;
   let skipped = 0;
-  let total = offset;
   const newCheckins: SyncedCheckin[] = [];
 
   for (let page = 0; page < maxPages; page++) {
-    const result = await client.getCheckins({ offset, limit: PAGE_SIZE });
-    total = result.count;
+    const unfetched = apiCount - localCount;
+    if (unfetched <= 0) break;
+    const limit = Math.min(pageSize, unfetched);
+    const offset = unfetched - limit;
+
+    const result = await client.getCheckins({ offset, limit });
+    // Refresh so prepends at offset 0 don't shift later tail offsets.
+    apiCount = result.count;
     if (result.items.length === 0) break;
 
-    for (const item of result.items) {
-      const venue = item.venue;
-      if (!venue) {
-        console.log(`[INFO] Skipping checkin ${item.id} - no venue`);
-        skipped++;
-        continue;
-      }
+    // The page is newest-first; insert oldest-first so autoincrement ids
+    // follow chronology.
+    const items = [...result.items].sort((a, b) => a.createdAt - b.createdAt);
 
+    let inserted = 0;
+    for (const item of items) {
+      const venue = item.venue;
       const checkedInAt = new Date(item.createdAt * 1000).toISOString();
       const insertResult = await db
         .insert(checkins)
         .values({
           userId,
           foursquareId: item.id,
-          venueId: venue.id,
-          venueName: venue.name,
+          venueId: venue?.id ?? null,
+          venueName: venue?.name ?? item.shout ?? 'Unknown venue',
           venueCategory: primaryCategory(item),
-          venueCity: venue.location?.city ?? null,
-          venueState: venue.location?.state ?? null,
-          venueCountry: venue.location?.country ?? null,
-          lat: venue.location?.lat ?? null,
-          lng: venue.location?.lng ?? null,
+          venueCity: venue?.location?.city ?? null,
+          venueState: venue?.location?.state ?? null,
+          venueCountry: venue?.location?.country ?? null,
+          lat: venue?.location?.lat ?? null,
+          lng: venue?.location?.lng ?? null,
           checkedInAt,
           shout: item.shout ?? null,
         })
         .onConflictDoNothing();
 
-      // Conflict on idx_checkins_foursquare_id: an overlap re-fetch of an
-      // already-stored checkin. Count it as skipped for truthful totals.
+      // Conflict on idx_checkins_foursquare_id: an interleaved re-fetch
+      // of an already-stored checkin. Count as skipped for truthful
+      // totals.
       if (insertResult.meta.changes === 0) {
         skipped++;
         continue;
       }
 
-      newCheckins.push({
-        foursquareId: item.id,
-        venueId: venue.id,
-        venueName: venue.name,
-        venueCity: venue.location?.city ?? null,
-        checkedInAt,
-      });
+      inserted++;
+      localCount++;
       synced++;
+
+      // Venueless legacy checkins are stored for cursor integrity but
+      // emit no feed/search items.
+      if (venue) {
+        newCheckins.push({
+          foursquareId: item.id,
+          venueId: venue.id,
+          venueName: venue.name,
+          venueCity: venue.location?.city ?? null,
+          checkedInAt,
+        });
+      }
     }
 
-    offset += result.items.length;
-    if (offset >= total) break;
+    // A batch of pure dupes means localCount didn't advance and the next
+    // window would be identical — stop instead of spinning to maxPages.
+    if (inserted === 0) break;
   }
 
-  const remaining = Math.max(0, total - offset);
+  const remaining = Math.max(0, apiCount - localCount);
   return { synced, skipped, remaining, newCheckins };
 }
 

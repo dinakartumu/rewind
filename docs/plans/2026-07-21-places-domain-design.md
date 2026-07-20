@@ -32,14 +32,22 @@ unique foursquare_id, venue_id.
 `src/services/foursquare/` — `client.ts` + `sync.ts`.
 
 - v2 `GET /v2/users/self/checkins?oauth_token=…&v=20250101&limit=250&
-offset=N&sort=oldestfirst`. `sort=oldestfirst` + offset = naturally
-  resumable oldest-first walk (the lesson from Trakt/Strava/Last.fm baked in
-  from the start): cursor is simply `COUNT(checkins)` locally; an interrupted
-  batch resumes exactly where it stopped; `foursquare_id` unique index makes
-  overlap idempotent.
+offset=N`. The API IGNORES its `sort` parameter (verified empirically:
+  `oldestfirst` and `newestfirst` both return the newest item; offset 7319
+  of 7321 returns a 2014 item) — the feed is always newest-first, so no
+  sort is sent and the walk is end-anchored instead: each batch fetches
+  `offset = apiCount - localCount - limit` (limit clamped at the offset-0
+  boundary so windows never overlap), processing from the deepest offset
+  toward 0, with each page sorted by createdAt ascending before insert so
+  insert order stays chronological. Cursor is simply `COUNT(checkins)`
+  locally; venueless legacy checkins are inserted too (null venue fields,
+  name falls back to shout or "Unknown venue", no feed/search output) so
+  the count tracks the API frontier exactly. New checkins prepend at
+  offset 0 and don't shift end-anchored tail offsets; any final-batch
+  interleave dedups on the `foursquare_id` unique index.
 - `syncPlaces(env, { maxPages = 8 })` → `{ synced, remaining }` where
-  remaining derives from `response.checkins.count - (offset + fetched)`.
-  Bounded batches; the admin route loops until remaining 0.
+  remaining is `max(0, apiCount - localCount)`. Bounded batches (plus one
+  count probe per run); the admin route loops until remaining 0.
 - sync_runs domain `places`, syncType `foursquare`.
 - afterSync: feed items (`checkin` events, title "Checked in at {venue}",
   sourceId `foursquare:checkin:{foursquare_id}`) and search items

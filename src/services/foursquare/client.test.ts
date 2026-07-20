@@ -23,7 +23,7 @@ describe('FoursquareClient', () => {
     expect(client).toBeDefined();
   });
 
-  it('should request users/self/checkins with token, version, sort, and paging params', async () => {
+  it('should request users/self/checkins with token, version, and paging params', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify(checkinsResponse([], 0))));
@@ -35,9 +35,11 @@ describe('FoursquareClient', () => {
     expect(url).toContain('https://api.foursquare.com/v2/users/self/checkins');
     expect(url).toContain('oauth_token=test-oauth-token');
     expect(url).toContain('v=20250101');
-    expect(url).toContain('sort=oldestfirst');
     expect(url).toContain('limit=250');
     expect(url).toContain('offset=500');
+    // The API ignores sort entirely (the feed is always newest-first), so
+    // the client does not pretend to send one.
+    expect(url).not.toContain('sort=');
   });
 
   it('should default to offset 0 and limit 250', async () => {
