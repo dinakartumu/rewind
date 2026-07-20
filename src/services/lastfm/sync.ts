@@ -1,4 +1,4 @@
-import { eq, and, asc, desc, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, lte, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import {
   lastfmArtists,
@@ -869,6 +869,28 @@ export async function syncUserStats(
 }
 
 /**
+ * Runs async tasks with a fixed concurrency limit. D1 allows a handful of
+ * simultaneous queries per invocation; sequential per-scrobble round trips
+ * are what made the unbounded backfill take ~60s per page.
+ */
+async function runWithConcurrency(
+  tasks: (() => Promise<void>)[],
+  limit: number
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, tasks.length) },
+    async () => {
+      while (next < tasks.length) {
+        const i = next++;
+        await tasks[i]();
+      }
+    }
+  );
+  await Promise.all(workers);
+}
+
+/**
  * Historical backfill in bounded, resumable batches.
  *
  * Anchors each batch on the oldest stored scrobble: passes its epoch as
@@ -880,14 +902,28 @@ export async function syncUserStats(
  *
  * Processes at most `maxPages` pages per invocation to stay inside Worker
  * limits. Returns synced count plus remaining pages so the caller can loop.
+ *
+ * Per-page work is deduplicated and parallelized: upserts run once per
+ * unique artist/album/track (memoized across the invocation), scrobble
+ * dedup is a single time-range query per page, and inserts are chunked.
+ * The upsert helpers stay the single source of insert logic.
  */
+// Default sized from live measurement: ~4.5s per page against remote D1,
+// so 12 pages keeps an admin-triggered batch inside a ~60s response budget.
 export async function backfillScrobbles(
   db: Database,
   client: LastfmClient,
-  maxPages = 15
+  maxPages = 12
 ): Promise<{ synced: number; remaining: number }> {
   const runId = await startSyncRun(db, 'backfill');
   let totalSynced = 0;
+
+  // Memo caches, keyed to match each upsert's identity columns so a key
+  // never races another key for the same row.
+  const artistCache = new Map<string, number>(); // cleaned name -> id
+  const albumCache = new Map<string, number>(); // artistId::name -> id
+  const trackCache = new Map<string, number>(); // artistId::name -> id
+  const CONCURRENCY = 5;
 
   try {
     // Cursor: the oldest scrobble we already have. Absent on a fresh
@@ -932,54 +968,167 @@ export async function backfillScrobbles(
         break;
       }
 
-      for (const rawTrack of tracks) {
-        const track = normalizeScrobble(rawTrack);
-        if (track.isNowPlaying || !track.scrobbledAt) continue;
+      const scrobbles = tracks
+        .map(normalizeScrobble)
+        .filter((t) => !t.isNowPlaying && t.scrobbledAt !== null);
 
-        const { id: artistId } = await upsertArtist(
-          db,
-          track.artistName,
-          track.artistMbid
-        );
-        const album = track.albumName
-          ? await upsertAlbum(
-              db,
-              track.albumName,
-              artistId,
-              track.albumMbid,
-              track.artistName
-            )
-          : null;
-        const trackId = await upsertTrack(
-          db,
-          track.trackName,
-          artistId,
-          album?.id ?? null,
-          track.trackMbid,
-          track.artistName,
-          track.albumName,
-          track.trackUrl
-        );
-
-        const [existingScrobble] = await db
-          .select({ id: lastfmScrobbles.id })
-          .from(lastfmScrobbles)
-          .where(
-            and(
-              eq(lastfmScrobbles.trackId, trackId),
-              eq(lastfmScrobbles.scrobbledAt, track.scrobbledAt)
-            )
-          )
-          .limit(1);
-
-        if (!existingScrobble) {
-          await db.insert(lastfmScrobbles).values({
-            trackId,
-            scrobbledAt: track.scrobbledAt,
-          });
-          totalSynced++;
+      // Phase 1: artists. Unique by cleaned name; entries sharing an MBID
+      // are chained onto one sequential task so the MBID-first lookup in
+      // upsertArtist can't race itself into duplicate rows.
+      const artistChains = new Map<
+        string,
+        { nameKey: string; name: string; mbid: string | null }[]
+      >();
+      const seenNameKeys = new Set<string>();
+      const mbidToChain = new Map<string, string>();
+      for (const s of scrobbles) {
+        const nameKey = cleanArtistName(s.artistName);
+        if (artistCache.has(nameKey) || seenNameKeys.has(nameKey)) continue;
+        seenNameKeys.add(nameKey);
+        let chainKey = s.artistMbid ? mbidToChain.get(s.artistMbid) : undefined;
+        if (chainKey === undefined) {
+          chainKey = nameKey;
+          artistChains.set(chainKey, []);
+          if (s.artistMbid) mbidToChain.set(s.artistMbid, chainKey);
         }
+        artistChains
+          .get(chainKey)!
+          .push({ nameKey, name: s.artistName, mbid: s.artistMbid });
       }
+      await runWithConcurrency(
+        [...artistChains.values()].map((entries) => async () => {
+          for (const entry of entries) {
+            const { id } = await upsertArtist(db, entry.name, entry.mbid);
+            artistCache.set(entry.nameKey, id);
+          }
+        }),
+        CONCURRENCY
+      );
+
+      // Phase 2: albums, unique by (artistId, name) — upsertAlbum's strict
+      // identity, so distinct keys never touch the same row.
+      const albumJobs = new Map<
+        string,
+        { name: string; artistId: number; mbid: string | null; artist: string }
+      >();
+      for (const s of scrobbles) {
+        if (!s.albumName) continue;
+        const artistId = artistCache.get(cleanArtistName(s.artistName))!;
+        const key = `${artistId}::${s.albumName}`;
+        if (albumCache.has(key) || albumJobs.has(key)) continue;
+        albumJobs.set(key, {
+          name: s.albumName,
+          artistId,
+          mbid: s.albumMbid,
+          artist: s.artistName,
+        });
+      }
+      await runWithConcurrency(
+        [...albumJobs.entries()].map(([key, job]) => async () => {
+          const { id } = await upsertAlbum(
+            db,
+            job.name,
+            job.artistId,
+            job.mbid,
+            job.artist
+          );
+          albumCache.set(key, id);
+        }),
+        CONCURRENCY
+      );
+
+      // Phase 3: tracks, unique by (artistId, name) — upsertTrack's
+      // identity. First occurrence in page order wins the album link.
+      const trackJobs = new Map<
+        string,
+        {
+          name: string;
+          artistId: number;
+          albumId: number | null;
+          mbid: string | null;
+          artist: string;
+          album?: string;
+          url?: string;
+        }
+      >();
+      for (const s of scrobbles) {
+        const artistId = artistCache.get(cleanArtistName(s.artistName))!;
+        const key = `${artistId}::${s.trackName}`;
+        if (trackCache.has(key) || trackJobs.has(key)) continue;
+        const albumId = s.albumName
+          ? (albumCache.get(`${artistId}::${s.albumName}`) ?? null)
+          : null;
+        trackJobs.set(key, {
+          name: s.trackName,
+          artistId,
+          albumId,
+          mbid: s.trackMbid,
+          artist: s.artistName,
+          album: s.albumName ?? undefined,
+          url: s.trackUrl,
+        });
+      }
+      await runWithConcurrency(
+        [...trackJobs.entries()].map(([key, job]) => async () => {
+          const trackId = await upsertTrack(
+            db,
+            job.name,
+            job.artistId,
+            job.albumId,
+            job.mbid,
+            job.artist,
+            job.album,
+            job.url
+          );
+          trackCache.set(key, trackId);
+        }),
+        CONCURRENCY
+      );
+
+      // Phase 4: scrobble dedup via one time-range query (a page is a
+      // contiguous slice of history), then chunked inserts.
+      const timestamps = scrobbles.map((s) => s.scrobbledAt as string);
+      const minTs = timestamps.reduce((a, b) => (a < b ? a : b));
+      const maxTs = timestamps.reduce((a, b) => (a > b ? a : b));
+      const existingRows = await db
+        .select({
+          trackId: lastfmScrobbles.trackId,
+          scrobbledAt: lastfmScrobbles.scrobbledAt,
+        })
+        .from(lastfmScrobbles)
+        .where(
+          and(
+            gte(lastfmScrobbles.scrobbledAt, minTs),
+            lte(lastfmScrobbles.scrobbledAt, maxTs)
+          )
+        );
+      const seenScrobbles = new Set(
+        existingRows.map((r) => `${r.trackId}|${r.scrobbledAt}`)
+      );
+
+      const newRows: { trackId: number; scrobbledAt: string }[] = [];
+      for (const s of scrobbles) {
+        const artistId = artistCache.get(cleanArtistName(s.artistName))!;
+        const trackId = trackCache.get(`${artistId}::${s.trackName}`)!;
+        const scrobbleKey = `${trackId}|${s.scrobbledAt}`;
+        if (seenScrobbles.has(scrobbleKey)) continue;
+        seenScrobbles.add(scrobbleKey);
+        newRows.push({ trackId, scrobbledAt: s.scrobbledAt as string });
+      }
+
+      // 20 rows per insert: drizzle binds user_id/created_at defaults too,
+      // and D1 caps a statement at 100 bound parameters.
+      const chunks: (typeof newRows)[] = [];
+      for (let i = 0; i < newRows.length; i += 20) {
+        chunks.push(newRows.slice(i, i + 20));
+      }
+      await runWithConcurrency(
+        chunks.map((chunk) => async () => {
+          await db.insert(lastfmScrobbles).values(chunk);
+        }),
+        CONCURRENCY
+      );
+      totalSynced += newRows.length;
 
       pagesProcessed++;
       page++;

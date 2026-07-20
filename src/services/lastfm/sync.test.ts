@@ -587,6 +587,36 @@ describe('backfillScrobbles - bounded resumable batches', () => {
     expect(result.remaining).toBe(0);
   });
 
+  it('dedupes repeated tracks within a page and skips stored scrobbles', async () => {
+    const dupe = makeRawTrack('Repeat Song', 900);
+    const { client } = makeClient(() =>
+      makePage(
+        [
+          makeRawTrack('Repeat Song', 1100),
+          makeRawTrack('Repeat Song', 1000),
+          dupe,
+          dupe, // exact duplicate timestamp within the page
+        ],
+        1,
+        1
+      )
+    );
+
+    const result = await backfillScrobbles(db, client);
+
+    expect(result.synced).toBe(3);
+    const artists = await db.select().from(lastfmArtists);
+    expect(artists).toHaveLength(1);
+    const trackRows = await db.select().from(lastfmTracks);
+    expect(trackRows).toHaveLength(1);
+    const scrobbleRows = await db.select().from(lastfmScrobbles);
+    expect(scrobbleRows).toHaveLength(3);
+
+    // Re-running the same window inserts nothing new.
+    const again = await backfillScrobbles(db, client);
+    expect(again.synced).toBe(0);
+  });
+
   it('completes with remaining 0 when totalPages fits inside maxPages', async () => {
     const { client, calls } = makeClient((options) =>
       makePage(
