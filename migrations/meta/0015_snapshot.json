@@ -1,8 +1,8 @@
 {
-  "id": "c257970b-2aee-4765-b8e6-dc25648a2f4e",
-  "prevId": "1fb3a23f-9069-47fc-bb61-2a2302083abb",
   "version": "6",
   "dialect": "sqlite",
+  "id": "c257970b-2aee-4765-b8e6-dc25648a2f4e",
+  "prevId": "1fb3a23f-9069-47fc-bb61-2a2302083abb",
   "tables": {
     "attended_event_performers": {
       "name": "attended_event_performers",
@@ -51,28 +51,28 @@
         "attended_event_performers_event_id_attended_events_id_fk": {
           "name": "attended_event_performers_event_id_attended_events_id_fk",
           "tableFrom": "attended_event_performers",
+          "tableTo": "attended_events",
           "columnsFrom": [
             "event_id"
           ],
-          "tableTo": "attended_events",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "attended_event_performers_performer_id_performers_id_fk": {
           "name": "attended_event_performers_performer_id_performers_id_fk",
           "tableFrom": "attended_event_performers",
+          "tableTo": "performers",
           "columnsFrom": [
             "performer_id"
           ],
-          "tableTo": "performers",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -220,28 +220,28 @@
         "attended_event_players_event_id_attended_events_id_fk": {
           "name": "attended_event_players_event_id_attended_events_id_fk",
           "tableFrom": "attended_event_players",
+          "tableTo": "attended_events",
           "columnsFrom": [
             "event_id"
           ],
-          "tableTo": "attended_events",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "attended_event_players_player_id_players_id_fk": {
           "name": "attended_event_players_player_id_players_id_fk",
           "tableFrom": "attended_event_players",
+          "tableTo": "players",
           "columnsFrom": [
             "player_id"
           ],
-          "tableTo": "players",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -330,15 +330,15 @@
         "attended_event_sources_event_id_attended_events_id_fk": {
           "name": "attended_event_sources_event_id_attended_events_id_fk",
           "tableFrom": "attended_event_sources",
+          "tableTo": "attended_events",
           "columnsFrom": [
             "event_id"
           ],
-          "tableTo": "attended_events",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -493,15 +493,15 @@
         "attended_event_tickets_event_id_attended_events_id_fk": {
           "name": "attended_event_tickets_event_id_attended_events_id_fk",
           "tableFrom": "attended_event_tickets",
+          "tableTo": "attended_events",
           "columnsFrom": [
             "event_id"
           ],
-          "tableTo": "attended_events",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -691,114 +691,17 @@
         "attended_events_venue_id_venues_id_fk": {
           "name": "attended_events_venue_id_venues_id_fk",
           "tableFrom": "attended_events",
+          "tableTo": "venues",
           "columnsFrom": [
             "venue_id"
           ],
-          "tableTo": "venues",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "mlb_teams": {
-      "name": "mlb_teams",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "abbreviation": {
-          "name": "abbreviation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "team_code": {
-          "name": "team_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "league": {
-          "name": "league",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'mlb'"
-        },
-        "primary_color": {
-          "name": "primary_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "secondary_color": {
-          "name": "secondary_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "logo_image_key": {
-          "name": "logo_image_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "active": {
-          "name": "active",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "synced_at": {
-          "name": "synced_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_mlb_teams_abbr": {
-          "name": "idx_mlb_teams_abbr",
-          "columns": [
-            "abbreviation"
-          ],
-          "isUnique": false
-        },
-        "idx_mlb_teams_active": {
-          "name": "idx_mlb_teams_active",
-          "columns": [
-            "active"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -908,15 +811,15 @@
         "performers_lastfm_artist_id_lastfm_artists_id_fk": {
           "name": "performers_lastfm_artist_id_lastfm_artists_id_fk",
           "tableFrom": "performers",
+          "tableTo": "lastfm_artists",
           "columnsFrom": [
             "lastfm_artist_id"
           ],
-          "tableTo": "lastfm_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1011,9 +914,30 @@
           "notNull": false,
           "autoincrement": false
         },
+        "birth_state_province": {
+          "name": "birth_state_province",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "birth_country": {
           "name": "birth_country",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "height": {
+          "name": "height",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weight": {
+          "name": "weight",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1041,6 +965,20 @@
         },
         "debut_date": {
           "name": "debut_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "college_name": {
+          "name": "college_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "awards": {
+          "name": "awards",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1101,6 +1039,230 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "teams": {
+      "name": "teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "league": {
+          "name": "league",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "league_team_id": {
+          "name": "league_team_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "abbreviation": {
+          "name": "abbreviation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "primary_color": {
+          "name": "primary_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "secondary_color": {
+          "name": "secondary_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "tertiary_color": {
+          "name": "tertiary_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ui_tint_color": {
+          "name": "ui_tint_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "logo_dark_url": {
+          "name": "logo_dark_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "logo_light_url": {
+          "name": "logo_light_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "logo_key": {
+          "name": "logo_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "conference": {
+          "name": "conference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "division": {
+          "name": "division",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "home_venue_id": {
+          "name": "home_venue_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "external_ids": {
+          "name": "external_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aliases": {
+          "name": "aliases",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "founded_year": {
+          "name": "founded_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_teams_league_native_id": {
+          "name": "idx_teams_league_native_id",
+          "columns": [
+            "league",
+            "league_team_id"
+          ],
+          "isUnique": true
+        },
+        "idx_teams_league_abbr": {
+          "name": "idx_teams_league_abbr",
+          "columns": [
+            "league",
+            "abbreviation"
+          ],
+          "isUnique": true
+        },
+        "idx_teams_league": {
+          "name": "idx_teams_league",
+          "columns": [
+            "league"
+          ],
+          "isUnique": false
+        },
+        "idx_teams_division": {
+          "name": "idx_teams_division",
+          "columns": [
+            "conference",
+            "division"
+          ],
+          "isUnique": false
+        },
+        "idx_teams_home_venue": {
+          "name": "idx_teams_home_venue",
+          "columns": [
+            "home_venue_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "teams_home_venue_id_venues_id_fk": {
+          "name": "teams_home_venue_id_venues_id_fk",
+          "tableFrom": "teams",
+          "tableTo": "venues",
+          "columnsFrom": [
+            "home_venue_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -1350,28 +1512,28 @@
         "collection_listening_xref_collection_id_discogs_collection_id_fk": {
           "name": "collection_listening_xref_collection_id_discogs_collection_id_fk",
           "tableFrom": "collection_listening_xref",
+          "tableTo": "discogs_collection",
           "columnsFrom": [
             "collection_id"
           ],
-          "tableTo": "discogs_collection",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "collection_listening_xref_release_id_discogs_releases_id_fk": {
           "name": "collection_listening_xref_release_id_discogs_releases_id_fk",
           "tableFrom": "collection_listening_xref",
+          "tableTo": "discogs_releases",
           "columnsFrom": [
             "release_id"
           ],
-          "tableTo": "discogs_releases",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1566,15 +1728,15 @@
         "discogs_collection_release_id_discogs_releases_id_fk": {
           "name": "discogs_collection_release_id_discogs_releases_id_fk",
           "tableFrom": "discogs_collection",
+          "tableTo": "discogs_releases",
           "columnsFrom": [
             "release_id"
           ],
-          "tableTo": "discogs_releases",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1755,28 +1917,28 @@
         "discogs_release_artists_release_id_discogs_releases_id_fk": {
           "name": "discogs_release_artists_release_id_discogs_releases_id_fk",
           "tableFrom": "discogs_release_artists",
+          "tableTo": "discogs_releases",
           "columnsFrom": [
             "release_id"
           ],
-          "tableTo": "discogs_releases",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "discogs_release_artists_artist_id_discogs_artists_id_fk": {
           "name": "discogs_release_artists_artist_id_discogs_artists_id_fk",
           "tableFrom": "discogs_release_artists",
+          "tableTo": "discogs_artists",
           "columnsFrom": [
             "artist_id"
           ],
-          "tableTo": "discogs_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2179,6 +2341,109 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "lastfm_album_attribution_audit": {
+      "name": "lastfm_album_attribution_audit",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "original_album_id": {
+          "name": "original_album_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_album_name": {
+          "name": "original_album_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_artist_id": {
+          "name": "original_artist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "new_album_id": {
+          "name": "new_album_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "new_artist_id": {
+          "name": "new_artist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "tracks_moved": {
+          "name": "tracks_moved",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_album_attribution_audit_original": {
+          "name": "idx_album_attribution_audit_original",
+          "columns": [
+            "original_album_id"
+          ],
+          "isUnique": false
+        },
+        "idx_album_attribution_audit_action": {
+          "name": "idx_album_attribution_audit_action",
+          "columns": [
+            "action"
+          ],
+          "isUnique": false
+        },
+        "idx_album_attribution_audit_created": {
+          "name": "idx_album_attribution_audit_created",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "lastfm_albums": {
       "name": "lastfm_albums",
       "columns": {
@@ -2247,14 +2512,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "is_compilation": {
-          "name": "is_compilation",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": 0
         },
         "apple_music_id": {
           "name": "apple_music_id",
@@ -2342,29 +2599,21 @@
             "is_filtered"
           ],
           "isUnique": false
-        },
-        "idx_lastfm_albums_compilation": {
-          "name": "idx_lastfm_albums_compilation",
-          "columns": [
-            "is_compilation",
-            "name"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
         "lastfm_albums_artist_id_lastfm_artists_id_fk": {
           "name": "lastfm_albums_artist_id_lastfm_artists_id_fk",
           "tableFrom": "lastfm_albums",
+          "tableTo": "lastfm_artists",
           "columnsFrom": [
             "artist_id"
           ],
-          "tableTo": "lastfm_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2783,15 +3032,15 @@
         "lastfm_scrobbles_track_id_lastfm_tracks_id_fk": {
           "name": "lastfm_scrobbles_track_id_lastfm_tracks_id_fk",
           "tableFrom": "lastfm_scrobbles",
+          "tableTo": "lastfm_tracks",
           "columnsFrom": [
             "track_id"
           ],
-          "tableTo": "lastfm_tracks",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2880,15 +3129,15 @@
         "lastfm_top_albums_album_id_lastfm_albums_id_fk": {
           "name": "lastfm_top_albums_album_id_lastfm_albums_id_fk",
           "tableFrom": "lastfm_top_albums",
+          "tableTo": "lastfm_albums",
           "columnsFrom": [
             "album_id"
           ],
-          "tableTo": "lastfm_albums",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2977,15 +3226,15 @@
         "lastfm_top_artists_artist_id_lastfm_artists_id_fk": {
           "name": "lastfm_top_artists_artist_id_lastfm_artists_id_fk",
           "tableFrom": "lastfm_top_artists",
+          "tableTo": "lastfm_artists",
           "columnsFrom": [
             "artist_id"
           ],
-          "tableTo": "lastfm_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3074,15 +3323,15 @@
         "lastfm_top_tracks_track_id_lastfm_tracks_id_fk": {
           "name": "lastfm_top_tracks_track_id_lastfm_tracks_id_fk",
           "tableFrom": "lastfm_top_tracks",
+          "tableTo": "lastfm_tracks",
           "columnsFrom": [
             "track_id"
           ],
-          "tableTo": "lastfm_tracks",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3242,28 +3491,28 @@
         "lastfm_tracks_artist_id_lastfm_artists_id_fk": {
           "name": "lastfm_tracks_artist_id_lastfm_artists_id_fk",
           "tableFrom": "lastfm_tracks",
+          "tableTo": "lastfm_artists",
           "columnsFrom": [
             "artist_id"
           ],
-          "tableTo": "lastfm_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "lastfm_tracks_album_id_lastfm_albums_id_fk": {
           "name": "lastfm_tracks_album_id_lastfm_albums_id_fk",
           "tableFrom": "lastfm_tracks",
+          "tableTo": "lastfm_albums",
           "columnsFrom": [
             "album_id"
           ],
-          "tableTo": "lastfm_albums",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3442,15 +3691,15 @@
         "lastfm_yearly_stats_top_artist_id_lastfm_artists_id_fk": {
           "name": "lastfm_yearly_stats_top_artist_id_lastfm_artists_id_fk",
           "tableFrom": "lastfm_yearly_stats",
+          "tableTo": "lastfm_artists",
           "columnsFrom": [
             "top_artist_id"
           ],
-          "tableTo": "lastfm_artists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3568,15 +3817,15 @@
         "reading_highlights_item_id_reading_items_id_fk": {
           "name": "reading_highlights_item_id_reading_items_id_fk",
           "tableFrom": "reading_highlights",
+          "tableTo": "reading_items",
           "columnsFrom": [
             "item_id"
           ],
-          "tableTo": "reading_items",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5753,15 +6002,15 @@
         "trakt_collection_movie_id_movies_id_fk": {
           "name": "trakt_collection_movie_id_movies_id_fk",
           "tableFrom": "trakt_collection",
+          "tableTo": "movies",
           "columnsFrom": [
             "movie_id"
           ],
-          "tableTo": "movies",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5959,6 +6208,149 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "episodes_watched": {
+      "name": "episodes_watched",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "show_id": {
+          "name": "show_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "season_number": {
+          "name": "season_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "episode_number": {
+          "name": "episode_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "watched_at": {
+          "name": "watched_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'plex'"
+        },
+        "trakt_history_id": {
+          "name": "trakt_history_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_episodes_watched_show_id": {
+          "name": "idx_episodes_watched_show_id",
+          "columns": [
+            "show_id"
+          ],
+          "isUnique": false
+        },
+        "idx_episodes_watched_watched_at": {
+          "name": "idx_episodes_watched_watched_at",
+          "columns": [
+            "watched_at"
+          ],
+          "isUnique": false
+        },
+        "idx_episodes_watched_user_id": {
+          "name": "idx_episodes_watched_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "idx_episodes_timeline": {
+          "name": "idx_episodes_timeline",
+          "columns": [
+            "user_id",
+            "watched_at"
+          ],
+          "isUnique": false
+        },
+        "idx_episodes_unique": {
+          "name": "idx_episodes_unique",
+          "columns": [
+            "show_id",
+            "season_number",
+            "episode_number",
+            "watched_at"
+          ],
+          "isUnique": true
+        },
+        "idx_episodes_trakt_history_id": {
+          "name": "idx_episodes_trakt_history_id",
+          "columns": [
+            "trakt_history_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "episodes_watched_show_id_shows_id_fk": {
+          "name": "episodes_watched_show_id_shows_id_fk",
+          "tableFrom": "episodes_watched",
+          "tableTo": "shows",
+          "columnsFrom": [
+            "show_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "genres": {
       "name": "genres",
       "columns": {
@@ -6022,28 +6414,28 @@
         "movie_directors_movie_id_movies_id_fk": {
           "name": "movie_directors_movie_id_movies_id_fk",
           "tableFrom": "movie_directors",
+          "tableTo": "movies",
           "columnsFrom": [
             "movie_id"
           ],
-          "tableTo": "movies",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "movie_directors_director_id_directors_id_fk": {
           "name": "movie_directors_director_id_directors_id_fk",
           "tableFrom": "movie_directors",
+          "tableTo": "directors",
           "columnsFrom": [
             "director_id"
           ],
-          "tableTo": "directors",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -6089,28 +6481,28 @@
         "movie_genres_movie_id_movies_id_fk": {
           "name": "movie_genres_movie_id_movies_id_fk",
           "tableFrom": "movie_genres",
+          "tableTo": "movies",
           "columnsFrom": [
             "movie_id"
           ],
-          "tableTo": "movies",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "movie_genres_genre_id_genres_id_fk": {
           "name": "movie_genres_genre_id_genres_id_fk",
           "tableFrom": "movie_genres",
+          "tableTo": "genres",
           "columnsFrom": [
             "genre_id"
           ],
-          "tableTo": "genres",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -6291,129 +6683,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "plex_episodes_watched": {
-      "name": "plex_episodes_watched",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
-        },
-        "show_id": {
-          "name": "show_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "season_number": {
-          "name": "season_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "episode_number": {
-          "name": "episode_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "watched_at": {
-          "name": "watched_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_plex_episodes_watched_show_id": {
-          "name": "idx_plex_episodes_watched_show_id",
-          "columns": [
-            "show_id"
-          ],
-          "isUnique": false
-        },
-        "idx_plex_episodes_watched_watched_at": {
-          "name": "idx_plex_episodes_watched_watched_at",
-          "columns": [
-            "watched_at"
-          ],
-          "isUnique": false
-        },
-        "idx_plex_episodes_watched_user_id": {
-          "name": "idx_plex_episodes_watched_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        },
-        "idx_plex_episodes_timeline": {
-          "name": "idx_plex_episodes_timeline",
-          "columns": [
-            "user_id",
-            "watched_at"
-          ],
-          "isUnique": false
-        },
-        "idx_plex_episodes_unique": {
-          "name": "idx_plex_episodes_unique",
-          "columns": [
-            "show_id",
-            "season_number",
-            "episode_number",
-            "watched_at"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "plex_episodes_watched_show_id_plex_shows_id_fk": {
-          "name": "plex_episodes_watched_show_id_plex_shows_id_fk",
-          "tableFrom": "plex_episodes_watched",
-          "columnsFrom": [
-            "show_id"
-          ],
-          "tableTo": "plex_shows",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "plex_shows": {
-      "name": "plex_shows",
+    "shows": {
+      "name": "shows",
       "columns": {
         "id": {
           "name": "id",
@@ -6434,7 +6705,14 @@
           "name": "plex_rating_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trakt_id": {
+          "name": "trakt_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "title": {
@@ -6523,26 +6801,33 @@
         }
       },
       "indexes": {
-        "plex_shows_plex_rating_key_unique": {
-          "name": "plex_shows_plex_rating_key_unique",
+        "shows_plex_rating_key_unique": {
+          "name": "shows_plex_rating_key_unique",
           "columns": [
             "plex_rating_key"
           ],
           "isUnique": true
         },
-        "idx_plex_shows_user_id": {
-          "name": "idx_plex_shows_user_id",
+        "shows_trakt_id_unique": {
+          "name": "shows_trakt_id_unique",
+          "columns": [
+            "trakt_id"
+          ],
+          "isUnique": true
+        },
+        "idx_shows_user_id": {
+          "name": "idx_shows_user_id",
           "columns": [
             "user_id"
           ],
           "isUnique": false
         },
-        "idx_plex_shows_tmdb_id": {
-          "name": "idx_plex_shows_tmdb_id",
+        "idx_shows_tmdb_id": {
+          "name": "idx_shows_tmdb_id",
           "columns": [
             "tmdb_id"
           ],
-          "isUnique": false
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -6633,6 +6918,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "trakt_history_id": {
+          "name": "trakt_history_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -6684,21 +6976,28 @@
             "letterboxd_guid"
           ],
           "isUnique": true
+        },
+        "idx_watch_history_trakt_history_id": {
+          "name": "idx_watch_history_trakt_history_id",
+          "columns": [
+            "trakt_history_id"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
         "watch_history_movie_id_movies_id_fk": {
           "name": "watch_history_movie_id_movies_id_fk",
           "tableFrom": "watch_history",
+          "tableTo": "movies",
           "columnsFrom": [
             "movie_id"
           ],
-          "tableTo": "movies",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6797,9 +7096,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}
