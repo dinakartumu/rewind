@@ -1,5 +1,12 @@
 -- Custom SQL migration file, put your code below! --
 
+-- PRE-DEPLOY CHECK for databases with existing Plex data: this migration
+-- creates a UNIQUE index on shows.tmdb_id. Before running db:remote, verify
+-- plex_shows has no duplicate non-NULL tmdb_id values:
+--   SELECT tmdb_id, COUNT(*) c FROM plex_shows
+--   WHERE tmdb_id IS NOT NULL GROUP BY tmdb_id HAVING c > 1;
+-- Any rows returned must be deduplicated first or the migration aborts.
+
 -- Rename Plex-specific show tables to source-neutral names and add Trakt
 -- columns. The `shows` table is rebuilt (not just renamed) because
 -- `plex_rating_key` must become nullable -- Trakt-sourced shows have no

@@ -220,7 +220,7 @@ Standard RSS fields plus Letterboxd extensions:
 - Dedup: every history item carries a unique Trakt history ID, stored as `trakt_history_id` -- re-walks are idempotent.
 - Full re-walk: `POST /v1/admin/sync/watching?source=trakt&full=true` ignores the cursor. Escape hatch for watches back-dated in Trakt to before an already-advanced cursor.
 - Trakt movie ratings are applied to Trakt-sourced watch events.
-- Shows and episodes are matched by TMDB ID -- the `shows` and `episodes_watched` tables are source-neutral (Plex or Trakt).
+- Shows and episodes are matched by TMDB ID -- the `shows` and `episodes_watched` tables are source-neutral (Plex or Trakt). Caveat: the Plex sync/webhook paths look shows up by `plex_rating_key` only, so if Trakt creates a show first, a later Plex insert for the same show can hit the unique `tmdb_id` index. Run one episode source at a time (this instance is Trakt-only), or add a TMDB-ID fallback lookup to the Plex paths before enabling both.
 
 ## Manual Movie Entry
 
