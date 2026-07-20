@@ -321,10 +321,13 @@ export default {
         break;
       }
       case '0 */6 * * *': {
-        const letterboxdRetry = await shouldRetry(db, 'watching');
-        if (letterboxdRetry.shouldRetry) {
+        const watchingRetry = await shouldRetry(db, 'watching');
+        if (
+          watchingRetry.shouldRetry &&
+          (env.LETTERBOXD_USERNAME || env.TRAKT_CLIENT_ID)
+        ) {
           console.log(
-            `[SYNC] Retrying failed watching sync (${letterboxdRetry.consecutiveFailures} consecutive failures)`
+            `[SYNC] Retrying failed watching sync (${watchingRetry.consecutiveFailures} consecutive failures)`
           );
         }
         if (env.LETTERBOXD_USERNAME) {
@@ -333,6 +336,19 @@ export default {
             (async () => {
               try {
                 await syncLetterboxd(db, env);
+                // When Trakt is configured, its block below owns watching
+                // image processing. Without Trakt, run it here so
+                // Letterboxd-only movies still get posters.
+                if (!env.TRAKT_CLIENT_ID) {
+                  const skip = await shouldSkipWatchingImages(db);
+                  if (skip) {
+                    console.log(
+                      '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
+                    );
+                  } else {
+                    await processWatchingImages(db, env);
+                  }
+                }
               } catch (error) {
                 console.log(
                   `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`

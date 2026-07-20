@@ -592,15 +592,16 @@ const IMAGE_SYNC_DEDUP_HOURS = 6;
 
 /**
  * Check if watching image processing was already run recently (within 6 hours)
- * by the Plex daily cron. If so, the Letterboxd cron can skip it.
+ * by the Plex daily cron. If so, the 6-hour watching-source blocks (Trakt, or
+ * Letterboxd when Trakt is unconfigured) can skip re-running it.
  *
- * Must filter to syncType 'plex_library' — the Letterboxd sync writes its own
- * domain='watching' completed run (syncType 'letterboxd_rss') immediately
- * before this check runs, so a domain-only match would always see that run and
- * skip image processing on every Letterboxd cron. That would leave
- * Letterboxd-only movies (theatrical films never on Plex) without posters until
- * the next daily Plex cron. processWatchingImages is only ever chained off the
- * Plex cron, so 'plex_library' is the run we actually want to dedup against.
+ * Must filter to syncType 'plex_library' — the 6-hour sources write their own
+ * domain='watching' completed runs (syncType 'letterboxd_rss' /
+ * 'trakt_history') immediately before this check runs, so a domain-only match
+ * would always see those runs and skip image processing on every 6-hour cron.
+ * That would leave non-Plex movies (theatrical films never on Plex) without
+ * posters until the next daily Plex cron. 'plex_library' is the run we
+ * actually want to dedup against.
  */
 export async function shouldSkipWatchingImages(db: Database): Promise<boolean> {
   const cutoff = new Date(

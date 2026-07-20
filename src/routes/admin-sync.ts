@@ -73,10 +73,10 @@ const WatchingSyncQuery = z.object({
     .optional()
     .default('plex')
     .openapi({ example: 'plex' }),
-  full: z.coerce.boolean().optional().openapi({
+  full: z.enum(['true', 'false', '1', '0']).optional().openapi({
     description:
       'Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.',
-    example: false,
+    example: 'true',
   }),
 });
 
@@ -260,7 +260,8 @@ const syncWatchingRoute = createRoute({
 
 adminSync.openapi(syncWatchingRoute, async (c) => {
   const db = createDb(c.env.DB);
-  const source = c.req.query('source') || 'plex';
+  const query = c.req.valid('query');
+  const source = query.source;
 
   try {
     if (source === 'letterboxd') {
@@ -281,8 +282,7 @@ adminSync.openapi(syncWatchingRoute, async (c) => {
         skipped: result.skipped,
       });
     } else if (source === 'trakt') {
-      const fullParam = c.req.query('full');
-      const full = fullParam === 'true' || fullParam === '1';
+      const full = query.full === 'true' || query.full === '1';
       const result = await syncTraktHistory(c.env, 1, { full });
       c.executionCtx.waitUntil(
         processWatchingImages(db, c.env).catch((err) =>

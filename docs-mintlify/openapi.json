@@ -24758,12 +24758,15 @@
           },
           {
             "schema": {
-              "type": [
-                "boolean",
-                "null"
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
               ],
               "description": "Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.",
-              "example": false
+              "example": "true"
             },
             "required": false,
             "description": "Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.",
