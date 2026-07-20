@@ -16,9 +16,11 @@ import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import type { Env } from '../../types/env.js';
 
-// The per-page inArray dedup binds PAGE_LIMIT parameters in one select, and
-// D1 caps queries at 100 bound parameters — PAGE_LIMIT must not exceed 100.
-const PAGE_LIMIT = 100;
+// The per-page inArray dedup binds PAGE_LIMIT parameters plus the user_id
+// param in one select, and remote D1 caps queries at 100 bound parameters —
+// PAGE_LIMIT must not exceed 99. (The local test D1 does not enforce the
+// cap; this limit was confirmed against production D1.)
+const PAGE_LIMIT = 99;
 
 export interface SyncedWatch {
   movieId: number;
