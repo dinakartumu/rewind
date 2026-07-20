@@ -233,6 +233,23 @@ async function ensureShow(
     return existing.id;
   }
 
+  // Fall back to Trakt identity: a prior run may have stored this show
+  // under a different TMDB id (Trakt TMDB-mapping churn). Reuse that row
+  // rather than tripping shows_trakt_id_unique on insert; keep its stored
+  // tmdbId as-is.
+  const [byTraktId] = await db
+    .select({ id: shows.id })
+    .from(shows)
+    .where(eq(shows.traktId, show.traktId))
+    .limit(1);
+  if (byTraktId) {
+    console.log(
+      `[INFO] Show ${show.title} (trakt ${show.traktId}) exists under a different TMDB id; ignoring incoming tmdb ${show.tmdbId}`
+    );
+    cache.set(show.tmdbId, byTraktId.id);
+    return byTraktId.id;
+  }
+
   let detail = null;
   try {
     detail = await tmdbClient.getTvShowDetail(show.tmdbId);
@@ -385,7 +402,7 @@ export async function syncEpisodeHistory(
         showCache
       );
 
-      await db
+      const insertResult = await db
         .insert(episodesWatched)
         .values({
           userId,
@@ -398,6 +415,16 @@ export async function syncEpisodeHistory(
           traktHistoryId: item.id,
         })
         .onConflictDoNothing();
+
+      // Conflict on idx_episodes_unique: an existing row with the same
+      // show/season/episode/timestamp — typically a Plex-sourced
+      // duplicate — keeps ownership. Count the event as skipped and emit
+      // no feed item. Its traktHistoryId is never recorded, so the window
+      // may be re-scanned; the per-page dedup tolerates that.
+      if (insertResult.meta.changes === 0) {
+        skipped++;
+        continue;
+      }
 
       newEpisodes.push({
         showId,

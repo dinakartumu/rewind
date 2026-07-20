@@ -505,6 +505,100 @@ describe('syncEpisodeHistory', () => {
     expect(seen).toHaveLength(1);
     expect(typeof seen[0].endAt).toBe('string');
   });
+
+  it('counts a Plex-owned duplicate timestamp as skipped without a feed item', async () => {
+    const db = createDb(env.DB);
+    const [show] = await db
+      .select({ id: shows.id })
+      .from(shows)
+      .where(eq(shows.tmdbId, 95396));
+
+    // Plex-sourced row identical on show/season/episode/timestamp to the
+    // oldest incoming Trakt event (3001, S01E01 at 2026-06-01)
+    await db.insert(episodesWatched).values({
+      showId: show.id,
+      seasonNumber: 1,
+      episodeNumber: 1,
+      watchedAt: '2026-06-01T21:00:00.000Z',
+      source: 'plex',
+    });
+
+    const result = await syncEpisodeHistory(db, makeClient(pages), tmdbStub, 1);
+
+    // The colliding event no-ops: counted as skipped, not synced
+    expect(result.synced).toBe(2);
+    expect(result.skipped).toBe(1);
+
+    // No feed item for the row that was never written
+    expect(result.newEpisodes).toHaveLength(2);
+    expect(
+      result.newEpisodes.some((e) => e.watchedAt === '2026-06-01T21:00:00.000Z')
+    ).toBe(false);
+
+    // No duplicate row: the Plex row keeps ownership of the timestamp
+    const dupes = await db
+      .select({
+        source: episodesWatched.source,
+        traktHistoryId: episodesWatched.traktHistoryId,
+      })
+      .from(episodesWatched)
+      .where(eq(episodesWatched.watchedAt, '2026-06-01T21:00:00.000Z'));
+    expect(dupes).toHaveLength(1);
+    expect(dupes[0].source).toBe('plex');
+    expect(dupes[0].traktHistoryId).toBeNull();
+  });
+
+  it('attaches to an existing show found by traktId when the TMDB mapping changed', async () => {
+    const db = createDb(env.DB);
+
+    // Prior run stored this show under a different tmdbId (mapping churn)
+    const [existing] = await db
+      .insert(shows)
+      .values({
+        title: 'Severance (old mapping)',
+        year: 2022,
+        tmdbId: 111111,
+        traktId: 555,
+      })
+      .returning({ id: shows.id });
+
+    const ev = episodeEvent(3300, '2026-06-07T21:00:00.000Z', 1, 3, 'In P.');
+    ev.show = {
+      title: 'Severance',
+      year: 2022,
+      ids: { trakt: 555, slug: 'severance', imdb: 'tt11280740', tmdb: 222222 },
+    };
+
+    // tmdbStub throws on getTvShowDetail, so reaching the insert path here
+    // would also fail the test before the unique violation could
+    const result = await syncEpisodeHistory(
+      db,
+      makeClient([[ev]]),
+      tmdbStub,
+      1
+    );
+    expect(result.synced).toBe(1);
+
+    // No new shows row was created for the new tmdbId
+    const byNewTmdb = await db
+      .select({ id: shows.id })
+      .from(shows)
+      .where(eq(shows.tmdbId, 222222));
+    expect(byNewTmdb).toHaveLength(0);
+
+    // The episode attached to the existing show, whose tmdbId is untouched
+    const [episode] = await db
+      .select({ showId: episodesWatched.showId })
+      .from(episodesWatched)
+      .where(eq(episodesWatched.traktHistoryId, 3300));
+    expect(episode.showId).toBe(existing.id);
+
+    const [kept] = await db
+      .select({ tmdbId: shows.tmdbId })
+      .from(shows)
+      .where(eq(shows.id, existing.id));
+    expect(kept.tmdbId).toBe(111111);
+  });
 });
 
 describe('buildEpisodeFeedItem', () => {
