@@ -237,6 +237,21 @@ describe('TraktClient', () => {
       expect(url).toContain('start_at=2026-01-01T00%3A00%3A00.000Z');
     });
 
+    it('getMovieHistory passes end_at when provided', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('[]', { headers: historyHeaders }));
+
+      await client.getMovieHistory({
+        endAt: '2026-02-01T00:00:00.000Z',
+        page: 1,
+        limit: 100,
+      });
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('end_at=2026-02-01T00%3A00%3A00.000Z');
+    });
+
     it('getMovieHistory defaults pageCount to 1 when header missing', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'));
       const result = await client.getMovieHistory({ page: 1, limit: 100 });

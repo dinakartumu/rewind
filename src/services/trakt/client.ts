@@ -102,6 +102,7 @@ export interface TraktHistoryPage<T> {
 
 export interface TraktHistoryOptions {
   startAt?: string;
+  endAt?: string;
   page?: number;
   limit?: number;
 }
@@ -224,6 +225,9 @@ export class TraktClient {
     });
     if (options.startAt) {
       params.set('start_at', options.startAt);
+    }
+    if (options.endAt) {
+      params.set('end_at', options.endAt);
     }
     const { data, headers } = await this.requestWithHeaders<T[]>(
       `/sync/history/${kind}?${params.toString()}`

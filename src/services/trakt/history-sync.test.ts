@@ -7,15 +7,24 @@ import {
   directors,
   movieDirectors,
   watchHistory,
+  shows,
+  episodesWatched,
 } from '../../db/schema/watching.js';
 import { setupTestDb } from '../../test-helpers.js';
 import {
   syncTraktHistory,
   syncMovieHistory,
+  syncEpisodeHistory,
   buildMovieFeedItem,
+  buildEpisodeFeedItem,
   shouldMarkRewatch,
 } from './history-sync.js';
-import type { TraktClient, TraktHistoryMovieItem } from './client.js';
+import type {
+  TraktClient,
+  TraktHistoryMovieItem,
+  TraktHistoryEpisodeItem,
+  TraktHistoryOptions,
+} from './client.js';
 import type { TmdbClient } from '../watching/tmdb.js';
 
 describe('syncTraktHistory', () => {
@@ -177,6 +186,340 @@ describe('syncMovieHistory', () => {
       .from(watchHistory)
       .where(eq(watchHistory.source, 'trakt'));
     expect(row.max).toBe('2026-05-01T21:00:00.000Z');
+  });
+
+  it('pins the walk with endAt and fetches a single-page history exactly once', async () => {
+    const db = createDb(env.DB);
+    const seen: TraktHistoryOptions[] = [];
+    const client = {
+      getMovieHistory: async (options: TraktHistoryOptions = {}) => {
+        seen.push(options);
+        return { items: [], page: options.page ?? 1, pageCount: 1 };
+      },
+    } as unknown as TraktClient;
+
+    await syncMovieHistory(db, client, tmdbStub, 1);
+
+    // Single-page (incremental cron) path costs one Trakt call, not two
+    expect(seen).toHaveLength(1);
+    // The walk window is pinned to the sync start on every request
+    expect(typeof seen[0].endAt).toBe('string');
+  });
+
+  it('resumes an interrupted backfill from the cursor without gaps', async () => {
+    const db = createDb(env.DB);
+
+    // Newest-first flat history: Fight Club is watched first and last
+    const all: TraktHistoryMovieItem[] = [
+      movieEvent(2003, '2026-06-01T21:00:00.000Z', 550, 'Fight Club', 1999),
+      movieEvent(2002, '2025-06-01T19:00:00.000Z', 603, 'The Matrix', 1999),
+      movieEvent(2001, '2024-06-01T20:00:00.000Z', 550, 'Fight Club', 1999),
+    ];
+
+    // One event per page; the walk goes 3 -> 2 -> 1 and dies fetching page 2
+    const failing = {
+      getMovieHistory: async (options: TraktHistoryOptions = {}) => {
+        const page = options.page ?? 1;
+        if (page === 2) throw new Error('Trakt 502 mid-walk');
+        return { items: [all[page - 1]], page, pageCount: 3 };
+      },
+    } as unknown as TraktClient;
+
+    await expect(syncMovieHistory(db, failing, tmdbStub, 1)).rejects.toThrow(
+      'mid-walk'
+    );
+
+    // Only the oldest (page 3) event landed before the failure
+    const partial = await db
+      .select({ traktHistoryId: watchHistory.traktHistoryId })
+      .from(watchHistory)
+      .where(eq(watchHistory.source, 'trakt'));
+    expect(partial.map((r) => r.traktHistoryId)).toEqual([2001]);
+
+    // Cursor covers only completed work: the newest inserted timestamp
+    const [cursor] = await db
+      .select({ max: sql<string | null>`max(${watchHistory.watchedAt})` })
+      .from(watchHistory)
+      .where(eq(watchHistory.source, 'trakt'));
+    expect(cursor.max).toBe('2024-06-01T20:00:00.000Z');
+
+    // Resumed run: fake Trakt filters by start_at (inclusive) like the API
+    const resumed = {
+      getMovieHistory: async (options: TraktHistoryOptions = {}) => {
+        const filtered = options.startAt
+          ? all.filter((item) => item.watched_at >= options.startAt!)
+          : all;
+        return { items: filtered, page: options.page ?? 1, pageCount: 1 };
+      },
+    } as unknown as TraktClient;
+
+    const result = await syncMovieHistory(db, resumed, tmdbStub, 1);
+    expect(result.synced).toBe(2);
+    expect(result.skipped).toBe(1); // cursor-boundary event deduped
+
+    const rows = await db
+      .select({
+        traktHistoryId: watchHistory.traktHistoryId,
+        rewatch: watchHistory.rewatch,
+      })
+      .from(watchHistory)
+      .orderBy(asc(watchHistory.id));
+    expect(rows.map((r) => r.traktHistoryId)).toEqual([2001, 2002, 2003]);
+    expect(rows.map((r) => r.rewatch)).toEqual([0, 0, 1]);
+  });
+});
+
+describe('syncEpisodeHistory', () => {
+  // Shows are pre-seeded by tmdbId, so ensureShow short-circuits in the DB
+  // and TMDB must never be reached.
+  const tmdbStub = {
+    getTvShowDetail: async () => {
+      throw new Error('TMDB getTvShowDetail should not be called');
+    },
+  } as unknown as TmdbClient;
+
+  function episodeEvent(
+    id: number,
+    watchedAt: string,
+    season: number,
+    number: number,
+    title: string
+  ): TraktHistoryEpisodeItem {
+    return {
+      id,
+      watched_at: watchedAt,
+      action: 'watch',
+      type: 'episode',
+      episode: { season, number, title, ids: { trakt: id, tmdb: null } },
+      show: {
+        title: 'Severance',
+        year: 2022,
+        ids: { trakt: 333, slug: 'severance', imdb: 'tt11280740', tmdb: 95396 },
+      },
+    };
+  }
+
+  // Trakt returns history newest-first: page 1 holds the newest events.
+  // The same show repeats across both pages.
+  const pages: TraktHistoryEpisodeItem[][] = [
+    [episodeEvent(3003, '2026-06-03T21:00:00.000Z', 2, 1, 'Hello, Ms. Cobel')],
+    [
+      episodeEvent(3002, '2026-06-02T21:00:00.000Z', 1, 2, 'Half Loop'),
+      episodeEvent(3001, '2026-06-01T21:00:00.000Z', 1, 1, 'Good News'),
+    ],
+  ];
+
+  function makeClient(fixture: TraktHistoryEpisodeItem[][]): TraktClient {
+    return {
+      getEpisodeHistory: async (options: TraktHistoryOptions = {}) => {
+        const page = options.page ?? 1;
+        return {
+          items: fixture[page - 1] ?? [],
+          page,
+          pageCount: fixture.length,
+        };
+      },
+    } as unknown as TraktClient;
+  }
+
+  beforeAll(async () => {
+    await setupTestDb();
+    const db = createDb(env.DB);
+    await db.insert(shows).values({
+      title: 'Severance',
+      year: 2022,
+      tmdbId: 95396,
+      traktId: 333,
+      contentRating: 'TV-MA',
+      tmdbRating: 8.7,
+      totalSeasons: 2,
+      totalEpisodes: 19,
+    });
+  });
+
+  it('backfills a two-page newest-first history chronologically', async () => {
+    const db = createDb(env.DB);
+    const result = await syncEpisodeHistory(db, makeClient(pages), tmdbStub, 1);
+
+    expect(result.synced).toBe(3);
+    expect(result.skipped).toBe(0);
+
+    const [show] = await db
+      .select({ id: shows.id })
+      .from(shows)
+      .where(eq(shows.tmdbId, 95396));
+
+    const rows = await db
+      .select({
+        traktHistoryId: episodesWatched.traktHistoryId,
+        watchedAt: episodesWatched.watchedAt,
+        showId: episodesWatched.showId,
+        seasonNumber: episodesWatched.seasonNumber,
+        episodeNumber: episodesWatched.episodeNumber,
+        source: episodesWatched.source,
+      })
+      .from(episodesWatched)
+      .orderBy(asc(episodesWatched.id));
+
+    // Insert order is chronological despite newest-first pages
+    expect(rows.map((r) => r.traktHistoryId)).toEqual([3001, 3002, 3003]);
+    expect(rows.map((r) => r.watchedAt)).toEqual([
+      '2026-06-01T21:00:00.000Z',
+      '2026-06-02T21:00:00.000Z',
+      '2026-06-03T21:00:00.000Z',
+    ]);
+    expect(rows.every((r) => r.showId === show.id)).toBe(true);
+    expect(rows.every((r) => r.source === 'trakt')).toBe(true);
+    expect(rows[2].seasonNumber).toBe(2);
+    expect(rows[2].episodeNumber).toBe(1);
+  });
+
+  it('is idempotent: re-running the same sync inserts nothing new', async () => {
+    const db = createDb(env.DB);
+    const client = makeClient(pages);
+
+    const firstRun = await syncEpisodeHistory(db, client, tmdbStub, 1);
+    expect(firstRun.synced).toBe(3);
+
+    const secondRun = await syncEpisodeHistory(db, client, tmdbStub, 1);
+    expect(secondRun.synced).toBe(0);
+    expect(secondRun.newEpisodes).toEqual([]);
+
+    const [row] = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(episodesWatched)
+      .where(eq(episodesWatched.source, 'trakt'));
+    expect(row.total).toBe(3);
+  });
+
+  it('advances the cursor to the newest event after a completed run', async () => {
+    const db = createDb(env.DB);
+    await syncEpisodeHistory(db, makeClient(pages), tmdbStub, 1);
+
+    const [row] = await db
+      .select({ max: sql<string | null>`max(${episodesWatched.watchedAt})` })
+      .from(episodesWatched)
+      .where(eq(episodesWatched.source, 'trakt'));
+    expect(row.max).toBe('2026-06-03T21:00:00.000Z');
+  });
+
+  it('skips events whose show has no TMDb id', async () => {
+    const db = createDb(env.DB);
+    const noTmdb = episodeEvent(3100, '2026-06-04T21:00:00.000Z', 1, 1, 'Lost');
+    noTmdb.show = {
+      title: 'Obscure Show',
+      year: null,
+      ids: { trakt: 999, slug: 'obscure', imdb: '', tmdb: 0 },
+    };
+
+    const result = await syncEpisodeHistory(
+      db,
+      makeClient([[noTmdb]]),
+      tmdbStub,
+      1
+    );
+
+    expect(result.synced).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('creates a TMDB-enriched show row once for unseen shows', async () => {
+    const db = createDb(env.DB);
+    let tmdbCalls = 0;
+    const tmdbFake = {
+      getTvShowDetail: async (tmdbId: number) => {
+        tmdbCalls++;
+        return {
+          id: tmdbId,
+          title: 'The Rehearsal',
+          year: 2022,
+          summary: 'Nathan Fielder helps people rehearse.',
+          posterPath: '/poster.jpg',
+          backdropPath: '/backdrop.jpg',
+          contentRating: 'TV-MA',
+          tmdbRating: 8.1,
+          totalSeasons: 2,
+          totalEpisodes: 14,
+        };
+      },
+    } as unknown as TmdbClient;
+
+    const showIds = {
+      trakt: 444,
+      slug: 'the-rehearsal',
+      imdb: 'tt10788510',
+      tmdb: 999,
+    };
+    const first = episodeEvent(3201, '2026-06-05T21:00:00.000Z', 1, 1, 'Or');
+    first.show = { title: 'Rehearsal (Trakt name)', year: 2021, ids: showIds };
+    const second = episodeEvent(3202, '2026-06-06T21:00:00.000Z', 1, 2, 'Sca');
+    second.show = { title: 'Rehearsal (Trakt name)', year: 2021, ids: showIds };
+
+    const result = await syncEpisodeHistory(
+      db,
+      makeClient([[second, first]]),
+      tmdbFake,
+      1
+    );
+
+    expect(result.synced).toBe(2);
+    // Per-run cache: one TMDB lookup, one show row
+    expect(tmdbCalls).toBe(1);
+
+    const created = await db
+      .select({
+        title: shows.title,
+        year: shows.year,
+        traktId: shows.traktId,
+        tmdbRating: shows.tmdbRating,
+        totalEpisodes: shows.totalEpisodes,
+      })
+      .from(shows)
+      .where(eq(shows.tmdbId, 999));
+    expect(created).toHaveLength(1);
+    expect(created[0].title).toBe('The Rehearsal');
+    expect(created[0].year).toBe(2022);
+    expect(created[0].traktId).toBe(444);
+    expect(created[0].tmdbRating).toBe(8.1);
+    expect(created[0].totalEpisodes).toBe(14);
+
+    const episodes = await db
+      .select({ traktHistoryId: episodesWatched.traktHistoryId })
+      .from(episodesWatched)
+      .orderBy(asc(episodesWatched.id));
+    expect(episodes.map((e) => e.traktHistoryId)).toEqual([3201, 3202]);
+  });
+
+  it('pins the walk with endAt and fetches a single-page history exactly once', async () => {
+    const db = createDb(env.DB);
+    const seen: TraktHistoryOptions[] = [];
+    const client = {
+      getEpisodeHistory: async (options: TraktHistoryOptions = {}) => {
+        seen.push(options);
+        return { items: [], page: options.page ?? 1, pageCount: 1 };
+      },
+    } as unknown as TraktClient;
+
+    await syncEpisodeHistory(db, client, tmdbStub, 1);
+
+    expect(seen).toHaveLength(1);
+    expect(typeof seen[0].endAt).toBe('string');
+  });
+});
+
+describe('buildEpisodeFeedItem', () => {
+  it('builds an episode_watched feed item with SxxExx code', () => {
+    const item = buildEpisodeFeedItem({
+      showId: 5,
+      showTitle: 'Severance',
+      seasonNumber: 2,
+      episodeNumber: 3,
+      episodeTitle: 'Who Is Alive?',
+      watchedAt: '2026-06-03T21:00:00.000Z',
+    });
+    expect(item.eventType).toBe('episode_watched');
+    expect(item.title).toBe('Watched Severance S02E03');
+    expect(item.sourceId).toBe('trakt:episode:5:2:3:2026-06-03');
   });
 });
 
