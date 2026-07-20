@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import {
   lastfmArtists,
@@ -869,28 +869,51 @@ export async function syncUserStats(
 }
 
 /**
- * Full historical backfill: fetch all scrobbles from the beginning of time.
+ * Historical backfill in bounded, resumable batches.
+ *
+ * Anchors each batch on the oldest stored scrobble: passes its epoch as
+ * `to` so Last.fm only returns strictly-older history. Newest-first paging
+ * inside that window is safe — the window's newest scrobble abuts our
+ * oldest stored row, so a killed invocation leaves the stored block
+ * contiguous and the next call re-anchors on the new oldest. Same
+ * chronological-cursor pattern as the Trakt and Strava backfills.
+ *
+ * Processes at most `maxPages` pages per invocation to stay inside Worker
+ * limits. Returns synced count plus remaining pages so the caller can loop.
  */
 export async function backfillScrobbles(
   db: Database,
-  client: LastfmClient
-): Promise<number> {
+  client: LastfmClient,
+  maxPages = 15
+): Promise<{ synced: number; remaining: number }> {
   const runId = await startSyncRun(db, 'backfill');
   let totalSynced = 0;
 
   try {
+    // Cursor: the oldest scrobble we already have. Absent on a fresh
+    // table, in which case we walk from the newest page unbounded by `to`.
+    const [oldest] = await db
+      .select({ scrobbledAt: lastfmScrobbles.scrobbledAt })
+      .from(lastfmScrobbles)
+      .orderBy(asc(lastfmScrobbles.scrobbledAt))
+      .limit(1);
+    const oldestCursor = oldest
+      ? Math.floor(new Date(oldest.scrobbledAt).getTime() / 1000)
+      : undefined;
+
     let page = 1;
     let totalPages = 1;
+    let pagesProcessed = 0;
 
-    // Fetch from oldest to newest
-    while (page <= totalPages) {
+    while (page <= totalPages && pagesProcessed < maxPages) {
       const response = await client.getRecentTracks({
         limit: 200,
         page,
+        ...(oldestCursor !== undefined && { to: oldestCursor }),
       });
 
       const attr = response.recenttracks['@attr'];
-      totalPages = parseInt(attr.totalPages);
+      totalPages = parseInt(attr.totalPages) || 0;
 
       console.log(
         `[SYNC] Backfill page ${page}/${totalPages} (${totalSynced} synced so far)`
@@ -903,7 +926,11 @@ export async function backfillScrobbles(
         : rawTracks
           ? [rawTracks]
           : [];
-      if (tracks.length === 0) break;
+      if (tracks.length === 0) {
+        // Empty window: nothing older than the cursor. Mark complete.
+        totalPages = pagesProcessed;
+        break;
+      }
 
       for (const rawTrack of tracks) {
         const track = normalizeScrobble(rawTrack);
@@ -954,17 +981,26 @@ export async function backfillScrobbles(
         }
       }
 
+      pagesProcessed++;
       page++;
     }
+
+    const remaining = Math.max(0, totalPages - pagesProcessed);
 
     await completeSyncRun(
       db,
       runId,
       totalSynced,
-      JSON.stringify({ totalPages })
+      JSON.stringify({
+        totalPages,
+        pagesProcessed,
+        oldestCursor: oldestCursor ?? null,
+      })
     );
-    console.log(`[SYNC] Backfill complete: ${totalSynced} scrobbles`);
-    return totalSynced;
+    console.log(
+      `[SYNC] Backfill batch complete: ${totalSynced} scrobbles, ${remaining} pages remaining`
+    );
+    return { synced: totalSynced, remaining };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await failSyncRun(db, runId, message);
@@ -1106,9 +1142,14 @@ export async function syncListening(
       await syncUserStats(db, client);
       totalSynced = 1;
       break;
-    case 'backfill':
-      totalSynced = await backfillScrobbles(db, client);
-      break;
+    case 'backfill': {
+      const backfillResult = await backfillScrobbles(db, client);
+      await afterSync(db, { domain: 'listening', feedItems, searchItems });
+      return {
+        itemsSynced: backfillResult.synced,
+        remaining: backfillResult.remaining,
+      };
+    }
     case 'full': {
       const scrobbleResult = await syncRecentScrobbles(db, client);
       totalSynced += scrobbleResult.count;

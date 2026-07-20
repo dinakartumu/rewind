@@ -10,11 +10,13 @@ import {
 } from '../../db/schema/lastfm.js';
 import { setupTestDb } from '../../test-helpers.js';
 import {
+  backfillScrobbles,
   syncListening,
   syncYearlyStats,
   upsertAlbum,
   upsertArtist,
 } from './sync.js';
+import type { LastfmClient } from './client.js';
 import { VARIOUS_ARTISTS_MBID } from './constants.js';
 import { loadFilters } from './filters.js';
 import { eq } from 'drizzle-orm';
@@ -435,5 +437,169 @@ describe('upsertArtist - MBID-first lookup', () => {
       .from(lastfmArtists)
       .where(eq(lastfmArtists.mbid, VARIOUS_ARTISTS_MBID));
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe('backfillScrobbles - bounded resumable batches', () => {
+  let db: Database;
+
+  function makeRawTrack(name: string, uts: number) {
+    return {
+      name,
+      url: `https://www.last.fm/music/Artist+X/_/${encodeURIComponent(name)}`,
+      mbid: '',
+      artist: { '#text': 'Artist X', mbid: '' },
+      album: { '#text': 'Album X', mbid: '' },
+      image: [],
+      date: { uts: String(uts), '#text': '' },
+    };
+  }
+
+  function makePage(
+    tracks: ReturnType<typeof makeRawTrack>[],
+    page: number,
+    totalPages: number
+  ) {
+    return {
+      recenttracks: {
+        track: tracks,
+        '@attr': {
+          page: String(page),
+          perPage: '200',
+          total: String(totalPages * 200),
+          totalPages: String(totalPages),
+        },
+      },
+    };
+  }
+
+  function makeClient(
+    handler: (options: {
+      limit?: number;
+      page?: number;
+      from?: number;
+      to?: number;
+    }) => unknown
+  ): { client: LastfmClient; calls: { page?: number; to?: number }[] } {
+    const calls: { page?: number; to?: number }[] = [];
+    const client = {
+      getRecentTracks: async (options: {
+        limit?: number;
+        page?: number;
+        from?: number;
+        to?: number;
+      }) => {
+        calls.push({ page: options.page, to: options.to });
+        return handler(options);
+      },
+    } as unknown as LastfmClient;
+    return { client, calls };
+  }
+
+  beforeAll(async () => {
+    await setupTestDb();
+  });
+
+  beforeEach(async () => {
+    db = createDb(env.DB);
+    await db.delete(lastfmScrobbles);
+    await db.delete(lastfmTracks);
+    await db.delete(lastfmAlbums);
+    await db.delete(lastfmArtists);
+    await loadFilters(db);
+  });
+
+  it('respects the maxPages bound and reports remaining pages', async () => {
+    const { client, calls } = makeClient((options) =>
+      makePage(
+        [
+          makeRawTrack(`Track ${options.page}-a`, 2000 - (options.page ?? 1)),
+          makeRawTrack(`Track ${options.page}-b`, 1000 - (options.page ?? 1)),
+        ],
+        options.page ?? 1,
+        5
+      )
+    );
+
+    const result = await backfillScrobbles(db, client, 2);
+
+    expect(calls).toHaveLength(2);
+    expect(calls.map((c) => c.page)).toEqual([1, 2]);
+    expect(result.synced).toBe(4);
+    expect(result.remaining).toBe(3);
+  });
+
+  it('passes the oldest stored scrobble as the to cursor', async () => {
+    const [artist] = await db
+      .insert(lastfmArtists)
+      .values({ userId: 1, name: 'Artist X', isFiltered: 0 })
+      .returning();
+    const [track] = await db
+      .insert(lastfmTracks)
+      .values({
+        userId: 1,
+        name: 'Old Track',
+        artistId: artist.id,
+        isFiltered: 0,
+      })
+      .returning();
+    await db.insert(lastfmScrobbles).values([
+      {
+        userId: 1,
+        trackId: track.id,
+        scrobbledAt: '2020-01-01T00:00:00.000Z',
+      },
+      {
+        userId: 1,
+        trackId: track.id,
+        scrobbledAt: '2024-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    const { client, calls } = makeClient(() => makePage([], 1, 0));
+
+    await backfillScrobbles(db, client);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].to).toBe(
+      Math.floor(new Date('2020-01-01T00:00:00.000Z').getTime() / 1000)
+    );
+  });
+
+  it('omits the to cursor when no scrobbles are stored', async () => {
+    const { client, calls } = makeClient((options) =>
+      makePage([makeRawTrack('Only Track', 500)], options.page ?? 1, 1)
+    );
+
+    const result = await backfillScrobbles(db, client);
+
+    expect(calls[0].to).toBeUndefined();
+    expect(result.synced).toBe(1);
+    expect(result.remaining).toBe(0);
+  });
+
+  it('completes with remaining 0 when the window has no tracks', async () => {
+    const { client } = makeClient(() => makePage([], 1, 0));
+
+    const result = await backfillScrobbles(db, client, 15);
+
+    expect(result.synced).toBe(0);
+    expect(result.remaining).toBe(0);
+  });
+
+  it('completes with remaining 0 when totalPages fits inside maxPages', async () => {
+    const { client, calls } = makeClient((options) =>
+      makePage(
+        [makeRawTrack(`Track ${options.page}`, 3000 - (options.page ?? 1))],
+        options.page ?? 1,
+        2
+      )
+    );
+
+    const result = await backfillScrobbles(db, client, 15);
+
+    expect(calls).toHaveLength(2);
+    expect(result.synced).toBe(2);
+    expect(result.remaining).toBe(0);
   });
 });
