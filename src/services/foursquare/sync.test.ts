@@ -20,8 +20,21 @@ function checkin(
       id: `venue${n}`,
       name: `Venue ${n}`,
       categories: [
-        { name: 'Secondary Category' },
-        { name: 'Coffee Shop', primary: true },
+        {
+          name: 'Secondary Category',
+          icon: {
+            prefix: 'https://ss3.4sqi.net/img/categories_v2/shops/misc_',
+            suffix: '.png',
+          },
+        },
+        {
+          name: 'Coffee Shop',
+          primary: true,
+          icon: {
+            prefix: 'https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_',
+            suffix: '.png',
+          },
+        },
       ],
       location: {
         city: 'Seattle',
@@ -116,6 +129,10 @@ describe('syncCheckins', () => {
     ]);
     expect(rows[0].venueName).toBe('Venue 0');
     expect(rows[0].venueCategory).toBe('Coffee Shop'); // primary wins
+    // 64px icon composed from the primary category's prefix/suffix
+    expect(rows[0].venueIcon).toBe(
+      'https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png'
+    );
     expect(rows[0].venueCity).toBe('Seattle');
     expect(rows[0].venueState).toBe('WA');
     expect(rows[0].venueCountry).toBe('United States');
@@ -231,6 +248,7 @@ describe('syncCheckins', () => {
     expect(rows[0].venueName).toBe('Unknown venue');
     expect(rows[0].venueId).toBeNull();
     expect(rows[0].venueCategory).toBeNull();
+    expect(rows[0].venueIcon).toBeNull();
     expect(rows[0].venueCity).toBeNull();
     expect(rows[0].venueState).toBeNull();
     expect(rows[0].venueCountry).toBeNull();
@@ -240,6 +258,28 @@ describe('syncCheckins', () => {
     expect(rows[1].venueName).toBe('From the road');
     expect(rows[1].shout).toBe('From the road');
     expect(rows[2].venueName).toBe('Venue 2');
+  });
+
+  it('falls back to the first category and stores null icon when absent', async () => {
+    const db = createDb(env.DB);
+    const feed = [
+      checkin(0, {
+        venue: {
+          id: 'venue-noicon',
+          name: 'No Icon Venue',
+          categories: [{ name: 'Plain Category' }],
+        },
+      }),
+    ];
+
+    const result = await syncCheckins(db, makeClient(feed).client, 1, {
+      maxPages: 8,
+    });
+    expect(result.synced).toBe(1);
+
+    const rows = await db.select().from(checkins);
+    expect(rows[0].venueCategory).toBe('Plain Category');
+    expect(rows[0].venueIcon).toBeNull();
   });
 
   it('counts venueless rows in the cursor so the next run fetches nothing', async () => {

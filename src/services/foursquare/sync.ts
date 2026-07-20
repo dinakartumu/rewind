@@ -29,12 +29,21 @@ export function buildCheckinFeedItem(c: SyncedCheckin): FeedItem {
 }
 
 /**
- * Primary category name, falling back to the first listed category.
+ * Primary category, falling back to the first listed category.
  */
-function primaryCategory(item: FoursquareCheckin): string | null {
+function primaryCategory(item: FoursquareCheckin) {
   const categories = item.venue?.categories;
   if (!categories || categories.length === 0) return null;
-  return (categories.find((c) => c.primary) ?? categories[0]).name;
+  return categories.find((c) => c.primary) ?? categories[0];
+}
+
+/** 64px icon URL composed from the category's prefix/suffix parts. */
+function categoryIconUrl(
+  category: ReturnType<typeof primaryCategory>
+): string | null {
+  const icon = category?.icon;
+  if (!icon) return null;
+  return `${icon.prefix}64${icon.suffix}`;
 }
 
 export interface CheckinSyncOptions {
@@ -116,6 +125,7 @@ export async function syncCheckins(
     for (const item of items) {
       const venue = item.venue;
       const checkedInAt = new Date(item.createdAt * 1000).toISOString();
+      const category = primaryCategory(item);
       const insertResult = await db
         .insert(checkins)
         .values({
@@ -123,7 +133,8 @@ export async function syncCheckins(
           foursquareId: item.id,
           venueId: venue?.id ?? null,
           venueName: venue?.name ?? item.shout ?? 'Unknown venue',
-          venueCategory: primaryCategory(item),
+          venueCategory: category?.name ?? null,
+          venueIcon: categoryIconUrl(category),
           venueCity: venue?.location?.city ?? null,
           venueState: venue?.location?.state ?? null,
           venueCountry: venue?.location?.country ?? null,

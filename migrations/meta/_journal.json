@@ -120,6 +120,13 @@
       "when": 1784576770378,
       "tag": "0043_places_checkins",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1784580591224,
+      "tag": "0044_checkin_venue_icon",
+      "breakpoints": true
     }
   ]
 }

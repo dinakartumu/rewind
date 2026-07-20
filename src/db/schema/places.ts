@@ -23,6 +23,8 @@ export const checkins = sqliteTable(
     venueId: text('venue_id'),
     venueName: text('venue_name').notNull(),
     venueCategory: text('venue_category'),
+    /** 64px category icon URL composed from the Foursquare prefix/suffix. */
+    venueIcon: text('venue_icon'),
     venueCity: text('venue_city'),
     venueState: text('venue_state'),
     venueCountry: text('venue_country'),

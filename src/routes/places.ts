@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq, and, desc, sql, count } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, count } from 'drizzle-orm';
 import { createDb } from '../db/client.js';
 import { checkins } from '../db/schema/places.js';
 import { setCache } from '../lib/cache.js';
@@ -31,6 +31,7 @@ const CheckinSchema = z.object({
   venue_id: z.string().nullable(),
   venue_name: z.string(),
   venue_category: z.string().nullable(),
+  venue_icon: z.string().nullable(),
   venue_city: z.string().nullable(),
   venue_state: z.string().nullable(),
   venue_country: z.string().nullable(),
@@ -43,10 +44,16 @@ const CheckinSchema = z.object({
 const CategoryCountSchema = z.object({
   category: z.string(),
   count: z.number(),
+  icon: z.string().nullable(),
 });
 
 const CityCountSchema = z.object({
   city: z.string(),
+  count: z.number(),
+});
+
+const TrendEntrySchema = z.object({
+  period: z.string(),
   count: z.number(),
 });
 
@@ -87,6 +94,8 @@ const recentRoute = createRoute({
                 venue_id: '4b5b3f2af964a520fb0029e3',
                 venue_name: 'Analog Coffee',
                 venue_category: 'Coffee Shop',
+                venue_icon:
+                  'https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png',
                 venue_city: 'Seattle',
                 venue_state: 'WA',
                 venue_country: 'United States',
@@ -125,8 +134,16 @@ const statsRoute = createRoute({
             unique_venues: 1289,
             this_year: 143,
             top_categories: [
-              { category: 'Coffee Shop', count: 612 },
-              { category: 'Bar', count: 402 },
+              {
+                category: 'Coffee Shop',
+                count: 612,
+                icon: 'https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png',
+              },
+              {
+                category: 'Bar',
+                count: 402,
+                icon: 'https://ss3.4sqi.net/img/categories_v2/nightlife/pub_64.png',
+              },
             ],
             top_cities: [
               { city: 'Seattle', count: 3120 },
@@ -140,6 +157,42 @@ const statsRoute = createRoute({
   },
 });
 
+// 3. GET /trends
+const trendsRoute = createRoute({
+  method: 'get',
+  path: '/trends',
+  operationId: 'getPlacesTrends',
+  tags: ['Places'],
+  summary: 'Check-in trends',
+  description:
+    'Returns monthly check-in counts. Supports date filtering via from/to params.',
+  request: {
+    query: DateFilterQuery,
+  },
+  responses: {
+    200: {
+      description: 'Trend data',
+      content: {
+        'application/json': {
+          schema: z.object({
+            period: z.string(),
+            data: z.array(TrendEntrySchema),
+          }),
+          example: {
+            period: 'monthly',
+            data: [
+              { period: '2026-01', count: 14 },
+              { period: '2026-02', count: 9 },
+              { period: '2026-03', count: 17 },
+            ],
+          },
+        },
+      },
+    },
+    ...errorResponses(400, 401),
+  },
+});
+
 // ─── Handlers ────────────────────────────────────────────────────────
 
 function formatCheckin(row: typeof checkins.$inferSelect) {
@@ -148,6 +201,7 @@ function formatCheckin(row: typeof checkins.$inferSelect) {
     venue_id: row.venueId,
     venue_name: row.venueName,
     venue_category: row.venueCategory,
+    venue_icon: row.venueIcon,
     venue_city: row.venueCity,
     venue_state: row.venueState,
     venue_country: row.venueCountry,
@@ -214,6 +268,9 @@ places.openapi(statsRoute, async (c) => {
     .select({
       category: checkins.venueCategory,
       count: sql<number>`count(*)`,
+      // Representative icon for the category: a simple correlated pick
+      // among the category's check-ins (icons rarely differ within one).
+      icon: sql<string | null>`max(${checkins.venueIcon})`,
     })
     .from(checkins)
     .where(
@@ -241,8 +298,40 @@ places.openapi(statsRoute, async (c) => {
     top_categories: topCategories.map((r) => ({
       category: r.category!,
       count: r.count,
+      icon: r.icon,
     })),
     top_cities: topCities.map((r) => ({ city: r.city!, count: r.count })),
+  });
+});
+
+// 3. GET /trends
+places.openapi(trendsRoute, async (c) => {
+  setCache(c, 'long');
+  const db = createDb(c.env.DB);
+  const { date, from, to } = c.req.valid('query');
+
+  const conditions = [eq(checkins.userId, 1)];
+  const dateCondition = buildDateCondition(checkins.checkedInAt, {
+    date,
+    from,
+    to,
+  });
+  if (dateCondition) conditions.push(dateCondition);
+
+  const monthExpr = sql`substr(${checkins.checkedInAt}, 1, 7)`;
+  const trendData = await db
+    .select({
+      period: sql<string>`substr(${checkins.checkedInAt}, 1, 7)`,
+      total: count(),
+    })
+    .from(checkins)
+    .where(and(...conditions))
+    .groupBy(monthExpr)
+    .orderBy(asc(monthExpr));
+
+  return c.json({
+    period: 'monthly',
+    data: trendData.map((t) => ({ period: t.period, count: t.total })),
   });
 });
 

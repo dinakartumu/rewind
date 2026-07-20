@@ -8,9 +8,19 @@ const API_VERSION = '20250101';
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+export interface FoursquareCategoryIcon {
+  prefix: string;
+  suffix: string;
+}
+
 export interface FoursquareCategory {
   name: string;
   primary?: boolean;
+  /**
+   * Icon URL parts; the full URL is `${prefix}${size}${suffix}` (e.g.
+   * size 64 for a 64px gray-on-transparent PNG).
+   */
+  icon?: FoursquareCategoryIcon;
 }
 
 export interface FoursquareVenueLocation {

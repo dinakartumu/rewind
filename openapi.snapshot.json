@@ -19225,6 +19225,12 @@
                               "null"
                             ]
                           },
+                          "venue_icon": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "venue_city": {
                             "type": [
                               "string",
@@ -19270,6 +19276,7 @@
                           "venue_id",
                           "venue_name",
                           "venue_category",
+                          "venue_icon",
                           "venue_city",
                           "venue_state",
                           "venue_country",
@@ -19296,6 +19303,7 @@
                       "venue_id": "4b5b3f2af964a520fb0029e3",
                       "venue_name": "Analog Coffee",
                       "venue_category": "Coffee Shop",
+                      "venue_icon": "https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png",
                       "venue_city": "Seattle",
                       "venue_state": "WA",
                       "venue_country": "United States",
@@ -19373,11 +19381,18 @@
                           },
                           "count": {
                             "type": "number"
+                          },
+                          "icon": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
                           "category",
-                          "count"
+                          "count",
+                          "icon"
                         ]
                       }
                     },
@@ -19415,11 +19430,13 @@
                   "top_categories": [
                     {
                       "category": "Coffee Shop",
-                      "count": 612
+                      "count": 612,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png"
                     },
                     {
                       "category": "Bar",
-                      "count": 402
+                      "count": 402,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/nightlife/pub_64.png"
                     }
                   ],
                   "top_cities": [
@@ -19432,6 +19449,128 @@
                       "count": 288
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/trends": {
+      "get": {
+        "operationId": "getPlacesTrends",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Check-in trends",
+        "description": "Returns monthly check-in counts. Supports date filtering via from/to params.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trend data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "period": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "period",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "period",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "period": "monthly",
+                  "data": [
+                    {
+                      "period": "2026-01",
+                      "count": 14
+                    },
+                    {
+                      "period": "2026-02",
+                      "count": 9
+                    },
+                    {
+                      "period": "2026-03",
+                      "count": 17
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

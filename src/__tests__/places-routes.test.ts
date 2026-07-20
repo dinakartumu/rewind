@@ -13,6 +13,11 @@ import type { Env } from '../types/env.js';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+const COFFEE_ICON =
+  'https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png';
+const BOOK_ICON =
+  'https://ss3.4sqi.net/img/categories_v2/shops/bookstore_64.png';
+
 describe('Places endpoints', () => {
   let readToken: string;
   let adminToken: string;
@@ -32,6 +37,7 @@ describe('Places endpoints', () => {
         venueId: 'venue-coffee',
         venueName: 'Analog Coffee',
         venueCategory: 'Coffee Shop',
+        venueIcon: COFFEE_ICON,
         venueCity: 'Seattle',
         venueState: 'WA',
         venueCountry: 'United States',
@@ -45,12 +51,13 @@ describe('Places endpoints', () => {
         venueId: 'venue-coffee',
         venueName: 'Analog Coffee',
         venueCategory: 'Coffee Shop',
+        venueIcon: COFFEE_ICON,
         venueCity: 'Seattle',
         venueState: 'WA',
         venueCountry: 'United States',
         lat: 47.62,
         lng: -122.32,
-        checkedInAt: `${CURRENT_YEAR}-02-01T18:30:00.000Z`,
+        checkedInAt: `${CURRENT_YEAR}-03-28T18:30:00.000Z`,
       },
       {
         foursquareId: 'fsq-3',
@@ -67,6 +74,7 @@ describe('Places endpoints', () => {
         venueId: 'venue-pdx',
         venueName: "Powell's Books",
         venueCategory: 'Bookstore',
+        venueIcon: BOOK_ICON,
         venueCity: 'Portland',
         venueState: 'OR',
         venueCountry: 'United States',
@@ -86,6 +94,7 @@ describe('Places endpoints', () => {
           id: number;
           venue_name: string;
           venue_category: string | null;
+          venue_icon: string | null;
           venue_city: string | null;
           checked_in_at: string;
           shout: string | null;
@@ -95,7 +104,11 @@ describe('Places endpoints', () => {
       expect(body.pagination.total).toBe(4);
       expect(body.data.length).toBe(4);
       expect(body.data[0].venue_name).toBe("Powell's Books");
+      expect(body.data[0].venue_icon).toBe(BOOK_ICON);
       expect(body.data[body.data.length - 1].shout).toBe('Morning cortado');
+      // Icon-less check-ins surface an explicit null.
+      const bar = body.data.find((d) => d.venue_name === 'Bait Shop');
+      expect(bar?.venue_icon).toBeNull();
       // newest first ordering
       const dates = body.data.map((d) => d.checked_in_at);
       expect([...dates].sort().reverse()).toEqual(dates);
@@ -170,7 +183,11 @@ describe('Places endpoints', () => {
         total: number;
         unique_venues: number;
         this_year: number;
-        top_categories: Array<{ category: string; count: number }>;
+        top_categories: Array<{
+          category: string;
+          count: number;
+          icon: string | null;
+        }>;
         top_cities: Array<{ city: string; count: number }>;
       };
       expect(body.total).toBe(4);
@@ -179,10 +196,55 @@ describe('Places endpoints', () => {
       expect(body.top_categories[0]).toEqual({
         category: 'Coffee Shop',
         count: 2,
+        icon: COFFEE_ICON,
       });
       expect(body.top_categories.length).toBe(3);
+      const bookstore = body.top_categories.find(
+        (t) => t.category === 'Bookstore'
+      );
+      expect(bookstore?.icon).toBe(BOOK_ICON);
+      // Categories whose check-ins carry no icon report null.
+      const barCat = body.top_categories.find((t) => t.category === 'Bar');
+      expect(barCat?.icon).toBeNull();
       expect(body.top_cities[0]).toEqual({ city: 'Seattle', count: 3 });
       expect(body.top_cities[1]).toEqual({ city: 'Portland', count: 1 });
+    });
+  });
+
+  describe('GET /v1/places/trends', () => {
+    it('returns monthly check-in counts in ascending period order', async () => {
+      const res = await SELF.fetch('http://localhost/v1/places/trends', {
+        headers: { Authorization: `Bearer ${readToken}` },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        period: string;
+        data: Array<{ period: string; count: number }>;
+      };
+      expect(body.period).toBe('monthly');
+      expect(body.data).toEqual([
+        { period: '2019-03', count: 1 },
+        { period: `${CURRENT_YEAR}-03`, count: 2 },
+        { period: `${CURRENT_YEAR}-04`, count: 1 },
+      ]);
+    });
+
+    it('filters by from/to range', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/places/trends?from=2019-01-01T00:00:00Z&to=2019-12-31T23:59:59Z',
+        { headers: { Authorization: `Bearer ${readToken}` } }
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        period: string;
+        data: Array<{ period: string; count: number }>;
+      };
+      expect(body.data).toEqual([{ period: '2019-03', count: 1 }]);
+    });
+
+    it('requires auth', async () => {
+      const res = await SELF.fetch('http://localhost/v1/places/trends');
+      expect(res.status).toBe(401);
     });
   });
 
