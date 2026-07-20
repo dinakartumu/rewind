@@ -61,9 +61,14 @@ export async function syncRunning(env: Env, db: Database): Promise<number> {
       .orderBy(desc(stravaActivities.startDate))
       .limit(1);
 
+    // Always pass `after` (epoch 1 on first run): Strava sorts results
+    // oldest-first when `after` is set, newest-first otherwise. Oldest-first
+    // makes an interrupted first backfill resumable from the cursor —
+    // newest-first would advance the cursor past never-fetched history and
+    // silently truncate it.
     const after = lastActivity
       ? Math.floor(new Date(lastActivity.startDate).getTime() / 1000)
-      : undefined;
+      : 1;
 
     // Fetch activities page by page
     let page = 1;
