@@ -368,6 +368,31 @@ describe('query_rewind embed_art', () => {
     await client.close();
   });
 
+  it('labels the data URI with the CDN response content-type, not a hardcoded webp', async () => {
+    // The CDN can ignore format=webp and return JPEG; the data URI MIME must
+    // match the actual bytes so strict decoders accept it.
+    const orig = `${CDN}/listening/albums/9/original.jpg?v=1`;
+    const { client } = await createTestClient(
+      {
+        columns: ['art'],
+        rows: [[orig]],
+        row_count: 1,
+        truncated: false,
+      },
+      async () => ({
+        bytes: new Uint8Array([0xff, 0xd8, 0xff]),
+        mimeType: 'image/jpeg',
+      })
+    );
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    const art = artOf(result);
+    expect(art![orig].startsWith('data:image/jpeg;base64,')).toBe(true);
+    await client.close();
+  });
+
   it('de-duplicates and caps embedded art at 16 distinct URLs', async () => {
     // 20 distinct URLs, each appearing twice → 40 cells.
     const rows: unknown[][] = [];

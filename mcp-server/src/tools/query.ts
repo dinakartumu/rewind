@@ -103,8 +103,12 @@ async function collectEmbedArt(
         quality: EMBED_ART_QUALITY,
       });
       try {
-        const { bytes } = await client.getBinaryFromUrl(url);
-        return { original: m.original, base64: bytesToBase64(bytes) };
+        const { bytes, mimeType } = await client.getBinaryFromUrl(url);
+        // Use the CDN's actual Content-Type: it may fall back to JPEG/PNG when
+        // it ignores the requested format=webp, and a data URI whose declared
+        // MIME mismatches its bytes can be rejected by strict image decoders.
+        const mime = mimeType || 'image/jpeg';
+        return { original: m.original, base64: bytesToBase64(bytes), mime };
       } catch {
         return null;
       }
@@ -118,7 +122,7 @@ async function collectEmbedArt(
       break;
     }
     totalBytes += item.base64.length;
-    art[item.original] = `data:image/webp;base64,${item.base64}`;
+    art[item.original] = `data:${item.mime};base64,${item.base64}`;
   }
 
   return { art, truncated };
