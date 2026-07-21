@@ -16,6 +16,7 @@ import reading from './routes/reading.js';
 import places from './routes/places.js';
 import attending from './routes/attending.js';
 import search from './routes/search.js';
+import query from './routes/query.js';
 import exportRoute from './routes/export.js';
 import keys from './routes/keys.js';
 import adminSync from './routes/admin-sync.js';
@@ -98,6 +99,7 @@ const routes = app
   .route('/attending', attending)
   .route('/feed', feed)
   .route('/search', search)
+  .route('/', query)
   .route('/admin/export', exportRoute)
   .route('/admin/keys', keys)
   .route('/admin', adminReindex)

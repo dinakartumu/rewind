@@ -52,6 +52,10 @@
       "description": "Full-text search across all domains."
     },
     {
+      "name": "Query",
+      "description": "Read-only SQL over the allowlisted tables, plus the annotated schema that documents them."
+    },
+    {
       "name": "Images",
       "description": "Image proxy with on-the-fly transforms via Cloudflare Images."
     },
@@ -532,6 +536,129 @@
           "logo_light_url",
           "conference",
           "division"
+        ]
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "year",
+              "plays"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {}
+            },
+            "example": [
+              [
+                "2024",
+                18234
+              ],
+              [
+                "2025",
+                21012
+              ]
+            ]
+          },
+          "row_count": {
+            "type": "integer",
+            "example": 2
+          },
+          "truncated": {
+            "type": "boolean",
+            "example": false,
+            "description": "True when rows were dropped to fit the response ceiling."
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "row_count",
+          "truncated"
+        ]
+      },
+      "QueryRequest": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string",
+            "description": "A single read-only SELECT (or WITH … SELECT) statement. A LIMIT is applied automatically (200 default, 500 max).",
+            "example": "SELECT strftime('%Y', scrobbled_at) AS year, count(*) AS plays FROM lastfm_scrobbles GROUP BY year ORDER BY year"
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      },
+      "SchemaResponse": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Global conventions a model needs before writing queries."
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "purpose": {
+                  "type": "string"
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "type"
+                    ]
+                  }
+                },
+                "joins": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "purpose",
+                "columns"
+              ]
+            },
+            "description": "Every queryable table with columns, notes, and join keys."
+          }
+        },
+        "required": [
+          "notes",
+          "tables"
         ]
       },
       "ExportResponse": {
@@ -23610,6 +23737,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "operationId": "runQuery",
+        "tags": [
+          "Query"
+        ],
+        "summary": "Run a read-only SQL query",
+        "description": "Executes a single read-only SELECT (or WITH … SELECT) statement against the Rewind database and returns column names plus array-of-array row tuples. Gated server-side: writes, DDL, multi-statement input, and access to secret tables are rejected. A LIMIT is enforced automatically (200 default, 500 max). Fetch GET /v1/schema first for the annotated table list.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query results as column names plus row tuples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/schema": {
+      "get": {
+        "operationId": "getSchema",
+        "tags": [
+          "Query"
+        ],
+        "summary": "Annotated database schema",
+        "description": "Returns the curated, annotated schema for the query endpoint: every queryable table with its columns, types, semantic notes, join keys, and global conventions (single user_id, ISO timestamps, rating scales, image URL composition). Secret/system tables are intentionally omitted.",
+        "responses": {
+          "200": {
+            "description": "Annotated schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaResponse"
                 }
               }
             }

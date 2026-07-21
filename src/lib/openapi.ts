@@ -126,6 +126,11 @@ Common status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500
     },
     { name: 'Search', description: 'Full-text search across all domains.' },
     {
+      name: 'Query',
+      description:
+        'Read-only SQL over the allowlisted tables, plus the annotated schema that documents them.',
+    },
+    {
       name: 'Images',
       description:
         'Image proxy with on-the-fly transforms via Cloudflare Images.',
