@@ -343,6 +343,7 @@ function getMockResponse(path: string): unknown {
       suffer_score: null,
       city: 'Austin',
       state: 'TX',
+      polyline: '_wfbHb|niVD_@TEd@',
       is_race: false,
       workout_type: 'default',
       strava_url: 'https://www.strava.com/activities/123',
