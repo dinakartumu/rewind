@@ -324,10 +324,12 @@ export async function syncRecentScrobbles(
         if (artist.isNew) {
           try {
             const tagResponse = await client.getArtistTopTags(track.artistName);
-            const rawTags = tagResponse.toptags.tag.map((t) => ({
-              name: t.name,
-              count: t.count,
-            }));
+            const rawTags = normalizeTagList(tagResponse.toptags?.tag).map(
+              (t) => ({
+                name: t.name,
+                count: t.count,
+              })
+            );
             const { genre, normalizedTags } = resolveGenre(rawTags);
 
             // Auto-detect audiobook artists from Last.fm tags
@@ -1159,8 +1161,21 @@ export async function backfillScrobbles(
 }
 
 /**
+ * Last.fm omits the `tag` field entirely for artists with zero tags, and
+ * can return a bare object instead of an array for a single tag. Normalize
+ * to an array so callers can always map over it.
+ */
+function normalizeTagList<T>(tag: T[] | T | undefined | null): T[] {
+  if (Array.isArray(tag)) return tag;
+  if (tag == null) return [];
+  return [tag];
+}
+
+/**
  * Backfill genre tags for existing artists.
  * Processes up to `batchSize` artists per invocation to avoid Worker timeout.
+ * Artists with zero tags get tags='[]' (sentinel) so `tags IS NULL` stops
+ * matching them; `remaining` therefore converges to 0.
  * Returns tagged count and remaining count so the caller can loop.
  */
 export async function backfillArtistTags(
@@ -1186,7 +1201,10 @@ export async function backfillArtistTags(
     for (const artist of artists) {
       try {
         const response = await client.getArtistTopTags(artist.name);
-        const rawTags = response.toptags.tag.map((t) => ({
+        // Zero-tag artists come back without a `tag` array (or with a bare
+        // object). Normalize to [] so we still write the '[]' sentinel below
+        // — otherwise `tags IS NULL` re-selects the artist on every run.
+        const rawTags = normalizeTagList(response.toptags?.tag).map((t) => ({
           name: t.name,
           count: t.count,
         }));

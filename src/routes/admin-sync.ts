@@ -15,6 +15,7 @@ import {
   recomputeStats,
   deleteActivity,
 } from '../services/strava/sync.js';
+import { geocodeStravaActivities } from '../services/geo/reverse-geocode.js';
 import { syncWatching } from '../services/plex/sync.js';
 import { syncLetterboxd } from '../services/letterboxd/sync.js';
 import { syncCollecting } from '../services/discogs/sync.js';
@@ -41,6 +42,16 @@ const SyncCompletedResponse = z
     status: z.literal('completed'),
     items_synced: z.number().int().openapi({ example: 42 }),
     timestamp: z.string().datetime().optional(),
+    geocoded: z.number().int().optional().openapi({
+      description:
+        'Running only: activities reverse-geocoded in this call (bounded batch).',
+      example: 200,
+    }),
+    geocode_remaining: z.number().int().optional().openapi({
+      description:
+        'Running only: activities with coordinates still awaiting geocoding. Call again to drain.',
+      example: 864,
+    }),
   })
   .openapi('SyncCompletedResponse');
 
@@ -241,9 +252,26 @@ adminSync.openapi(syncRunningRoute, async (c) => {
 
   try {
     const itemsSynced = await syncRunning(c.env, db, { full });
+
+    // Drain another geocoding batch beyond the one syncRunning already
+    // ran, so repeated admin calls backfill locations quickly. Non-fatal.
+    let geocoded: number | undefined;
+    let geocodeRemaining: number | undefined;
+    try {
+      const geo = await geocodeStravaActivities(db, 200);
+      geocoded = geo.updated;
+      geocodeRemaining = geo.remaining;
+    } catch (e) {
+      console.log(`[ERROR] Post-sync geocoding failed: ${e}`);
+    }
+
     return c.json({
       status: 'completed' as const,
       items_synced: itemsSynced,
+      ...(geocoded !== undefined && { geocoded }),
+      ...(geocodeRemaining !== undefined && {
+        geocode_remaining: geocodeRemaining,
+      }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

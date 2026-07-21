@@ -10,6 +10,7 @@ import {
 import { env } from 'cloudflare:test';
 import { createDb, type Database } from '../../db/client.js';
 import { stravaActivities, stravaTokens } from '../../db/schema/strava.js';
+import { geoCities } from '../../db/schema/geo.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
 import { syncRunning, syncSingleActivity } from './sync.js';
@@ -253,6 +254,34 @@ describe('Strava sync', () => {
       ).toBe(true);
     });
 
+    it('geocodes new activities with coordinates at the end of the sync', async () => {
+      await db.delete(geoCities);
+      await db.insert(geoCities).values({
+        id: 5809844,
+        name: 'Seattle',
+        admin1: 'Washington',
+        countryCode: 'US',
+        lat: 47.60621,
+        lng: -122.33207,
+      });
+
+      const calls: string[] = [];
+      installFetchStub(
+        [makeApiActivity(1, 'Run', { start_latlng: [47.61, -122.33] })],
+        calls
+      );
+
+      await syncRunning(env as unknown as Env, db);
+
+      const [row] = await db
+        .select()
+        .from(stravaActivities)
+        .where(eq(stravaActivities.stravaId, 1));
+      expect(row.city).toBe('Seattle');
+      expect(row.state).toBe('Washington');
+      expect(row.country).toBe('United States');
+    });
+
     it('full option ignores the incremental cursor and walks from the beginning', async () => {
       await db.insert(stravaActivities).values({
         stravaId: 400,
@@ -297,6 +326,34 @@ describe('Strava sync', () => {
         .where(eq(stravaActivities.stravaId, 555));
       expect(row).toBeDefined();
       expect(row.sportType).toBe('Ride');
+    });
+
+    it('reverse-geocodes the activity from start coordinates', async () => {
+      await db.delete(geoCities);
+      await db.insert(geoCities).values({
+        id: 5746545,
+        name: 'Portland',
+        admin1: 'Oregon',
+        countryCode: 'US',
+        lat: 45.52345,
+        lng: -122.67621,
+      });
+
+      const calls: string[] = [];
+      installFetchStub(
+        [makeApiActivity(556, 'Run', { start_latlng: [45.515, -122.67] })],
+        calls
+      );
+
+      await syncSingleActivity(env as unknown as Env, db, 556);
+
+      const [row] = await db
+        .select()
+        .from(stravaActivities)
+        .where(eq(stravaActivities.stravaId, 556));
+      expect(row.city).toBe('Portland');
+      expect(row.state).toBe('Oregon');
+      expect(row.country).toBe('United States');
     });
   });
 

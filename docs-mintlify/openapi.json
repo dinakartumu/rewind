@@ -1637,6 +1637,16 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          },
+          "geocoded": {
+            "type": "integer",
+            "description": "Running only: activities reverse-geocoded in this call (bounded batch).",
+            "example": 200
+          },
+          "geocode_remaining": {
+            "type": "integer",
+            "description": "Running only: activities with coordinates still awaiting geocoding. Call again to drain.",
+            "example": 864
           }
         },
         "required": [

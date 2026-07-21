@@ -12,6 +12,10 @@ import {
 import type { Env } from '../../types/env.js';
 import { StravaClient } from './client.js';
 import { afterSync } from '../../lib/after-sync.js';
+import {
+  reverseGeocode,
+  geocodeStravaActivities,
+} from '../geo/reverse-geocode.js';
 import { chunkForInsertValues } from '../../lib/d1-chunk.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import {
@@ -175,6 +179,20 @@ export async function syncRunning(
 
     // Sync gear
     await syncGear(client, db);
+
+    // Reverse-geocode activities with coordinates but no city (bounded
+    // batch; Strava deprecated its location fields). Non-fatal: a
+    // geocoding failure must not fail the sync.
+    try {
+      const geo = await geocodeStravaActivities(db, 200);
+      if (geo.updated > 0 || geo.remaining > 0) {
+        console.log(
+          `[SYNC] Geocoded ${geo.updated} activities, ${geo.remaining} remaining`
+        );
+      }
+    } catch (e) {
+      console.log(`[ERROR] Activity geocoding failed: ${e}`);
+    }
 
     // Recompute stats incrementally for affected years (full if no new activities)
     await recomputeStats(db, changedYears.size > 0 ? changedYears : undefined);
@@ -620,6 +638,35 @@ export async function syncSingleActivity(
     target: stravaActivities.stravaId,
     set: transformed,
   });
+
+  // Reverse-geocode from start coordinates (Strava deprecated its
+  // location fields, so transformed.city is null). Non-fatal.
+  if (
+    transformed.city == null &&
+    transformed.startLat != null &&
+    transformed.startLng != null
+  ) {
+    try {
+      const location = await reverseGeocode(
+        db,
+        transformed.startLat,
+        transformed.startLng
+      );
+      if (location) {
+        await db
+          .update(stravaActivities)
+          .set({
+            city: location.city,
+            state: location.state,
+            country: location.country,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(stravaActivities.stravaId, stravaId));
+      }
+    } catch (e) {
+      console.log(`[ERROR] Geocoding activity ${stravaId} failed: ${e}`);
+    }
+  }
 
   // Upsert splits
   if (activity.splits_standard?.length) {
