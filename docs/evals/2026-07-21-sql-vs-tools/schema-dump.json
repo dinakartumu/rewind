@@ -1,0 +1,1168 @@
+{
+  "notes": [
+    "Single-user database: every table has `user_id` and it is always 1. You may omit `WHERE user_id = 1` — there is only one user.",
+    "All timestamps are ISO 8601 strings stored in text columns (e.g. \"2026-03-18T14:30:00.000Z\"), UTC. Date-only fields (event_date, birth_date, date) are \"YYYY-MM-DD\". Compare/sort them as strings; use SQLite date()/strftime() for bucketing.",
+    "Booleans are stored as integers 0/1 (e.g. is_filtered, starred, is_race, attended, notable, rewatch, is_home).",
+    "is_filtered = 1 marks Last.fm rows the owner has hidden (junk scrobbles, misattributions). Analytical listening queries should filter `is_filtered = 0` unless you specifically want the raw data. lastfm_scrobbles has no is_filtered column — join through lastfm_tracks to filter.",
+    "Rating scales differ by domain: watch_history.user_rating and movies.tmdb_rating / shows.tmdb_rating are 0-10 (real). discogs_collection.rating and discogs_wantlist.rating are 0-5 integers (0 = unrated). reading_items.rating is a small integer (may be null). There is no single global scale.",
+    "Images: the shared `images` table keys on (domain, entity_type, entity_id). The public CDN URL is composed as https://cdn.dinakartumu.com/cdn-cgi/image/<transforms>/<r2_key>, and image_version is appended as a cache-busting query param (?v=<image_version>). Many domain tables also carry a denormalized image_key/poster_path for convenience. dominant_color/accent_color are hex strings; thumbhash is a compact placeholder blob.",
+    "Cross-domain join keys: performers.lastfm_artist_id → lastfm_artists.id (concerts ↔ listening); collection_listening_xref links discogs_collection ↔ Last.fm play counts by matched name; trakt_collection.movie_id and watch_history.movie_id → movies.id (physical media ↔ watched films).",
+    "Enums are stored as plain text. Notable ones: watch_history.source (plex|letterboxd|manual|trakt), trakt_collection.media_type (bluray|uhd_bluray|hddvd|dvd|digital), reading_items.status (unread|reading|finished), attended_events.category (sports|music|arts)."
+  ],
+  "tables": [
+    {
+      "name": "lastfm_artists",
+      "purpose": "One row per artist scrobbled by the user, with playcount and enrichment (bio, genre, similar artists, Apple Music links).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text" },
+        { "name": "mbid", "type": "text", "note": "MusicBrainz id, nullable" },
+        {
+          "name": "playcount",
+          "type": "integer",
+          "note": "lifetime scrobble count"
+        },
+        {
+          "name": "is_filtered",
+          "type": "integer",
+          "note": "0/1; 1 = hidden from analytics"
+        },
+        {
+          "name": "genre",
+          "type": "text",
+          "note": "primary genre (top allowlisted tag)"
+        },
+        {
+          "name": "tags",
+          "type": "text",
+          "note": "JSON array of {name,count}"
+        },
+        { "name": "bio_summary", "type": "text" },
+        {
+          "name": "similar_artists",
+          "type": "text",
+          "note": "JSON array of similar artists the user also plays"
+        },
+        { "name": "apple_music_url", "type": "text" },
+        { "name": "image_key", "type": "text" },
+        { "name": "created_at", "type": "text" },
+        { "name": "updated_at", "type": "text" }
+      ]
+    },
+    {
+      "name": "lastfm_albums",
+      "purpose": "Albums scrobbled by the user.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text" },
+        {
+          "name": "artist_id",
+          "type": "integer",
+          "note": "→ lastfm_artists.id"
+        },
+        { "name": "playcount", "type": "integer" },
+        { "name": "is_filtered", "type": "integer", "note": "0/1" },
+        {
+          "name": "released_year",
+          "type": "integer",
+          "note": "nullable, from Apple Music"
+        },
+        { "name": "total_tracks", "type": "integer", "note": "nullable" },
+        { "name": "apple_music_url", "type": "text" },
+        { "name": "image_key", "type": "text" }
+      ],
+      "joins": ["artist_id → lastfm_artists.id"]
+    },
+    {
+      "name": "lastfm_tracks",
+      "purpose": "Tracks scrobbled by the user (the grain that scrobbles reference).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text" },
+        {
+          "name": "artist_id",
+          "type": "integer",
+          "note": "→ lastfm_artists.id"
+        },
+        {
+          "name": "album_id",
+          "type": "integer",
+          "note": "→ lastfm_albums.id, nullable"
+        },
+        { "name": "duration_ms", "type": "integer", "note": "nullable" },
+        { "name": "is_filtered", "type": "integer", "note": "0/1" },
+        { "name": "apple_music_url", "type": "text" },
+        { "name": "preview_url", "type": "text" }
+      ],
+      "joins": ["artist_id → lastfm_artists.id", "album_id → lastfm_albums.id"]
+    },
+    {
+      "name": "lastfm_scrobbles",
+      "purpose": "Individual play events — one row per listen. The base fact table for listening.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "track_id", "type": "integer", "note": "→ lastfm_tracks.id" },
+        {
+          "name": "scrobbled_at",
+          "type": "text",
+          "note": "ISO 8601 timestamp of the play"
+        }
+      ],
+      "joins": [
+        "track_id → lastfm_tracks.id (then → lastfm_artists / lastfm_albums). Filter is_filtered via the track join."
+      ]
+    },
+    {
+      "name": "lastfm_top_artists",
+      "purpose": "Precomputed top-artist rankings per Last.fm period (7day, 1month, 3month, 6month, 12month, overall).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "period", "type": "text", "note": "Last.fm period key" },
+        { "name": "rank", "type": "integer" },
+        {
+          "name": "artist_id",
+          "type": "integer",
+          "note": "→ lastfm_artists.id"
+        },
+        {
+          "name": "playcount",
+          "type": "integer",
+          "note": "plays within the period"
+        }
+      ],
+      "joins": ["artist_id → lastfm_artists.id"]
+    },
+    {
+      "name": "lastfm_top_albums",
+      "purpose": "Precomputed top-album rankings per period.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "period", "type": "text" },
+        { "name": "rank", "type": "integer" },
+        { "name": "album_id", "type": "integer", "note": "→ lastfm_albums.id" },
+        { "name": "playcount", "type": "integer" }
+      ],
+      "joins": ["album_id → lastfm_albums.id"]
+    },
+    {
+      "name": "lastfm_top_tracks",
+      "purpose": "Precomputed top-track rankings per period.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "period", "type": "text" },
+        { "name": "rank", "type": "integer" },
+        { "name": "track_id", "type": "integer", "note": "→ lastfm_tracks.id" },
+        { "name": "playcount", "type": "integer" }
+      ],
+      "joins": ["track_id → lastfm_tracks.id"]
+    },
+    {
+      "name": "lastfm_filters",
+      "purpose": "User-defined filter rules that drive the is_filtered flags (which artists/tracks to hide).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "filter_type", "type": "text" },
+        { "name": "pattern", "type": "text" },
+        { "name": "scope", "type": "text", "note": "nullable" },
+        { "name": "reason", "type": "text", "note": "nullable" }
+      ]
+    },
+    {
+      "name": "lastfm_user_stats",
+      "purpose": "Single-row lifetime listening totals (scrobbles, unique artists/albums/tracks).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "total_scrobbles", "type": "integer" },
+        { "name": "unique_artists", "type": "integer" },
+        { "name": "unique_albums", "type": "integer" },
+        { "name": "unique_tracks", "type": "integer" },
+        { "name": "registered_date", "type": "text", "note": "nullable" },
+        { "name": "updated_at", "type": "text" }
+      ]
+    },
+    {
+      "name": "lastfm_monthly_stats",
+      "purpose": "Precomputed per-month listening totals (is_filtered=0 scope).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "year_month", "type": "text", "note": "\"YYYY-MM\"" },
+        { "name": "scrobbles", "type": "integer" },
+        { "name": "unique_artists", "type": "integer" },
+        { "name": "unique_albums", "type": "integer" }
+      ]
+    },
+    {
+      "name": "lastfm_yearly_stats",
+      "purpose": "Precomputed per-year listening totals plus top artist of the year.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "year", "type": "integer" },
+        { "name": "scrobbles", "type": "integer" },
+        { "name": "unique_artists", "type": "integer" },
+        { "name": "unique_albums", "type": "integer" },
+        { "name": "unique_tracks", "type": "integer" },
+        {
+          "name": "top_artist_id",
+          "type": "integer",
+          "note": "→ lastfm_artists.id, nullable"
+        }
+      ],
+      "joins": ["top_artist_id → lastfm_artists.id"]
+    },
+    {
+      "name": "lastfm_album_attribution_audit",
+      "purpose": "Audit log for the one-time album-attribution repair migration. Rarely useful for user questions.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "original_album_id", "type": "integer" },
+        { "name": "original_album_name", "type": "text" },
+        {
+          "name": "action",
+          "type": "text",
+          "note": "KEEP_AS_VA | COLLAPSE_TO_PRIMARY | SPLIT_PER_ARTIST"
+        },
+        { "name": "tracks_moved", "type": "integer" },
+        { "name": "created_at", "type": "text" }
+      ]
+    },
+    {
+      "name": "strava_activities",
+      "purpose": "One row per Strava activity (mostly runs). Base fact table for running. Filter is_deleted = 0.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "strava_id",
+          "type": "integer",
+          "note": "upstream Strava activity id"
+        },
+        { "name": "name", "type": "text" },
+        {
+          "name": "sport_type",
+          "type": "text",
+          "note": "e.g. Run, TrailRun, Walk"
+        },
+        { "name": "distance_miles", "type": "real" },
+        { "name": "distance_meters", "type": "real" },
+        { "name": "moving_time_seconds", "type": "integer" },
+        { "name": "total_elevation_gain_feet", "type": "real" },
+        { "name": "start_date", "type": "text", "note": "ISO 8601, UTC" },
+        {
+          "name": "start_date_local",
+          "type": "text",
+          "note": "ISO 8601, venue-local"
+        },
+        { "name": "city", "type": "text", "note": "nullable" },
+        { "name": "state", "type": "text", "note": "nullable" },
+        { "name": "pace_min_per_mile", "type": "real", "note": "nullable" },
+        { "name": "pace_formatted", "type": "text", "note": "e.g. \"8:32\"" },
+        { "name": "average_heartrate", "type": "real", "note": "nullable" },
+        { "name": "calories", "type": "integer", "note": "nullable" },
+        { "name": "is_race", "type": "integer", "note": "0/1" },
+        { "name": "is_deleted", "type": "integer", "note": "0/1; filter = 0" },
+        {
+          "name": "gear_id",
+          "type": "text",
+          "note": "→ strava_gear.strava_gear_id, nullable"
+        },
+        { "name": "strava_url", "type": "text" }
+      ],
+      "joins": [
+        "gear_id → strava_gear.strava_gear_id",
+        "strava_id → strava_splits.activity_strava_id"
+      ]
+    },
+    {
+      "name": "strava_splits",
+      "purpose": "Per-mile splits for an activity.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "activity_strava_id",
+          "type": "integer",
+          "note": "→ strava_activities.strava_id"
+        },
+        { "name": "split_number", "type": "integer" },
+        { "name": "distance_miles", "type": "real" },
+        { "name": "moving_time_seconds", "type": "integer" },
+        { "name": "pace_formatted", "type": "text" },
+        { "name": "average_heartrate", "type": "real", "note": "nullable" }
+      ],
+      "joins": ["activity_strava_id → strava_activities.strava_id"]
+    },
+    {
+      "name": "strava_gear",
+      "purpose": "Shoes / gear with accumulated mileage.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "strava_gear_id",
+          "type": "text",
+          "note": "upstream id, matches strava_activities.gear_id"
+        },
+        { "name": "name", "type": "text" },
+        { "name": "brand", "type": "text", "note": "nullable" },
+        { "name": "model", "type": "text", "note": "nullable" },
+        { "name": "distance_miles", "type": "real" },
+        { "name": "is_retired", "type": "integer", "note": "0/1" }
+      ]
+    },
+    {
+      "name": "strava_personal_records",
+      "purpose": "Best times per distance (e.g. fastest 5K).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "distance",
+          "type": "text",
+          "note": "machine key, e.g. \"5k\""
+        },
+        { "name": "distance_label", "type": "text", "note": "display label" },
+        { "name": "time_seconds", "type": "integer" },
+        { "name": "time_formatted", "type": "text" },
+        { "name": "pace_formatted", "type": "text" },
+        { "name": "date", "type": "text", "note": "YYYY-MM-DD" },
+        {
+          "name": "activity_strava_id",
+          "type": "integer",
+          "note": "→ strava_activities.strava_id"
+        },
+        { "name": "activity_name", "type": "text" }
+      ]
+    },
+    {
+      "name": "strava_year_summaries",
+      "purpose": "Precomputed per-year running totals.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "year", "type": "integer" },
+        { "name": "total_runs", "type": "integer" },
+        { "name": "total_distance_miles", "type": "real" },
+        { "name": "total_elevation_feet", "type": "real" },
+        { "name": "total_duration_seconds", "type": "integer" },
+        { "name": "avg_pace_formatted", "type": "text" },
+        { "name": "longest_run_miles", "type": "real" },
+        { "name": "race_count", "type": "integer" }
+      ]
+    },
+    {
+      "name": "strava_lifetime_stats",
+      "purpose": "Single-row lifetime running totals, streaks, and Eddington number.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "total_runs", "type": "integer" },
+        { "name": "total_distance_miles", "type": "real" },
+        { "name": "total_elevation_feet", "type": "real" },
+        { "name": "total_duration_seconds", "type": "integer" },
+        { "name": "avg_pace_formatted", "type": "text" },
+        { "name": "years_active", "type": "integer" },
+        { "name": "first_run", "type": "text", "note": "ISO 8601, nullable" },
+        { "name": "eddington_number", "type": "integer" },
+        { "name": "current_streak_days", "type": "integer" },
+        { "name": "longest_streak_days", "type": "integer" }
+      ]
+    },
+    {
+      "name": "movies",
+      "purpose": "One row per unique film. watch_history references this; a movie can be watched many times.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "title", "type": "text" },
+        { "name": "year", "type": "integer", "note": "nullable" },
+        { "name": "tmdb_id", "type": "integer", "note": "nullable, unique" },
+        { "name": "imdb_id", "type": "text", "note": "nullable, unique" },
+        { "name": "runtime", "type": "integer", "note": "minutes, nullable" },
+        { "name": "tmdb_rating", "type": "real", "note": "0-10, nullable" },
+        { "name": "summary", "type": "text", "note": "nullable" },
+        { "name": "content_rating", "type": "text", "note": "nullable" },
+        {
+          "name": "poster_path",
+          "type": "text",
+          "note": "TMDB path, nullable"
+        },
+        { "name": "image_key", "type": "text", "note": "nullable" }
+      ],
+      "joins": [
+        "id ← watch_history.movie_id",
+        "id ← movie_genres.movie_id ← genres",
+        "id ← movie_directors.movie_id ← directors",
+        "id ← trakt_collection.movie_id"
+      ]
+    },
+    {
+      "name": "genres",
+      "purpose": "Movie genre lookup (shared name → id).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text", "note": "unique" }
+      ],
+      "joins": ["id ← movie_genres.genre_id"]
+    },
+    {
+      "name": "movie_genres",
+      "purpose": "Many-to-many join between movies and genres.",
+      "columns": [
+        { "name": "movie_id", "type": "integer", "note": "→ movies.id" },
+        { "name": "genre_id", "type": "integer", "note": "→ genres.id" }
+      ],
+      "joins": ["movie_id → movies.id", "genre_id → genres.id"]
+    },
+    {
+      "name": "directors",
+      "purpose": "Director lookup (shared name → id).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text", "note": "unique" }
+      ],
+      "joins": ["id ← movie_directors.director_id"]
+    },
+    {
+      "name": "movie_directors",
+      "purpose": "Many-to-many join between movies and directors.",
+      "columns": [
+        { "name": "movie_id", "type": "integer", "note": "→ movies.id" },
+        { "name": "director_id", "type": "integer", "note": "→ directors.id" }
+      ],
+      "joins": ["movie_id → movies.id", "director_id → directors.id"]
+    },
+    {
+      "name": "watch_history",
+      "purpose": "One row per movie viewing event (rewatches produce multiple rows). Base fact table for watching films.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "movie_id", "type": "integer", "note": "→ movies.id" },
+        { "name": "watched_at", "type": "text", "note": "ISO 8601" },
+        {
+          "name": "source",
+          "type": "text",
+          "note": "plex | letterboxd | manual | trakt"
+        },
+        { "name": "user_rating", "type": "real", "note": "0-10, nullable" },
+        { "name": "rewatch", "type": "integer", "note": "0/1" },
+        { "name": "review", "type": "text", "note": "nullable" },
+        {
+          "name": "review_url",
+          "type": "text",
+          "note": "nullable Letterboxd review link"
+        },
+        { "name": "percent_complete", "type": "real", "note": "nullable" }
+      ],
+      "joins": ["movie_id → movies.id"]
+    },
+    {
+      "name": "watch_stats",
+      "purpose": "Single-row denormalized watching totals (movies, shows, episodes, watch time).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "total_movies", "type": "integer" },
+        { "name": "total_watch_time_s", "type": "integer" },
+        { "name": "movies_this_year", "type": "integer" },
+        { "name": "total_shows", "type": "integer" },
+        { "name": "total_episodes_watched", "type": "integer" },
+        { "name": "episodes_this_year", "type": "integer" }
+      ]
+    },
+    {
+      "name": "shows",
+      "purpose": "One row per TV show. episodes_watched references this.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "title", "type": "text" },
+        { "name": "year", "type": "integer", "note": "nullable" },
+        { "name": "tmdb_id", "type": "integer", "note": "nullable" },
+        { "name": "trakt_id", "type": "integer", "note": "nullable" },
+        { "name": "tmdb_rating", "type": "real", "note": "0-10, nullable" },
+        { "name": "total_seasons", "type": "integer", "note": "nullable" },
+        { "name": "total_episodes", "type": "integer", "note": "nullable" },
+        { "name": "poster_path", "type": "text", "note": "nullable" },
+        { "name": "image_key", "type": "text", "note": "nullable" }
+      ],
+      "joins": ["id ← episodes_watched.show_id"]
+    },
+    {
+      "name": "episodes_watched",
+      "purpose": "One row per episode viewing event.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "show_id", "type": "integer", "note": "→ shows.id" },
+        { "name": "season_number", "type": "integer" },
+        { "name": "episode_number", "type": "integer" },
+        { "name": "title", "type": "text", "note": "nullable" },
+        { "name": "watched_at", "type": "text", "note": "ISO 8601" },
+        { "name": "source", "type": "text", "note": "plex | trakt" }
+      ],
+      "joins": ["show_id → shows.id"]
+    },
+    {
+      "name": "discogs_releases",
+      "purpose": "Catalog metadata for a Discogs release (album pressing). discogs_collection references these.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "discogs_id",
+          "type": "integer",
+          "note": "upstream release id"
+        },
+        { "name": "title", "type": "text" },
+        { "name": "year", "type": "integer", "note": "nullable" },
+        { "name": "genres", "type": "text", "note": "JSON array" },
+        { "name": "styles", "type": "text", "note": "JSON array" },
+        {
+          "name": "formats",
+          "type": "text",
+          "note": "JSON array (e.g. Vinyl, CD)"
+        },
+        {
+          "name": "labels",
+          "type": "text",
+          "note": "JSON array of {name,catno}"
+        },
+        { "name": "country", "type": "text", "note": "nullable" },
+        { "name": "cover_url", "type": "text", "note": "nullable" },
+        {
+          "name": "lowest_price",
+          "type": "real",
+          "note": "nullable, market price"
+        }
+      ],
+      "joins": [
+        "id ← discogs_collection.release_id",
+        "id ← discogs_release_artists.release_id ← discogs_artists"
+      ]
+    },
+    {
+      "name": "discogs_artists",
+      "purpose": "Artist metadata for releases in the collection.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "discogs_id", "type": "integer" },
+        { "name": "name", "type": "text" },
+        { "name": "profile_url", "type": "text", "note": "nullable" },
+        { "name": "image_url", "type": "text", "note": "nullable" }
+      ],
+      "joins": ["id ← discogs_release_artists.artist_id"]
+    },
+    {
+      "name": "discogs_collection",
+      "purpose": "The owned records — one row per physical copy in the collection. Base fact table for the vinyl/CD collection.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "release_id",
+          "type": "integer",
+          "note": "→ discogs_releases.id"
+        },
+        {
+          "name": "instance_id",
+          "type": "integer",
+          "note": "unique per-copy id"
+        },
+        { "name": "folder_id", "type": "integer" },
+        { "name": "rating", "type": "integer", "note": "0-5, 0 = unrated" },
+        { "name": "notes", "type": "text", "note": "nullable" },
+        { "name": "date_added", "type": "text", "note": "ISO 8601" }
+      ],
+      "joins": [
+        "release_id → discogs_releases.id",
+        "id ← collection_listening_xref.collection_id"
+      ]
+    },
+    {
+      "name": "discogs_release_artists",
+      "purpose": "Many-to-many join between releases and artists.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "release_id",
+          "type": "integer",
+          "note": "→ discogs_releases.id"
+        },
+        {
+          "name": "artist_id",
+          "type": "integer",
+          "note": "→ discogs_artists.id"
+        }
+      ],
+      "joins": [
+        "release_id → discogs_releases.id",
+        "artist_id → discogs_artists.id"
+      ]
+    },
+    {
+      "name": "discogs_wantlist",
+      "purpose": "Records the user wants but does not own yet.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "discogs_id", "type": "integer" },
+        { "name": "title", "type": "text" },
+        { "name": "artists", "type": "text", "note": "JSON array of names" },
+        { "name": "year", "type": "integer", "note": "nullable" },
+        { "name": "formats", "type": "text", "note": "JSON array" },
+        { "name": "genres", "type": "text", "note": "JSON array" },
+        { "name": "rating", "type": "integer", "note": "0-5" },
+        { "name": "date_added", "type": "text", "note": "ISO 8601" }
+      ]
+    },
+    {
+      "name": "discogs_collection_stats",
+      "purpose": "Single-row denormalized collection summary (counts, top genre, estimated value, breakdowns).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "total_items", "type": "integer" },
+        {
+          "name": "by_format",
+          "type": "text",
+          "note": "JSON {vinyl,cd,cassette,other}"
+        },
+        { "name": "wantlist_count", "type": "integer" },
+        { "name": "unique_artists", "type": "integer" },
+        { "name": "estimated_value", "type": "real", "note": "nullable" },
+        { "name": "top_genre", "type": "text", "note": "nullable" },
+        { "name": "added_this_year", "type": "integer" },
+        { "name": "by_genre", "type": "text", "note": "JSON {genre:count}" },
+        { "name": "by_decade", "type": "text", "note": "JSON {decade:count}" }
+      ]
+    },
+    {
+      "name": "collection_listening_xref",
+      "purpose": "Cross-references owned records (discogs_collection) with Last.fm play counts by matched name — how often the owner streams what they own.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "collection_id",
+          "type": "integer",
+          "note": "→ discogs_collection.id"
+        },
+        {
+          "name": "release_id",
+          "type": "integer",
+          "note": "→ discogs_releases.id"
+        },
+        {
+          "name": "lastfm_album_name",
+          "type": "text",
+          "note": "nullable matched name"
+        },
+        { "name": "lastfm_artist_name", "type": "text", "note": "nullable" },
+        { "name": "play_count", "type": "integer" },
+        { "name": "last_played", "type": "text", "note": "ISO 8601, nullable" },
+        {
+          "name": "match_type",
+          "type": "text",
+          "note": "exact | fuzzy | artist_only | none"
+        },
+        { "name": "match_confidence", "type": "real" }
+      ],
+      "joins": [
+        "collection_id → discogs_collection.id",
+        "release_id → discogs_releases.id"
+      ]
+    },
+    {
+      "name": "trakt_collection",
+      "purpose": "Physical/digital movie media owned (Blu-ray, 4K UHD, DVD, digital) with A/V specs. Joins to movies.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "movie_id", "type": "integer", "note": "→ movies.id" },
+        { "name": "trakt_id", "type": "integer" },
+        {
+          "name": "media_type",
+          "type": "text",
+          "note": "bluray | uhd_bluray | hddvd | dvd | digital"
+        },
+        {
+          "name": "resolution",
+          "type": "text",
+          "note": "uhd_4k | hd_1080p | hd_720p | sd_480p, nullable"
+        },
+        {
+          "name": "hdr",
+          "type": "text",
+          "note": "dolby_vision | hdr10 | hdr10_plus | hlg, nullable"
+        },
+        {
+          "name": "audio",
+          "type": "text",
+          "note": "e.g. dolby_atmos, dts_x, nullable"
+        },
+        {
+          "name": "audio_channels",
+          "type": "text",
+          "note": "7_1 | 5_1 | 2_0, nullable"
+        },
+        { "name": "collected_at", "type": "text", "note": "ISO 8601" }
+      ],
+      "joins": ["movie_id → movies.id"]
+    },
+    {
+      "name": "trakt_collection_stats",
+      "purpose": "Single-row summary of the physical media collection (counts by format/resolution/HDR).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "total_items", "type": "integer" },
+        { "name": "by_format", "type": "text", "note": "JSON" },
+        { "name": "by_resolution", "type": "text", "note": "JSON" },
+        { "name": "by_hdr", "type": "text", "note": "JSON" },
+        { "name": "by_genre", "type": "text", "note": "JSON" },
+        { "name": "by_decade", "type": "text", "note": "JSON" },
+        { "name": "added_this_year", "type": "integer" }
+      ]
+    },
+    {
+      "name": "reading_items",
+      "purpose": "One row per saved article (or future book). Base fact table for reading.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "item_type", "type": "text", "note": "article (default)" },
+        { "name": "source", "type": "text", "note": "instapaper" },
+        { "name": "source_id", "type": "text", "note": "upstream bookmark id" },
+        {
+          "name": "url",
+          "type": "text",
+          "note": "nullable original article URL"
+        },
+        { "name": "title", "type": "text" },
+        { "name": "author", "type": "text", "note": "nullable" },
+        {
+          "name": "domain",
+          "type": "text",
+          "note": "nullable, e.g. theatlantic.com"
+        },
+        { "name": "site_name", "type": "text", "note": "nullable" },
+        { "name": "word_count", "type": "integer", "note": "nullable" },
+        { "name": "estimated_read_min", "type": "integer", "note": "nullable" },
+        {
+          "name": "status",
+          "type": "text",
+          "note": "unread | reading | finished"
+        },
+        { "name": "progress", "type": "real", "note": "0.0-1.0" },
+        { "name": "starred", "type": "integer", "note": "0/1" },
+        { "name": "rating", "type": "integer", "note": "small int, nullable" },
+        { "name": "tags", "type": "text", "note": "JSON array" },
+        {
+          "name": "enrichment_status",
+          "type": "text",
+          "note": "pending | ok | no_body (no_body = body unavailable)"
+        },
+        { "name": "saved_at", "type": "text", "note": "ISO 8601" },
+        { "name": "started_at", "type": "text", "note": "ISO 8601, nullable" },
+        { "name": "finished_at", "type": "text", "note": "ISO 8601, nullable" }
+      ],
+      "joins": ["id ← reading_highlights.item_id"]
+    },
+    {
+      "name": "reading_highlights",
+      "purpose": "Highlights/annotations the user saved within an article.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "item_id", "type": "integer", "note": "→ reading_items.id" },
+        { "name": "text", "type": "text", "note": "the highlighted passage" },
+        { "name": "note", "type": "text", "note": "nullable user note" },
+        {
+          "name": "position",
+          "type": "integer",
+          "note": "order within the article"
+        },
+        { "name": "chapter", "type": "text", "note": "nullable" },
+        { "name": "page", "type": "integer", "note": "nullable" },
+        { "name": "created_at", "type": "text", "note": "ISO 8601" }
+      ],
+      "joins": ["item_id → reading_items.id"]
+    },
+    {
+      "name": "checkins",
+      "purpose": "One row per Foursquare/Swarm check-in. Base fact table for places.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "foursquare_id", "type": "text", "note": "upstream id" },
+        { "name": "venue_id", "type": "text", "note": "nullable" },
+        { "name": "venue_name", "type": "text" },
+        { "name": "venue_category", "type": "text", "note": "nullable" },
+        { "name": "venue_city", "type": "text", "note": "nullable" },
+        { "name": "venue_state", "type": "text", "note": "nullable" },
+        { "name": "venue_country", "type": "text", "note": "nullable" },
+        { "name": "lat", "type": "real", "note": "nullable" },
+        { "name": "lng", "type": "real", "note": "nullable" },
+        { "name": "checked_in_at", "type": "text", "note": "ISO 8601" },
+        {
+          "name": "shout",
+          "type": "text",
+          "note": "nullable note posted with the check-in"
+        }
+      ]
+    },
+    {
+      "name": "geo_cities",
+      "purpose": "Offline reverse-geocoding reference (GeoNames cities >= 15k population). Static lookup data, not user activity.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK (GeoNames geonameid)" },
+        { "name": "name", "type": "text" },
+        { "name": "admin1", "type": "text", "note": "state/region, nullable" },
+        {
+          "name": "country_code",
+          "type": "text",
+          "note": "ISO 3166-1 alpha-2"
+        },
+        { "name": "lat", "type": "real" },
+        { "name": "lng", "type": "real" }
+      ]
+    },
+    {
+      "name": "attended_events",
+      "purpose": "One row per live event the user has tickets for (sports/music/arts). Base fact table for attending. Type-specific data lives in event_data JSON.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "category", "type": "text", "note": "sports | music | arts" },
+        {
+          "name": "event_type",
+          "type": "text",
+          "note": "e.g. mlb_game, concert, theater"
+        },
+        {
+          "name": "event_date",
+          "type": "text",
+          "note": "YYYY-MM-DD (venue-local)"
+        },
+        {
+          "name": "event_datetime",
+          "type": "text",
+          "note": "ISO 8601, nullable"
+        },
+        {
+          "name": "venue_id",
+          "type": "integer",
+          "note": "→ venues.id, nullable"
+        },
+        { "name": "title", "type": "text" },
+        { "name": "subtitle", "type": "text", "note": "nullable" },
+        {
+          "name": "event_data",
+          "type": "text",
+          "note": "JSON, type-specific (teams, scores, tour, etc.)"
+        },
+        {
+          "name": "attended",
+          "type": "integer",
+          "note": "0/1 (0 = ticket bought, skipped)"
+        },
+        { "name": "notes", "type": "text", "note": "nullable" }
+      ],
+      "joins": [
+        "venue_id → venues.id",
+        "id ← attended_event_performers.event_id ← performers",
+        "id ← attended_event_players.event_id ← players",
+        "id ← attended_event_tickets.event_id"
+      ]
+    },
+    {
+      "name": "venues",
+      "purpose": "Normalized venues where events happen (stadiums, arenas, theaters).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text" },
+        {
+          "name": "aliases",
+          "type": "text",
+          "note": "JSON array of historical names"
+        },
+        { "name": "city", "type": "text", "note": "nullable" },
+        { "name": "state", "type": "text", "note": "nullable" },
+        { "name": "country", "type": "text", "note": "nullable" },
+        { "name": "latitude", "type": "real", "note": "nullable" },
+        { "name": "longitude", "type": "real", "note": "nullable" },
+        { "name": "capacity", "type": "integer", "note": "nullable" },
+        { "name": "image_key", "type": "text", "note": "nullable" }
+      ],
+      "joins": ["id ← attended_events.venue_id"]
+    },
+    {
+      "name": "teams",
+      "purpose": "Shared sports-team reference data (no user_id). Join via (league, league_team_id), not teams.id — attended_events.event_data stores the league-native team id.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "league",
+          "type": "text",
+          "note": "mlb | nfl | nba | mls | ..."
+        },
+        {
+          "name": "league_team_id",
+          "type": "integer",
+          "note": "league-native id (join key)"
+        },
+        { "name": "abbreviation", "type": "text" },
+        { "name": "location", "type": "text", "note": "nullable" },
+        { "name": "name", "type": "text" },
+        { "name": "full_name", "type": "text", "note": "nullable" },
+        { "name": "primary_color", "type": "text", "note": "nullable hex" },
+        { "name": "logo_url", "type": "text", "note": "nullable" },
+        { "name": "conference", "type": "text", "note": "nullable" },
+        { "name": "division", "type": "text", "note": "nullable" },
+        {
+          "name": "home_venue_id",
+          "type": "integer",
+          "note": "→ venues.id, nullable"
+        }
+      ],
+      "joins": [
+        "home_venue_id → venues.id",
+        "(league, league_team_id) ↔ players.primary_team_id / attended_events.event_data team ids"
+      ]
+    },
+    {
+      "name": "performers",
+      "purpose": "Musical artists, comedians, theater companies, speakers. lastfm_artist_id bridges concerts to listening.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "name", "type": "text" },
+        {
+          "name": "performer_type",
+          "type": "text",
+          "note": "musical_artist | comedian | theater_company | speaker | other"
+        },
+        { "name": "mbid", "type": "text", "note": "nullable" },
+        {
+          "name": "lastfm_artist_id",
+          "type": "integer",
+          "note": "→ lastfm_artists.id, nullable (cross-domain link)"
+        },
+        { "name": "image_key", "type": "text", "note": "nullable" }
+      ],
+      "joins": [
+        "lastfm_artist_id → lastfm_artists.id",
+        "id ← attended_event_performers.performer_id"
+      ]
+    },
+    {
+      "name": "attended_event_performers",
+      "purpose": "Many-to-many join between events and performers with role/billing.",
+      "columns": [
+        {
+          "name": "event_id",
+          "type": "integer",
+          "note": "→ attended_events.id"
+        },
+        {
+          "name": "performer_id",
+          "type": "integer",
+          "note": "→ performers.id"
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "note": "headliner | opener | support | guest | mc"
+        },
+        { "name": "billing_order", "type": "integer" }
+      ],
+      "joins": ["event_id → attended_events.id", "performer_id → performers.id"]
+    },
+    {
+      "name": "attended_event_tickets",
+      "purpose": "One row per ticket order for an event (vendor, seat, price).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "event_id",
+          "type": "integer",
+          "note": "→ attended_events.id"
+        },
+        {
+          "name": "vendor",
+          "type": "text",
+          "note": "ticketmaster | seatgeek | axs | box_office | ..."
+        },
+        { "name": "order_id", "type": "text", "note": "nullable" },
+        { "name": "section", "type": "text", "note": "nullable" },
+        { "name": "row", "type": "text", "note": "nullable" },
+        { "name": "seat", "type": "text", "note": "nullable" },
+        { "name": "quantity", "type": "integer" },
+        { "name": "total_price_cents", "type": "integer", "note": "nullable" },
+        { "name": "currency", "type": "text", "note": "default USD" },
+        { "name": "purchased_at", "type": "text", "note": "ISO 8601, nullable" }
+      ],
+      "joins": ["event_id → attended_events.id"]
+    },
+    {
+      "name": "attended_event_sources",
+      "purpose": "Provenance/debug trail for how each event was discovered (calendar, email, API). Mostly internal.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "event_id",
+          "type": "integer",
+          "note": "→ attended_events.id, nullable"
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "note": "gcal | gmail | manual | mlb_stats_api | espn | setlist_fm"
+        },
+        { "name": "source_ref", "type": "text" },
+        { "name": "match_confidence", "type": "real", "note": "nullable" }
+      ],
+      "joins": ["event_id → attended_events.id"]
+    },
+    {
+      "name": "players",
+      "purpose": "Athletes seen at attended sports events, with bios and cross-source ids (MLB Stats, ESPN).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "league", "type": "text", "note": "mlb | nfl | nba | ..." },
+        { "name": "mlb_stats_id", "type": "integer", "note": "nullable" },
+        { "name": "espn_id", "type": "text", "note": "nullable" },
+        { "name": "full_name", "type": "text" },
+        { "name": "primary_position", "type": "text", "note": "nullable" },
+        {
+          "name": "primary_number",
+          "type": "text",
+          "note": "jersey, kept as string, nullable"
+        },
+        {
+          "name": "birth_date",
+          "type": "text",
+          "note": "YYYY-MM-DD, nullable"
+        },
+        {
+          "name": "primary_team_id",
+          "type": "integer",
+          "note": "league-native team id, nullable"
+        },
+        { "name": "debut_date", "type": "text", "note": "nullable" },
+        {
+          "name": "awards",
+          "type": "text",
+          "note": "JSON array of {season,name,id}"
+        }
+      ],
+      "joins": [
+        "id ← attended_event_players.player_id",
+        "primary_team_id ↔ teams.league_team_id"
+      ]
+    },
+    {
+      "name": "attended_event_players",
+      "purpose": "Per-game appearance line for a player at an attended event (batting/pitching/fielding stats as JSON).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "event_id",
+          "type": "integer",
+          "note": "→ attended_events.id"
+        },
+        { "name": "player_id", "type": "integer", "note": "→ players.id" },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "note": "league-native team id, nullable"
+        },
+        { "name": "is_home", "type": "integer", "note": "0/1" },
+        {
+          "name": "batting_line",
+          "type": "text",
+          "note": "JSON AB/R/H/RBI/... nullable"
+        },
+        {
+          "name": "pitching_line",
+          "type": "text",
+          "note": "JSON IP/H/R/ER/... nullable"
+        },
+        {
+          "name": "decision",
+          "type": "text",
+          "note": "W | L | SV | HLD | BS, nullable (pitcher of record)"
+        },
+        {
+          "name": "notable",
+          "type": "integer",
+          "note": "0/1 standout performance flag"
+        }
+      ],
+      "joins": ["event_id → attended_events.id", "player_id → players.id"]
+    },
+    {
+      "name": "activity_feed",
+      "purpose": "Denormalized cross-domain feed — one row per notable event across all domains, for the unified timeline.",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        {
+          "name": "domain",
+          "type": "text",
+          "note": "listening | running | watching | collecting | reading | attending | places"
+        },
+        { "name": "event_type", "type": "text" },
+        { "name": "occurred_at", "type": "text", "note": "ISO 8601" },
+        { "name": "title", "type": "text" },
+        { "name": "subtitle", "type": "text", "note": "nullable" },
+        { "name": "image_key", "type": "text", "note": "nullable" },
+        {
+          "name": "source_id",
+          "type": "text",
+          "note": "id of the underlying domain row"
+        },
+        { "name": "metadata", "type": "text", "note": "JSON, nullable" }
+      ]
+    },
+    {
+      "name": "images",
+      "purpose": "Shared image store keyed by (domain, entity_type, entity_id). Compose the CDN URL from r2_key + image_version (see global notes).",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "domain", "type": "text" },
+        {
+          "name": "entity_type",
+          "type": "text",
+          "note": "e.g. artist, movie, articles"
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "note": "the domain row id as a string"
+        },
+        {
+          "name": "r2_key",
+          "type": "text",
+          "note": "object key in R2 (path component of the CDN URL)"
+        },
+        { "name": "source", "type": "text", "note": "origin of the image" },
+        { "name": "width", "type": "integer", "note": "nullable" },
+        { "name": "height", "type": "integer", "note": "nullable" },
+        {
+          "name": "thumbhash",
+          "type": "text",
+          "note": "nullable placeholder blob"
+        },
+        { "name": "dominant_color", "type": "text", "note": "nullable hex" },
+        { "name": "accent_color", "type": "text", "note": "nullable hex" },
+        { "name": "is_override", "type": "integer", "note": "0/1" },
+        {
+          "name": "image_version",
+          "type": "integer",
+          "note": "cache-busting version, append as ?v="
+        }
+      ]
+    },
+    {
+      "name": "sync_runs",
+      "purpose": "History of background sync jobs per domain — useful for \"when did data last update\".",
+      "columns": [
+        { "name": "id", "type": "integer", "note": "PK" },
+        { "name": "domain", "type": "text" },
+        { "name": "sync_type", "type": "text" },
+        {
+          "name": "status",
+          "type": "text",
+          "note": "running | completed | failed"
+        },
+        { "name": "started_at", "type": "text", "note": "ISO 8601" },
+        {
+          "name": "completed_at",
+          "type": "text",
+          "note": "ISO 8601, nullable"
+        },
+        { "name": "items_synced", "type": "integer", "note": "nullable" },
+        { "name": "error", "type": "text", "note": "nullable" },
+        { "name": "retry_count", "type": "integer" }
+      ]
+    }
+  ]
+}

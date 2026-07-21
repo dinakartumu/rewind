@@ -1,0 +1,623 @@
+{
+  "meta": {
+    "title": "SQL-first (query_rewind + get_schema) vs specialized-tools MCP eval",
+    "generated_at": "2026-07-21",
+    "base_url_env": "REWIND_API_URL",
+    "api_key_env": "REWIND_API_KEY",
+    "instance_note": "This instance has populated LISTENING, RUNNING, WATCHING, PLACES domains. READING, COLLECTING (discogs/trakt), and ATTENDING tables are EMPTY (0 rows). Cross-domain questions therefore join among the four populated domains. Cross-domain questions targeting empty domains would be unanswerable by BOTH architectures and are excluded as uninformative; the empty-domain fact is itself reported in REPORT.md.",
+    "ground_truth_method": "Every ground_truth was derived independently via hand-written, human-reviewed reference SQL run once against POST /v1/query and frozen here. For tiers 1-3 the reference value was additionally cross-checked against the OLD specialized endpoint; disagreements are recorded in the question's `notes` and are themselves findings. The `sql` field (NEW path) and reference SQL are the same family but the ground_truth VALUE is the frozen constant, so NEW is not graded against its own live output tautologically — it is graded against the frozen constant.",
+    "grading": {
+      "scalar": "extracted value == expected (numbers compared with abs tolerance `tol`, default 0)",
+      "top_item": "first row's label == expected_label AND its count == expected_count (ordering of ties tolerated only where noted)",
+      "list_contains": "expected_label present in returned labels",
+      "row_count": "number of returned rows == expected"
+    }
+  },
+  "questions": [
+    {
+      "id": "t1-01",
+      "tier": 1,
+      "category": "watching",
+      "question": "How many distinct movies have I watched?",
+      "ground_truth": { "type": "scalar", "expected": 1856 },
+      "notes": "OLD /watching/stats reports total_movies=1947, which is the count of watch EVENTS (watch_history rows), not distinct movies (1856). Recorded as an OLD correctness gap for the distinct-movie interpretation.",
+      "old_path": {
+        "endpoint": "/v1/watching/stats",
+        "extract": "data.total_movies"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM movies"
+    },
+    {
+      "id": "t1-02",
+      "tier": 1,
+      "category": "watching",
+      "question": "How many movie viewings (including rewatches) are in my history?",
+      "ground_truth": { "type": "scalar", "expected": 1947 },
+      "old_path": {
+        "endpoint": "/v1/watching/stats",
+        "extract": "data.total_movies"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM watch_history"
+    },
+    {
+      "id": "t1-03",
+      "tier": 1,
+      "category": "listening",
+      "question": "What is my total scrobble count?",
+      "ground_truth": { "type": "scalar", "expected": 69105 },
+      "old_path": {
+        "endpoint": "/v1/listening/stats",
+        "extract": "total_scrobbles"
+      },
+      "sql": "SELECT total_scrobbles AS n FROM lastfm_user_stats"
+    },
+    {
+      "id": "t1-04",
+      "tier": 1,
+      "category": "listening",
+      "question": "Who is my most-played artist of all time?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "A.R. Rahman",
+        "expected_count": 5703
+      },
+      "old_path": {
+        "endpoint": "/v1/listening/top/artists?period=overall&limit=1",
+        "extract_label": "data.0.name",
+        "extract_count": "data.0.playcount"
+      },
+      "sql": "SELECT name AS label, playcount AS cnt FROM lastfm_artists WHERE is_filtered=0 ORDER BY playcount DESC LIMIT 1"
+    },
+    {
+      "id": "t1-05",
+      "tier": 1,
+      "category": "places",
+      "question": "How many check-ins do I have?",
+      "ground_truth": { "type": "scalar", "expected": 7321 },
+      "old_path": { "endpoint": "/v1/places/stats", "extract": "total" },
+      "sql": "SELECT COUNT(*) AS n FROM checkins"
+    },
+    {
+      "id": "t1-06",
+      "tier": 1,
+      "category": "places",
+      "question": "How many unique venues have I checked into?",
+      "ground_truth": { "type": "scalar", "expected": 2982 },
+      "old_path": {
+        "endpoint": "/v1/places/stats",
+        "extract": "unique_venues"
+      },
+      "sql": "SELECT COUNT(DISTINCT venue_id) AS n FROM checkins"
+    },
+    {
+      "id": "t1-07",
+      "tier": 1,
+      "category": "running",
+      "question": "How many runs have I logged?",
+      "ground_truth": { "type": "scalar", "expected": 182 },
+      "old_path": {
+        "endpoint": "/v1/running/stats",
+        "extract": "data.total_runs"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun')"
+    },
+    {
+      "id": "t1-08",
+      "tier": 1,
+      "category": "running",
+      "question": "How many total activities (all sports) do I have?",
+      "ground_truth": { "type": "scalar", "expected": 1331 },
+      "old_path": {
+        "endpoint": "/v1/running/stats",
+        "extract": "data.total_activities"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM strava_activities WHERE is_deleted=0"
+    },
+    {
+      "id": "t1-09",
+      "tier": 1,
+      "category": "watching",
+      "question": "How many TV shows have I watched?",
+      "ground_truth": { "type": "scalar", "expected": 71 },
+      "old_path": {
+        "endpoint": "/v1/watching/stats",
+        "extract": "data.total_shows"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM shows"
+    },
+    {
+      "id": "t1-10",
+      "tier": 1,
+      "category": "listening",
+      "question": "How many unique artists have I scrobbled?",
+      "ground_truth": { "type": "scalar", "expected": 3152 },
+      "old_path": {
+        "endpoint": "/v1/listening/stats",
+        "extract": "unique_artists"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM lastfm_artists"
+    },
+    {
+      "id": "t1-11",
+      "tier": 1,
+      "category": "listening",
+      "question": "What is my most-played album of all time?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "Dude (Original Motion Picture Soundtrack)",
+        "expected_count": 863
+      },
+      "old_path": {
+        "endpoint": "/v1/listening/top/albums?period=overall&limit=1",
+        "extract_label": "data.0.name",
+        "extract_count": "data.0.playcount"
+      },
+      "sql": "SELECT name AS label, playcount AS cnt FROM lastfm_albums WHERE is_filtered=0 ORDER BY playcount DESC LIMIT 1"
+    },
+
+    {
+      "id": "t2-01",
+      "tier": 2,
+      "category": "places",
+      "question": "What are the top 5 cities I have checked into?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "Bangalore",
+        "expected_count": 1360,
+        "expected_rows": 5
+      },
+      "notes": "No OLD endpoint returns a city ranking for check-ins; /places/stats only exposes top_categories. Unanswerable by specialized tools.",
+      "old_path": {
+        "answerable": false,
+        "reason": "places endpoints expose top venue CATEGORIES, not a city leaderboard; no /places/cities exists"
+      },
+      "sql": "SELECT venue_city AS label, COUNT(*) AS cnt FROM checkins GROUP BY venue_city ORDER BY cnt DESC LIMIT 5"
+    },
+    {
+      "id": "t2-02",
+      "tier": 2,
+      "category": "watching",
+      "question": "How many distinct movies did I rate 5 stars (10/10)?",
+      "ground_truth": { "type": "scalar", "expected": 71 },
+      "notes": "The /watching/ratings endpoint has NO rating filter param (min_rating is ignored — it returns all 1928 rated entries regardless). Counting exactly-10 movies would require paginating all 1928 rows and filtering client-side, not a single-endpoint extraction. Marked old_path unanswerable as a single specialized-tool call.",
+      "old_path": {
+        "answerable": false,
+        "reason": "/watching/ratings has no rating-value filter; returns all rated entries. No endpoint yields a count of exactly-5-star (10/10) movies directly."
+      },
+      "sql": "SELECT COUNT(DISTINCT movie_id) AS n FROM watch_history WHERE user_rating=10"
+    },
+    {
+      "id": "t2-03",
+      "tier": 2,
+      "category": "running",
+      "question": "What was my total running distance (runs only) in 2021, in miles?",
+      "ground_truth": { "type": "scalar", "expected": 111.62, "tol": 0.5 },
+      "notes": "OLD /running/stats/years/2021 reports total_distance_mi=367.96, which sums ALL activity types (rides, walks), not runs only. The run-only figure is 111.62. OLD cannot isolate runs -> recorded as OLD correctness gap for the runs-only interpretation.",
+      "old_path": {
+        "endpoint": "/v1/running/stats/years/2021",
+        "extract": "data.total_distance_mi"
+      },
+      "sql": "SELECT ROUND(SUM(distance_miles),2) AS n FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun') AND substr(start_date_local,1,4)='2021'"
+    },
+    {
+      "id": "t2-04",
+      "tier": 2,
+      "category": "watching",
+      "question": "What is my most-watched movie genre (by watch events)?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "Drama",
+        "expected_count": 651
+      },
+      "notes": "OLD /watching/stats/genres reports Drama with count 605 (distinct movies carrying the genre). Reference SQL by watch-EVENT is 651. Labels agree (Drama) but counts differ by interpretation. OLD is correct on the top LABEL; count differs.",
+      "old_path": {
+        "endpoint": "/v1/watching/stats/genres",
+        "extract_label": "data.0.name",
+        "extract_count": "data.0.count"
+      },
+      "sql": "SELECT g.name AS label, COUNT(*) AS cnt FROM watch_history wh JOIN movie_genres mg ON mg.movie_id=wh.movie_id JOIN genres g ON g.id=mg.genre_id GROUP BY g.name ORDER BY cnt DESC LIMIT 1",
+      "grade_label_only": true
+    },
+    {
+      "id": "t2-05",
+      "tier": 2,
+      "category": "watching",
+      "question": "Which director have I watched the most distinct films from?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "Martin Scorsese",
+        "expected_count": 12
+      },
+      "old_path": {
+        "endpoint": "/v1/watching/stats/directors?limit=1",
+        "extract_label": "data.0.name",
+        "extract_count": "data.0.count"
+      },
+      "sql": "SELECT d.name AS label, COUNT(DISTINCT wh.movie_id) AS cnt FROM watch_history wh JOIN movie_directors md ON md.movie_id=wh.movie_id JOIN directors d ON d.id=md.director_id GROUP BY d.name ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t2-06",
+      "tier": 2,
+      "category": "places",
+      "question": "How many times have I checked into a Coffee Shop?",
+      "ground_truth": { "type": "scalar", "expected": 776 },
+      "old_path": {
+        "endpoint": "/v1/places/stats",
+        "extract": "top_categories[category=Coffee Shop].count"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM checkins WHERE venue_category='Coffee Shop'"
+    },
+    {
+      "id": "t2-07",
+      "tier": 2,
+      "category": "watching",
+      "question": "How many distinct movies from the 2010s have I watched?",
+      "ground_truth": { "type": "scalar", "expected": 789 },
+      "old_path": {
+        "endpoint": "/v1/watching/stats/decades",
+        "extract": "data[decade=2010].count"
+      },
+      "sql": "SELECT COUNT(DISTINCT wh.movie_id) AS n FROM watch_history wh JOIN movies m ON m.id=wh.movie_id WHERE m.year>=2010 AND m.year<=2019"
+    },
+    {
+      "id": "t2-08",
+      "tier": 2,
+      "category": "listening",
+      "question": "How many (unfiltered) scrobbles did I have in 2024?",
+      "ground_truth": { "type": "scalar", "expected": 7763 },
+      "old_path": {
+        "endpoint": "/v1/listening/year/2024",
+        "extract": "total_scrobbles"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,4)='2024'"
+    },
+    {
+      "id": "t2-09",
+      "tier": 2,
+      "category": "places",
+      "question": "How many distinct countries have I checked into?",
+      "ground_truth": { "type": "scalar", "expected": 5 },
+      "old_path": {
+        "answerable": false,
+        "reason": "no places endpoint returns a distinct-country count; /places/stats exposes only categories and totals"
+      },
+      "sql": "SELECT COUNT(DISTINCT venue_country) AS n FROM checkins WHERE venue_country IS NOT NULL"
+    },
+    {
+      "id": "t2-10",
+      "tier": 2,
+      "category": "running",
+      "question": "In how many distinct cities have I run?",
+      "ground_truth": { "type": "scalar", "expected": 86 },
+      "old_path": {
+        "answerable": false,
+        "reason": "/running/cities lists cities with pagination but returns rows, not a distinct-count scalar. Approximable by reading pagination.total but that is not exposed as a distinct-city scalar in the recent/list responses; no direct count endpoint."
+      },
+      "sql": "SELECT COUNT(DISTINCT city) AS n FROM strava_activities WHERE is_deleted=0 AND city IS NOT NULL"
+    },
+
+    {
+      "id": "t3-01",
+      "tier": 3,
+      "category": "running",
+      "question": "What was my longest run (miles) in each year?",
+      "ground_truth": {
+        "type": "rows",
+        "expected_rows": 7,
+        "spot_check": { "2021": 4.18, "2024": 2.58 },
+        "tol": 0.05
+      },
+      "notes": "OLD /running/stats/years returns per-year longest_run_mi, but that field is computed over ALL activities, not runs only; values can differ from the run-only reference. Grading NEW on run-only; OLD checked for the two spot-check years.",
+      "old_path": {
+        "endpoint": "/v1/running/stats/years",
+        "extract": "per-year data[].longest_run_mi",
+        "spot_check_years": ["2021", "2024"]
+      },
+      "sql": "SELECT substr(start_date_local,1,4) AS y, ROUND(MAX(distance_miles),2) AS mx FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun') GROUP BY y ORDER BY y"
+    },
+    {
+      "id": "t3-02",
+      "tier": 3,
+      "category": "listening",
+      "question": "What were my monthly scrobble counts for 2024?",
+      "ground_truth": {
+        "type": "rows",
+        "expected_rows": 12,
+        "spot_check": { "2024-03": 794, "2024-12": 445 }
+      },
+      "old_path": {
+        "endpoint": "/v1/listening/trends?period=monthly",
+        "extract": "data[].value keyed by period; spot_check months 2024-03, 2024-12"
+      },
+      "sql": "SELECT substr(s.scrobbled_at,1,7) AS ym, COUNT(*) AS c FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,4)='2024' GROUP BY ym ORDER BY ym"
+    },
+    {
+      "id": "t3-03",
+      "tier": 3,
+      "category": "watching",
+      "question": "What was the top genre of movies I watched in 2023?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "Drama",
+        "expected_count": 37
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "/watching/stats/genres has no year filter; it is all-time only. Cannot restrict genre breakdown to 2023."
+      },
+      "sql": "SELECT g.name AS label, COUNT(*) AS cnt FROM watch_history wh JOIN movie_genres mg ON mg.movie_id=wh.movie_id JOIN genres g ON g.id=mg.genre_id WHERE substr(wh.watched_at,1,4)='2023' GROUP BY g.name ORDER BY cnt DESC LIMIT 1",
+      "grade_label_only": true
+    },
+    {
+      "id": "t3-04",
+      "tier": 3,
+      "category": "places",
+      "question": "Which year did I check in the most, and how many times?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "2018",
+        "expected_count": 1104
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "no places endpoint yields per-year check-in counts; /places/trends returns a preset window, not a full per-year leaderboard"
+      },
+      "sql": "SELECT substr(checked_in_at,1,4) AS label, COUNT(*) AS cnt FROM checkins GROUP BY label ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t3-05",
+      "tier": 3,
+      "category": "watching",
+      "question": "What is the single movie I have watched the most times, and how many times?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "The Godfather",
+        "expected_count": 4
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "no endpoint returns a per-movie rewatch-count leaderboard; /watching/movies lists films but not a max-rewatch ranking"
+      },
+      "sql": "SELECT m.title AS label, COUNT(*) AS cnt FROM watch_history wh JOIN movies m ON m.id=wh.movie_id GROUP BY wh.movie_id ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t3-06",
+      "tier": 3,
+      "category": "listening",
+      "question": "Who was my top artist in 2024 by scrobbles?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "A.R. Rahman",
+        "expected_count": 1104
+      },
+      "old_path": {
+        "endpoint": "/v1/listening/year/2024",
+        "extract_label": "top_artists.0.name",
+        "extract_count": "top_artists.0.scrobbles"
+      },
+      "sql": "SELECT ar.name AS label, COUNT(*) AS cnt FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id JOIN lastfm_artists ar ON ar.id=t.artist_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,4)='2024' GROUP BY ar.id ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t3-07",
+      "tier": 3,
+      "category": "watching",
+      "question": "In which year did I watch the most movies, and how many?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "2016",
+        "expected_count": 279
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "no endpoint returns a per-year watch-count leaderboard across all years; /watching/year/{year} is single-year and requires knowing the year first"
+      },
+      "sql": "SELECT substr(watched_at,1,4) AS label, COUNT(*) AS cnt FROM watch_history GROUP BY label ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t3-08",
+      "tier": 3,
+      "category": "running",
+      "question": "What was my total run distance per year (runs only)?",
+      "ground_truth": {
+        "type": "rows",
+        "expected_rows": 7,
+        "spot_check": { "2015": 164.35, "2021": 111.62 },
+        "tol": 0.5
+      },
+      "notes": "OLD /running/stats/years returns total_distance_mi per year but over ALL activity types, not runs only; expected to diverge.",
+      "old_path": {
+        "endpoint": "/v1/running/stats/years",
+        "extract": "per-year data[].total_distance_mi",
+        "spot_check_years": ["2015", "2021"]
+      },
+      "sql": "SELECT substr(start_date_local,1,4) AS y, ROUND(SUM(distance_miles),2) AS d FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun') GROUP BY y ORDER BY y"
+    },
+
+    {
+      "id": "t4-01",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "On how many distinct days did I both watch a movie AND check in somewhere?",
+      "ground_truth": { "type": "scalar", "expected": 768 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires intersecting watch_history.watched_at (watching domain) with checkins.checked_in_at (places domain) by calendar day; no endpoint crosses the watching and places domains"
+      },
+      "sql": "SELECT COUNT(DISTINCT date(wh.watched_at)) AS n FROM watch_history wh WHERE date(wh.watched_at) IN (SELECT date(checked_in_at) FROM checkins)"
+    },
+    {
+      "id": "t4-02",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "On how many distinct days did I check into a movie theater AND log a movie the same day (cinema trips)?",
+      "ground_truth": { "type": "scalar", "expected": 214 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires joining checkins.venue_category='Movie Theater' (places) to watch_history by date (watching); no cross-domain endpoint"
+      },
+      "sql": "SELECT COUNT(DISTINCT date(c.checked_in_at)) AS n FROM checkins c WHERE c.venue_category='Movie Theater' AND date(c.checked_in_at) IN (SELECT date(watched_at) FROM watch_history)"
+    },
+    {
+      "id": "t4-03",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "In 2024, did I average more scrobbles on days I ran versus days I did not run?",
+      "ground_truth": {
+        "type": "compare_pair",
+        "expected": { "run_day_avg": 23.9, "non_run_avg": 22.0 },
+        "assertion": "run_day_avg > non_run_avg",
+        "tol": 0.2
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires partitioning listening scrobbles by whether a strava run occurred that day; joins listening and running domains on date with conditional aggregation. No endpoint does this."
+      },
+      "sql": "WITH days AS (SELECT DISTINCT substr(start_date_local,1,10) d FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun') AND substr(start_date_local,1,4)='2024'), sc AS (SELECT substr(s.scrobbled_at,1,10) d, COUNT(*) c FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,4)='2024' GROUP BY d) SELECT ROUND((SELECT AVG(c) FROM sc WHERE d IN (SELECT d FROM days)),1) AS run_day_avg, ROUND((SELECT AVG(c) FROM sc WHERE d NOT IN (SELECT d FROM days)),1) AS non_run_avg"
+    },
+    {
+      "id": "t4-04",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "How many scrobbles happened on days I went for a run (all time)?",
+      "ground_truth": { "type": "scalar", "expected": 2384 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires membership test of scrobble date against the set of run dates; crosses listening and running domains, no endpoint"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,10) IN (SELECT substr(start_date_local,1,10) FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun'))"
+    },
+    {
+      "id": "t4-05",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "In how many distinct cities have I BOTH run and checked in (exact city-name match)?",
+      "ground_truth": { "type": "scalar", "expected": 54 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires intersecting strava_activities.city (running) with checkins.venue_city (places); no endpoint returns either full city set for intersection, and none crosses domains"
+      },
+      "sql": "SELECT COUNT(DISTINCT sa.city) AS n FROM strava_activities sa WHERE sa.is_deleted=0 AND sa.city IS NOT NULL AND sa.city IN (SELECT DISTINCT venue_city FROM checkins)"
+    },
+    {
+      "id": "t4-06",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "On how many distinct days did I do all three: scrobble music, go for a run, and check in somewhere?",
+      "ground_truth": { "type": "scalar", "expected": 37 },
+      "old_path": {
+        "answerable": false,
+        "reason": "three-way date intersection across listening, running, and places domains; no endpoint combines even two of them"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM (SELECT DISTINCT substr(start_date_local,1,10) d FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun')) r WHERE r.d IN (SELECT substr(checked_in_at,1,10) FROM checkins) AND r.d IN (SELECT substr(scrobbled_at,1,10) FROM lastfm_scrobbles)"
+    },
+    {
+      "id": "t4-07",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "How many movie viewings happened on days I also ran?",
+      "ground_truth": { "type": "scalar", "expected": 75 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires date-membership of watch_history (watching) against run dates (running); no cross-domain endpoint"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM watch_history wh WHERE substr(wh.watched_at,1,10) IN (SELECT substr(start_date_local,1,10) FROM strava_activities WHERE is_deleted=0 AND sport_type IN ('Run','TrailRun'))"
+    },
+    {
+      "id": "t4-08",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "How many total scrobbles happened on days I watched a movie?",
+      "ground_truth": { "type": "scalar", "expected": 16826 },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires listening scrobbles filtered to watch-history dates; crosses listening and watching domains"
+      },
+      "sql": "SELECT COUNT(*) AS n FROM lastfm_scrobbles s JOIN lastfm_tracks t ON t.id=s.track_id WHERE t.is_filtered=0 AND substr(s.scrobbled_at,1,10) IN (SELECT substr(watched_at,1,10) FROM watch_history)"
+    },
+    {
+      "id": "t4-09",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "On days I watched a movie, which single day had the most check-ins, and how many?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "2019-12-14",
+        "expected_count": 10
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "requires grouping checkins (places) restricted to watch-history dates (watching) and ranking; two-domain join plus aggregation, no endpoint"
+      },
+      "sql": "SELECT substr(c.checked_in_at,1,10) AS label, COUNT(*) AS cnt FROM checkins c WHERE substr(c.checked_in_at,1,10) IN (SELECT substr(watched_at,1,10) FROM watch_history) GROUP BY label ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t4-10",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "In 2018, on how many distinct days did I both check in AND scrobble?",
+      "ground_truth": { "type": "scalar", "expected": 284 },
+      "old_path": {
+        "answerable": false,
+        "reason": "date intersection of checkins (places) and scrobbles (listening) restricted to 2018; crosses two domains, no endpoint"
+      },
+      "sql": "SELECT COUNT(DISTINCT substr(c.checked_in_at,1,10)) AS n FROM checkins c WHERE substr(c.checked_in_at,1,4)='2018' AND substr(c.checked_in_at,1,10) IN (SELECT substr(scrobbled_at,1,10) FROM lastfm_scrobbles)"
+    },
+    {
+      "id": "t4-11",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "Among cities where I have also checked in, which has my single farthest run, and how far?",
+      "ground_truth": {
+        "type": "top_item",
+        "expected_label": "San Francisco",
+        "expected_count": 121.25,
+        "tol": 0.1
+      },
+      "notes": "Data-quality caveat: the 121.25mi San Francisco value is almost certainly a mis-recorded activity, but it is the deterministic answer to the query as written; the question tests cross-domain join mechanics, not data hygiene.",
+      "old_path": {
+        "answerable": false,
+        "reason": "requires filtering strava_activities.city (running) to the set of checkin cities (places), then max distance; crosses two domains"
+      },
+      "sql": "SELECT sa.city AS label, ROUND(MAX(sa.distance_miles),2) AS cnt FROM strava_activities sa WHERE sa.is_deleted=0 AND sa.city IN (SELECT DISTINCT venue_city FROM checkins) GROUP BY sa.city ORDER BY cnt DESC LIMIT 1"
+    },
+    {
+      "id": "t4-12",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "How many check-ins do I have in Union City, my most-run city?",
+      "ground_truth": { "type": "scalar", "expected": 785 },
+      "old_path": {
+        "answerable": false,
+        "reason": "the city 'Union City' is derived from the running domain (top run city); counting check-ins there requires knowing that fact from running first, then querying places. No single tool bridges 'top run city' -> 'check-ins in that city'."
+      },
+      "sql": "SELECT COUNT(*) AS n FROM checkins WHERE venue_city='Union City'"
+    },
+    {
+      "id": "t4-13",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "List the cities where I have both run and checked in (alphabetical), and confirm Bengaluru and Fremont are among them.",
+      "ground_truth": {
+        "type": "list_contains",
+        "expected_labels": ["Bengaluru", "Fremont", "Dublin", "Berkeley"]
+      },
+      "old_path": {
+        "answerable": false,
+        "reason": "intersection of running cities and places cities; no endpoint returns both sets nor their intersection"
+      },
+      "sql": "SELECT DISTINCT sa.city AS label FROM strava_activities sa WHERE sa.is_deleted=0 AND sa.city IS NOT NULL AND sa.city IN (SELECT DISTINCT venue_city FROM checkins) ORDER BY sa.city"
+    },
+    {
+      "id": "t4-14",
+      "tier": 4,
+      "category": "cross-domain",
+      "question": "Across all my movie-theater check-ins, on how many distinct days did I check in at a theater at all?",
+      "ground_truth": { "type": "scalar", "expected": 270 },
+      "old_path": {
+        "answerable": false,
+        "reason": "this is single-domain (places) but there is no endpoint returning distinct theater-check-in DAYS; /places/stats gives a theater count of check-ins (280), not distinct days (270). Included to contrast the day-granularity gap. Marked unanswerable as a distinct-day scalar."
+      },
+      "sql": "SELECT COUNT(DISTINCT date(checked_in_at)) AS n FROM checkins WHERE venue_category='Movie Theater'"
+    }
+  ]
+}
