@@ -3464,7 +3464,7 @@
     },
     {
       "name": "query_rewind",
-      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview.",
+      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order).",
       "inputSchema": {
         "type": "object",
         "properties": {

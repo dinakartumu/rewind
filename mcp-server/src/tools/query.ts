@@ -1,8 +1,54 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RewindClient, QueryResult, SchemaDoc } from '../client.js';
-import { withRichResponse, text, READ_ONLY_ANNOTATIONS } from './helpers.js';
+import {
+  withRichResponse,
+  text,
+  imageBlock,
+  READ_ONLY_ANNOTATIONS,
+  type ContentBlock,
+} from './helpers.js';
 import { queryOutputSchema, schemaOutputSchema } from './schemas/query.js';
+
+/** Public Rewind image CDN origin. Cell values under this host are artwork. */
+const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
+/** Max inline thumbnails per query result — keeps a 200-row result from fetching 200 images. */
+const MAX_QUERY_IMAGES = 8;
+/** Thumbnail size (px) for inline artwork rendered from SQL results. */
+const QUERY_IMAGE_PX = 120;
+/**
+ * Domains that can prefix a bare r2_key (a value with no scheme). Mirrors the
+ * `images.domain` enum so we don't treat an arbitrary "a/b/c" string as art.
+ */
+const R2_KEY_RE =
+  /^(listening|watching|collecting|reading|places|attending|running)\/[\w./-]+$/;
+
+/**
+ * Detect image URLs among the result cells, in row-major order, de-duplicated,
+ * capped at MAX_QUERY_IMAGES. A cell qualifies if it is a full CDN URL, or a
+ * bare r2_key (no scheme) that we can compose into one.
+ */
+function collectImageUrls(result: QueryResult): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+
+  outer: for (const row of result.rows) {
+    for (const cell of row) {
+      if (typeof cell !== 'string') continue;
+      let url: string | null = null;
+      if (cell.startsWith(`${CDN_ORIGIN}/`)) {
+        url = cell;
+      } else if (!cell.includes('://') && R2_KEY_RE.test(cell)) {
+        url = `${CDN_ORIGIN}/${cell}`;
+      }
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      urls.push(url);
+      if (urls.length >= MAX_QUERY_IMAGES) break outer;
+    }
+  }
+  return urls;
+}
 
 type QueryStructured = z.infer<typeof queryOutputSchema>;
 type SchemaStructured = z.infer<typeof schemaOutputSchema>;
@@ -130,7 +176,7 @@ export function registerQueryTools(
     {
       title: 'Query Rewind (SQL)',
       description:
-        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview.',
+        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order).',
       inputSchema: {
         sql: z
           .string()
@@ -145,8 +191,24 @@ export function registerQueryTools(
     async ({ sql }) =>
       withRichResponse(async () => {
         const result = await client.query(sql);
+
+        // Additive: render up to MAX_QUERY_IMAGES distinct Rewind CDN image
+        // URLs found in the result as inline thumbnails. The markdown table and
+        // structuredContent are unchanged. Failed fetches return null and are
+        // filtered out — images are best-effort.
+        const imageUrls = collectImageUrls(result);
+        const images = (
+          await Promise.all(
+            imageUrls.map((url) =>
+              imageBlock(client, { cdn_url: url }, QUERY_IMAGE_PX)
+            )
+          )
+        ).filter((b): b is NonNullable<typeof b> => b !== null);
+
+        const content: ContentBlock[] = [text(renderResult(result)), ...images];
+
         return {
-          content: [text(renderResult(result))],
+          content,
           structuredContent: result as QueryStructured,
         };
       })

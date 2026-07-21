@@ -43,6 +43,7 @@ export const SCHEMA_DOC: SchemaDoc = {
     'is_filtered = 1 marks Last.fm rows the owner has hidden (junk scrobbles, misattributions). Analytical listening queries should filter `is_filtered = 0` unless you specifically want the raw data. lastfm_scrobbles has no is_filtered column — join through lastfm_tracks to filter.',
     'Rating scales differ by domain: watch_history.user_rating and movies.tmdb_rating / shows.tmdb_rating are 0-10 (real). discogs_collection.rating and discogs_wantlist.rating are 0-5 integers (0 = unrated). reading_items.rating is a small integer (may be null). There is no single global scale.',
     'Images: the shared `images` table keys on (domain, entity_type, entity_id). The public CDN URL is composed as https://cdn.dinakartumu.com/cdn-cgi/image/<transforms>/<r2_key>, and image_version is appended as a cache-busting query param (?v=<image_version>). Many domain tables also carry a denormalized image_key/poster_path for convenience. dominant_color/accent_color are hex strings; thumbhash is a compact placeholder blob.',
+    "Rendering artwork in query_rewind: SELECT a composed CDN image URL and query_rewind renders it as an inline thumbnail (first 8 distinct URLs, in row order). Copy-paste expression joining the images table: `'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || i.r2_key || '?v=' || i.image_version AS art`. Join path per entity: album art = JOIN images i ON i.domain='listening' AND i.entity_type='albums' AND i.entity_id = CAST(al.id AS TEXT); artist image = entity_type='artists' (entity_id = artist.id); movie poster = i.domain='watching' AND i.entity_type='movies' AND i.entity_id = CAST(m.id AS TEXT); show poster = entity_type='shows'. entity_id is TEXT, so cast the numeric row id. Shortcut: movies/shows/albums also carry a denormalized image_key you can compose the same way without the join when non-null — `'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || m.image_key AS art`. A place/venue icon lives directly on checkins.venue_icon (already a full URL — SELECT it as-is).",
     'Cross-domain join keys: performers.lastfm_artist_id → lastfm_artists.id (concerts ↔ listening); collection_listening_xref links discogs_collection ↔ Last.fm play counts by matched name; trakt_collection.movie_id and watch_history.movie_id → movies.id (physical media ↔ watched films).',
     'Enums are stored as plain text. Notable ones: watch_history.source (plex|letterboxd|manual|trakt), trakt_collection.media_type (bluray|uhd_bluray|hddvd|dvd|digital), reading_items.status (unread|reading|finished), attended_events.category (sports|music|arts).',
   ],
@@ -664,6 +665,11 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('venue_id', 'text', 'nullable'),
         c('venue_name', 'text'),
         c('venue_category', 'text', 'nullable'),
+        c(
+          'venue_icon',
+          'text',
+          'nullable, already a full image URL — SELECT as-is to render'
+        ),
         c('venue_city', 'text', 'nullable'),
         c('venue_state', 'text', 'nullable'),
         c('venue_country', 'text', 'nullable'),
