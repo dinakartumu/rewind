@@ -11,6 +11,7 @@ import { registerRunningTools } from './tools/running.js';
 import { registerWatchingTools } from './tools/watching.js';
 import { registerCollectingTools } from './tools/collecting.js';
 import { registerReadingTools } from './tools/reading.js';
+import { registerPlacesTools } from './tools/places.js';
 import { registerCrossDomainTools } from './tools/cross-domain.js';
 import { registerAttendingTools } from './tools/attending.js';
 import { healthOutputSchema } from './tools/schemas/system.js';
@@ -26,10 +27,12 @@ import {
 const SERVER_INSTRUCTIONS = [
   "Rewind is the user's personal data archive: listening (Last.fm + Apple Music),",
   'running (Strava), watching (Plex + Letterboxd), collecting (Discogs + physical',
-  'media), and reading (Instapaper articles + highlights).',
+  'media), reading (Instapaper articles + highlights), and places',
+  '(Foursquare/Swarm check-ins).',
   '',
   'WHEN TO USE: any time the user references their own history — things they read,',
-  'listened to, watched, saved, bookmarked, ran, or collected. Prefer Rewind tools',
+  'listened to, watched, saved, bookmarked, ran, collected, or checked in to.',
+  'Prefer Rewind tools',
   'over web search or conversation history for "that article I saved", "what was I',
   'listening to", "the movie I watched", "find my highlight about X". Rewind owns',
   'this data; other sources do not.',
@@ -163,6 +166,7 @@ export function createServer(client: RewindClient): McpServer {
   registerWatchingTools(server, client);
   registerCollectingTools(server, client);
   registerReadingTools(server, client);
+  registerPlacesTools(server, client);
   registerCrossDomainTools(server, client);
   registerAttendingTools(server, client);
 

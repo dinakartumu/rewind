@@ -5,7 +5,7 @@
 [![docs](https://img.shields.io/badge/docs-docs.rewind.rest-blue)](https://docs.rewind.rest/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
 
-MCP server for the [Rewind](https://rewind.rest) personal data API. Gives AI assistants access to your listening, running, watching, collecting, reading, and event-attendance data.
+MCP server for the [Rewind](https://rewind.rest) personal data API. Gives AI assistants access to your listening, running, watching, collecting, reading, places, and event-attendance data.
 
 Full reference: [docs.rewind.rest/mcp-server](https://docs.rewind.rest/mcp-server).
 
@@ -56,6 +56,7 @@ Requires a [Rewind API key](https://docs.rewind.rest/authentication). `REWIND_AP
 | **Watching**     | Plex, Letterboxd | Recent watches, movie details, browse by genre/decade/director, stats, genre/decade/director breakdowns                             |
 | **Collecting**   | Discogs, Trakt   | Vinyl collection, physical media, collection and media stats                                                                        |
 | **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats, semantic similar-article recall via `find_similar_articles`                   |
+| **Places**       | Foursquare/Swarm | Recent check-ins with venue, category, and shout; stats with top categories, cities, and venues                                     |
 | **Attending**    | Calendar, Gmail  | Attended events with filters, single event with player stat lines, sports season W/L, player photos and appearances, year-in-review |
 | **Cross-domain** | All              | Full-text search with keyword/semantic/hybrid modes, dedicated `semantic_search` for reading, unified feed, on-this-day, health     |
 
