@@ -43,6 +43,7 @@ export default tseslint.config(
       '.claude/',
       'migrations/',
       'docs-site/',
+      'docs/evals/',
       'scripts/',
     ],
   }
