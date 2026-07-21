@@ -4,6 +4,52 @@ icon: clock-rotate-left
 description: API updates and new features.
 ---
 
+<Update label="July 22, 2026" tags={["New releases", "New features"]}>
+
+## Places domain
+
+New sixth domain for check-in history from Foursquare and Swarm. Each check-in carries its venue, category, city, coordinates, and any shout.
+
+- [`GET /v1/places/recent`](/api-reference/places/recent-check-ins) — check-ins newest first, with pagination and date filters.
+- [`GET /v1/places/stats`](/api-reference/places/check-in-stats) — totals, unique venues, this-year count, and top categories, cities, and venues, each with a category icon.
+- [`GET /v1/places/trends`](/api-reference/places/check-in-trends) — monthly check-in counts over time.
+- See [Places domain](/domains/places).
+
+</Update>
+
+<Update label="July 22, 2026" tags={["New releases", "Improvements"]}>
+
+## MCP server: SQL first
+
+Claude now answers most questions by querying your data directly with SQL instead of calling one fixed tool per endpoint.
+
+- **`get_schema`** — returns the annotated database schema: every queryable table with columns, join keys, and conventions.
+- **`query_rewind`** — runs a single read-only `SELECT` against that schema, so cross-domain questions like "did I scrobble more on days I ran" work in one call.
+- **Read-only by design** — writes, schema changes, multi-statement input, and any query touching secret tables are rejected server-side; the query surface is an allow-list of documented tables.
+- **Rich cards stay** — `get_recent_watches`, `get_top_artists`, `get_article`, and the other visual tools still render interactive cards. See the [MCP overview](/mcp/overview).
+
+</Update>
+
+<Update label="July 22, 2026" tags={["New features", "Improvements"]}>
+
+## Running: every activity type, locations, and routes
+
+The Running domain now imports every Strava activity, not just runs — rides, walks, hikes, weight training, and the rest.
+
+- Each activity carries its `sport_type`, plus a `city` and `state` reverse-geocoded from the start coordinates.
+- Activities include a route polyline for mapping.
+- Filter by `city` on [`GET /v1/running/activities`](/api-reference/running/list-activities), and browse the [cities endpoint](/api-reference/running/cities). See [Running domain](/domains/running).
+
+</Update>
+
+<Update label="July 22, 2026" tags={["New features"]}>
+
+## Watching: Trakt source
+
+The Watching domain now syncs movie and TV episode watch history from Trakt alongside Plex and Letterboxd. Every watch carries a `source` (`plex`, `letterboxd`, `trakt`, or `manual`) so you can tell where it came from. See [Watching domain](/domains/watching).
+
+</Update>
+
 <Update label="May 15, 2026" tags={["Improvements"]}>
 
 ## MCP server: tool titles and output schemas

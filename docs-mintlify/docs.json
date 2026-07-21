@@ -61,6 +61,7 @@
               "domains/reading",
               "domains/collecting",
               "domains/attending",
+              "domains/places",
               "domains/images"
             ]
           },
@@ -188,6 +189,14 @@
               "api-reference/attending/list-attended-players",
               "api-reference/attending/get-attended-player",
               "api-reference/attending/year-in-review"
+            ]
+          },
+          {
+            "group": "Places",
+            "pages": [
+              "api-reference/places/recent-check-ins",
+              "api-reference/places/check-in-stats",
+              "api-reference/places/check-in-trends"
             ]
           },
           {

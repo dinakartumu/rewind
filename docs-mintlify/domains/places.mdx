@@ -1,0 +1,36 @@
+---
+title: Places
+icon: map-pin
+description: Foursquare and Swarm check-in history, with venues, categories, cities, stats, and trends.
+---
+
+## Overview
+
+The Places domain tracks your Foursquare and Swarm check-in history. Every check-in stores the venue, its primary category and category icon, the location (city, state, country, and coordinates), the check-in time, and any shout you posted with it.
+
+Check-ins sync a few times a day. Browse every endpoint in the [API reference](/api-reference/places/recent-check-ins).
+
+## Endpoints
+
+| Endpoint                                                    | Description                                                             |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [Recent check-ins](/api-reference/places/recent-check-ins)  | Check-ins newest first, with pagination and standard date filters.     |
+| [Check-in stats](/api-reference/places/check-in-stats)      | Totals, unique venues, this-year count, top categories, cities, venues. |
+| [Check-in trends](/api-reference/places/check-in-trends)    | Monthly check-in counts over time.                                     |
+
+## Stats
+
+The [stats endpoint](/api-reference/places/check-in-stats) returns your total check-ins, unique venue count, the current year's count, and your top categories, cities, and venues. Top categories and venues include a category icon URL so a client can render each row with its Foursquare glyph.
+
+Date filters (`date`, `from`, `to`) scope every aggregation to the given range, with one exception: `this_year` always counts the current calendar year regardless of the filter.
+
+## Filtering
+
+The recent check-ins endpoint supports:
+
+- `page` / `limit`: pagination.
+- Standard date filters (`date`, `from`, `to`).
+
+## From Claude
+
+You can also explore your check-in history from Claude. Set up the [MCP server](/mcp/overview) and ask in natural language, like where you go most or which cities you have checked in to. Claude answers by querying the [database directly with SQL](/mcp/overview) against the `checkins` table.

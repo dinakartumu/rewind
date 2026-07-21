@@ -1,14 +1,16 @@
 ---
 title: Running
 icon: person-running
-description: Track running activities synced from Strava, including distance, pace, elevation, splits, gear, and personal records.
+description: Every Strava activity synced with distance, pace, elevation, splits, gear, locations, routes, and personal records.
 ---
 
 ## Overview
 
-The Running domain tracks running activities from Strava, including distance, pace, elevation, splits, gear, and personal records.
+The Running domain tracks your Strava activity, including distance, pace, elevation, splits, gear, and personal records.
 
-Activities sync daily, with new runs arriving in real time via Strava webhooks. Browse every endpoint in the [API reference](/api-reference/running/lifetime-running-statistics).
+Strava imports every activity type, not just runs: rides, walks, hikes, weight training, and the rest all land here. Each activity carries the sport type, its city and state (reverse-geocoded from the start coordinates), and a route polyline for mapping. Running-specific stats such as pace, personal records, and streaks are computed over run activities only.
+
+Activities sync daily, with new activities arriving in real time via Strava webhooks. Browse every endpoint in the [API reference](/api-reference/running/lifetime-running-statistics).
 
 ## Charts
 
@@ -36,4 +38,4 @@ Running activities carry map artwork generated from Strava map tiles. See [Image
 
 ## From Claude
 
-You can also explore your running history from Claude. Set up the [MCP server](/mcp/overview), then the [running tools](/reference/mcp-tools/running) are yours. Ask how far you ran last month, or for a year-over-year pace trend.
+You can also explore your running history from Claude. Set up the [MCP server](/mcp/overview) and ask in natural language, like how far you ran last month or for a year-over-year pace trend. Claude answers most questions by querying the [database directly with SQL](/mcp/overview).

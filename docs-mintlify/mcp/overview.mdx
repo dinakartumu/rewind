@@ -5,25 +5,39 @@ description: Connect AI assistants to your Rewind data using the Model Context P
 icon: robot
 ---
 
-The Rewind MCP server gives AI assistants direct access to your personal data across every domain. Ask about your listening history, running stats, movie watches, vinyl collection, reading highlights, or events you have attended, all in natural language. It is built on the [Model Context Protocol](https://modelcontextprotocol.io/), an open standard from Anthropic, so it works with any MCP-compatible client such as Claude and ChatGPT.
+The Rewind MCP server gives AI assistants direct access to your personal data across every domain. Ask about your listening history, running stats, movie watches, vinyl collection, reading highlights, events you have attended, or places you have checked in to, all in natural language. It is built on the [Model Context Protocol](https://modelcontextprotocol.io/), an open standard from Anthropic, so it works with any MCP-compatible client such as Claude and ChatGPT.
 
 ## When to use it
 
-Reach for Rewind any time the conversation references your own history: things you read, listened to, watched, saved, bookmarked, ran, or collected. Rewind owns this data, so it answers from your archive instead of guessing or falling back to web search.
+Reach for Rewind any time the conversation references your own history: things you read, listened to, watched, saved, ran, collected, checked in to, or attended. Rewind owns this data, so it answers from your archive instead of guessing or falling back to web search.
 
 Questions that route here include:
 
 - "What have I been listening to this week?"
 - "When was the last time I watched a Wes Anderson film?"
 - "What Beastie Boys records do I have on vinyl?"
-- "Find that article I saved about a former SNL writer."
-- "What happened on this day in previous years?"
+- "Did I scrobble more music on days I ran?"
+- "Which cities have I checked in to the most?"
 
 The server pulls live answers from the same [REST API](/openapi-spec) that powers Rewind, so what an assistant sees matches what your apps see.
 
-## Tools by domain
+## SQL first
 
-Rewind groups its tools by domain. Each page lists the tools an assistant can call, with parameters and example responses.
+Rewind is your data as a SQLite database, and the MCP server exposes it that way. Two general-purpose tools answer almost every question:
+
+- **`get_schema`** returns the annotated database schema: every queryable table with its columns, types, semantic notes, and join keys, plus global conventions like the single-user id, ISO timestamps, and rating scales.
+- **`query_rewind`** runs a single read-only `SELECT` against that schema and returns the rows.
+
+The typical flow is to read the schema once, then answer with one `SELECT`. This is what unlocks cross-domain questions no fixed tool anticipated, like "did I average more scrobbles on days I ran," which joins listening and running by calendar day. In our [evaluation](https://github.com/pdugan20/rewind), this approach answered 100% of a 43-question benchmark, including every cross-domain question, versus 49% for the previous catalog of one tool per endpoint.
+
+<Card title="SQL tools" icon="database" href="/reference/mcp-tools/query">
+  The `get_schema` and `query_rewind` reference, plus the annotated schema
+  behind them.
+</Card>
+
+## Rich cards for visual answers
+
+A small set of tools stays purpose-built because they return a rendered card, not just rows. When you ask about one specific thing, or want a poster grid or a portrait grid, these tools drive an interactive [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) view alongside Claude's answer.
 
 <CardGroup cols={2}>
   <Card
@@ -31,44 +45,31 @@ Rewind groups its tools by domain. Each page lists the tools an assistant can ca
     icon="headphones"
     href="/reference/mcp-tools/listening"
   >
-    Now playing, top artists, albums, and tracks, streaks, and stats.
-  </Card>
-  <Card
-    title="Running"
-    icon="person-running"
-    href="/reference/mcp-tools/running"
-  >
-    Recent runs, per-mile splits, personal records, streaks, and stats.
+    Now playing, top artists, albums, and tracks, and a single-artist card.
   </Card>
   <Card title="Watching" icon="film" href="/reference/mcp-tools/watching">
-    Recent watches, browse by genre, decade, or director, and stats.
-  </Card>
-  <Card
-    title="Collecting"
-    icon="record-vinyl"
-    href="/reference/mcp-tools/collecting"
-  >
-    Vinyl records, Blu-ray, 4K UHD, HD DVD, and collection stats.
+    A poster grid of your recent watches.
   </Card>
   <Card title="Reading" icon="book-open" href="/reference/mcp-tools/reading">
-    Articles, highlights, a random highlight, and stats.
+    Recent reads and the full text of a single article.
   </Card>
   <Card title="Attending" icon="ticket" href="/reference/mcp-tools/attending">
-    Sports games, concerts, theater, season records, and players you have
-    watched.
+    Season grids, single-game cards, and athlete cards.
   </Card>
   <Card
     title="Cross-domain"
     icon="layer-group"
     href="/reference/mcp-tools/cross-domain"
   >
-    Full-text and semantic search, a unified feed, and on-this-day.
+    Full-text and semantic search, plus an API health check.
   </Card>
 </CardGroup>
 
+Everything else, including running, collecting, and places, is answered through the SQL tools rather than a dedicated tool per endpoint.
+
 ## Read-only by design
 
-The MCP server has read-only access to your data. It exposes browse, search, and stat tools only. No write or admin operations are reachable through it, so an assistant can read your archive but never change it.
+The MCP server has read-only access to your data. `query_rewind` accepts a single `SELECT` and nothing else: writes, schema changes, multi-statement input, and any query touching secret tables such as API keys or OAuth tokens are rejected server-side. The query surface is an allow-list of the tables in the [documented schema](/reference/mcp-tools/query), so a secret table is never reachable by default. No write or admin operations are exposed anywhere on the server.
 
 The server is also stateless. It holds no data between calls and caches nothing locally.
 

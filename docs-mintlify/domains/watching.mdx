@@ -1,17 +1,18 @@
 ---
 title: Watching
 icon: film
-description: Movies and TV shows from Plex and Letterboxd, enriched with TMDB metadata.
+description: Movies and TV shows from Plex, Letterboxd, and Trakt, enriched with TMDB metadata.
 ---
 
 ## Overview
 
-The Watching domain tracks movies and TV shows from two sources:
+The Watching domain tracks movies and TV shows from three sources:
 
 - **Plex**: real-time watch events via webhooks, plus a daily library scan.
 - **Letterboxd**: ratings, reviews, and watch history from the RSS feed, synced a few times a day.
+- **Trakt**: movie and TV episode watch history, so scrobbles from outside Plex still land here.
 
-Both sources feed into a unified movie database enriched with TMDB metadata such as posters, ratings, genres, directors, and summaries. Browse every endpoint in the [API reference](/api-reference/watching/recent-watches).
+All sources feed into a unified database enriched with TMDB metadata such as posters, ratings, genres, directors, and summaries. Every watch carries a `source` (`plex`, `letterboxd`, `trakt`, or `manual`) so you can tell where it came from. Browse every endpoint in the [API reference](/api-reference/watching/recent-watches).
 
 ## Filtering
 
@@ -34,4 +35,4 @@ Movie posters and backdrops are sourced from TMDB, with fallbacks to Fanart.tv a
 
 ## From Claude
 
-You can also explore your watching history from Claude. Set up the [MCP server](/mcp/overview), then the [watching tools](/reference/mcp-tools/watching) are yours. Ask what you watched last month, or for your top-rated films of a given year.
+You can also explore your watching history from Claude. Set up the [MCP server](/mcp/overview) and ask in natural language, like what you watched last month or for your top-rated films of a given year. The [`get_recent_watches` tool](/reference/mcp-tools/watching) renders an interactive poster grid, and Claude answers everything else by querying the [database directly with SQL](/mcp/overview).
