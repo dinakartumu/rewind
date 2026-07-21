@@ -140,6 +140,84 @@ describe('SQL-first tools', () => {
   });
 });
 
+// Helper: pull `_meta.ui.resourceUri` and structuredContent.view off a result.
+function uiResourceUriOf(result: unknown): string | undefined {
+  const meta = (result as { _meta?: { ui?: { resourceUri?: string } } })._meta;
+  return meta?.ui?.resourceUri;
+}
+function viewOf(result: unknown): string | undefined {
+  return (result as { structuredContent?: { view?: string } }).structuredContent
+    ?.view;
+}
+
+describe('query_rewind generic UI wiring', () => {
+  it('advertises the query-result UI resourceUri in the tool listing', async () => {
+    const { client } = await createTestClient();
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'query_rewind')!;
+    const meta = tool._meta as { ui?: { resourceUri?: string } } | undefined;
+    expect(meta?.ui?.resourceUri).toBe('ui://rewind/query-result.html');
+    await client.close();
+  });
+
+  it('registers the ui://rewind/query-result.html resource', async () => {
+    const { client } = await createTestClient();
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toContain(
+      'ui://rewind/query-result.html'
+    );
+    await client.close();
+  });
+
+  it('attaches _meta.ui.resourceUri on the query_rewind result', async () => {
+    const { client } = await createTestClient();
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1' },
+    });
+    expect(uiResourceUriOf(result)).toBe('ui://rewind/query-result.html');
+    await client.close();
+  });
+
+  it("defaults view to 'auto' and echoes it into structuredContent", async () => {
+    const { client } = await createTestClient();
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1' },
+    });
+    expect(viewOf(result)).toBe('auto');
+    await client.close();
+  });
+
+  it('accepts an explicit view arg and echoes it back', async () => {
+    const { client } = await createTestClient();
+    for (const view of ['table', 'chart', 'map', 'grid'] as const) {
+      const result = await client.callTool({
+        name: 'query_rewind',
+        arguments: { sql: 'SELECT 1', view },
+      });
+      expect(viewOf(result)).toBe(view);
+    }
+    await client.close();
+  });
+
+  it('rejects an invalid view value via the input schema', async () => {
+    const { client } = await createTestClient();
+    // The SDK validates inputs against the tool's inputSchema and surfaces a
+    // validation failure as an error result (isError) rather than a throw.
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', view: 'sunburst' },
+    });
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    const text = (result.content as Array<{ text?: string }>)
+      .map((b) => b.text ?? '')
+      .join(' ');
+    expect(text).toMatch(/view/i);
+    await client.close();
+  });
+});
+
 // Helper: count image content blocks and pull the text block from a tool result.
 type Block = { type: string; text?: string };
 function blocksOf(result: unknown): Block[] {

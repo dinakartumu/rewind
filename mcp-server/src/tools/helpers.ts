@@ -19,6 +19,8 @@ export type ToolResult<S = unknown> = {
   content: ContentBlock[];
   structuredContent?: S;
   isError?: boolean;
+  /** Optional result-level metadata (e.g. `{ ui: { resourceUri } }`). */
+  _meta?: Record<string, unknown>;
 };
 
 // ─── Content block builders ──────────────────────────────────────────

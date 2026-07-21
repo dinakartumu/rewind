@@ -9,6 +9,7 @@ import { ArticleDetail } from '../../web/components/ArticleDetail';
 import { ArtistDetail } from '../../web/components/ArtistDetail';
 import { AthleteDetailA } from '../../web/components/AthleteDetailA';
 import { TopTracks } from '../../web/components/TopTracks';
+import { QueryResult } from '../../web/components/QueryResult';
 
 import {
   fixtures as recentWatchesFixtures,
@@ -31,6 +32,8 @@ import { fixtures as articleFixtures } from '../../web/article.fixtures';
 import { fixtures as artistFixtures } from '../../web/artist.fixtures';
 import { fixtures as attendedPlayerFixtures } from '../../web/attended-player.fixtures';
 import { fixtures as topTracksFixtures } from '../../web/top-tracks.fixtures';
+import { fixtures as queryResultFixtures } from '../../web/query-result.fixtures';
+import type { QueryResultShape } from '../../web/lib/query-view';
 
 import type { EventDetail } from '../../web/components/GameCard';
 import type { ArticlePayload } from '../../web/components/ArticleDetail';
@@ -195,6 +198,17 @@ export const COMPONENTS: ComponentEntry[] = [
     getBuiltHtml: makeBuiltLoader('top-tracks.html'),
     render: (f) => (
       <TopTracks payload={f as TopTracksPayload} onOpen={defaultOpen} />
+    ),
+  },
+  {
+    id: 'query-result',
+    displayName: 'Query result',
+    producedBy: 'query_rewind',
+    defaultViewport: 'desktop',
+    fixtures: queryResultFixtures,
+    getBuiltHtml: makeBuiltLoader('query-result.html'),
+    render: (f) => (
+      <QueryResult payload={f as QueryResultShape} onOpen={defaultOpen} />
     ),
   },
 ];

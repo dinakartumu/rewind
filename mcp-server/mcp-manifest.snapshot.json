@@ -3464,7 +3464,7 @@
     },
     {
       "name": "query_rewind",
-      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.",
+      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. In MCP Apps hosts it ALSO renders an interactive table / chart / tile-less map / card-grid view, auto-selected from the result shape (or forced via `view`): a chart when the result is one category-or-period column plus one numeric column, a tile-less point/route map plotted from lat/lng or polyline columns (no tiles, no external requests), a card grid when a CDN image-URL column pairs with a name/label column, and a styled table otherwise. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3472,6 +3472,18 @@
             "type": "string",
             "minLength": 1,
             "description": "A single read-only SELECT (or WITH … SELECT) statement. Do not include a trailing semicolon. A LIMIT is applied automatically. Call get_schema first for table and column names."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "table",
+              "chart",
+              "map",
+              "grid"
+            ],
+            "default": "auto",
+            "description": "Preferred rendered view in MCP Apps hosts. 'auto' (default) auto-detects from the result shape: chart for one category/period column + one numeric column, map for lat/lng or polyline columns (tile-less), grid for a CDN image URL + label column, else table. Force one of 'table' | 'chart' | 'map' | 'grid' to override. Echoed back in structuredContent.view. Ignored by non-UI hosts."
           },
           "embed_art": {
             "type": "boolean",
@@ -3506,6 +3518,16 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "table",
+              "chart",
+              "map",
+              "grid"
+            ]
           },
           "art": {
             "type": "object",
@@ -3981,6 +4003,12 @@
       "uri": "ui://rewind/attended-season.html",
       "name": "Rewind -- Attended Season",
       "description": "Interactive season grid for attended sports games. Each card shows date, score, attendance, weather, and a strip of the game's notable performers as silo headshots. Consumes get_attended_season structuredContent.",
+      "mimeType": "text/html;profile=mcp-app"
+    },
+    {
+      "uri": "ui://rewind/query-result.html",
+      "name": "Rewind -- Query Result",
+      "description": "Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / tile-less map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are tile-less point/route plots from lat/lng or polyline columns. Consumes query_rewind structuredContent {columns, rows, view?, art?}.",
       "mimeType": "text/html;profile=mcp-app"
     },
     {

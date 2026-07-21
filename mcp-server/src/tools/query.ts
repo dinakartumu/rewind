@@ -12,6 +12,8 @@ import {
 } from './helpers.js';
 import { queryOutputSchema, schemaOutputSchema } from './schemas/query.js';
 
+/** ui:// resource the generic query-result renderer is registered under. */
+const QUERY_RESULT_UI = 'ui://rewind/query-result.html';
 /** Public Rewind image CDN origin. Cell values under this host are artwork. */
 const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
 /** Max inline thumbnails per query result — keeps a 200-row result from fetching 200 images. */
@@ -254,13 +256,19 @@ export function registerQueryTools(
     {
       title: 'Query Rewind (SQL)',
       description:
-        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.',
+        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. In MCP Apps hosts it ALSO renders an interactive table / chart / tile-less map / card-grid view, auto-selected from the result shape (or forced via `view`): a chart when the result is one category-or-period column plus one numeric column, a tile-less point/route map plotted from lat/lng or polyline columns (no tiles, no external requests), a card grid when a CDN image-URL column pairs with a name/label column, and a styled table otherwise. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.',
       inputSchema: {
         sql: z
           .string()
           .min(1)
           .describe(
             'A single read-only SELECT (or WITH … SELECT) statement. Do not include a trailing semicolon. A LIMIT is applied automatically. Call get_schema first for table and column names.'
+          ),
+        view: z
+          .enum(['auto', 'table', 'chart', 'map', 'grid'])
+          .default('auto')
+          .describe(
+            "Preferred rendered view in MCP Apps hosts. 'auto' (default) auto-detects from the result shape: chart for one category/period column + one numeric column, map for lat/lng or polyline columns (tile-less), grid for a CDN image URL + label column, else table. Force one of 'table' | 'chart' | 'map' | 'grid' to override. Echoed back in structuredContent.view. Ignored by non-UI hosts."
           ),
         embed_art: z
           .boolean()
@@ -271,8 +279,12 @@ export function registerQueryTools(
       },
       annotations: READ_ONLY_ANNOTATIONS,
       outputSchema: queryOutputSchema,
+      _meta: {
+        ui: { resourceUri: QUERY_RESULT_UI },
+        'ui/resourceUri': QUERY_RESULT_UI,
+      },
     },
-    async ({ sql, embed_art }) =>
+    async ({ sql, view, embed_art }) =>
       withRichResponse(async () => {
         const result = await client.query(sql);
 
@@ -291,7 +303,8 @@ export function registerQueryTools(
 
         const content: ContentBlock[] = [text(renderResult(result)), ...images];
 
-        const structuredContent = { ...result } as QueryStructured & {
+        const structuredContent = { ...result, view } as QueryStructured & {
+          view: 'auto' | 'table' | 'chart' | 'map' | 'grid';
           art?: Record<string, string>;
           art_truncated?: boolean;
         };
@@ -308,6 +321,12 @@ export function registerQueryTools(
         return {
           content,
           structuredContent,
+          // Attach on the RESULT too (not just the tool listing) so hosts that
+          // read `_meta.ui.resourceUri` from the call result render the bundle.
+          _meta: {
+            ui: { resourceUri: QUERY_RESULT_UI },
+            'ui/resourceUri': QUERY_RESULT_UI,
+          },
         };
       })
   );

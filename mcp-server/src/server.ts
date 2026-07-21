@@ -221,6 +221,17 @@ export function createServer(client: RewindClient): McpServer {
   });
 
   registerUiResource(server, {
+    name: 'Rewind -- Query Result',
+    uri: 'ui://rewind/query-result.html',
+    html: UI_BUNDLES['query-result.html'],
+    description:
+      'Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / tile-less map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are tile-less point/route plots from lat/lng or polyline columns. Consumes query_rewind structuredContent {columns, rows, view?, art?}.',
+    csp: {
+      resourceDomains: ['https://cdn.dinakartumu.com'],
+    },
+  });
+
+  registerUiResource(server, {
     name: 'Rewind -- Top Tracks',
     uri: 'ui://rewind/top-tracks.html',
     html: UI_BUNDLES['top-tracks.html'],
