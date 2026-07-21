@@ -79,6 +79,8 @@ const ActivitySchema = z.object({
   suffer_score: z.number().nullable(),
   city: z.string().nullable(),
   state: z.string().nullable(),
+  start_lat: z.number().nullable(),
+  start_lng: z.number().nullable(),
   polyline: z.string().nullable(),
   is_race: z.boolean(),
   workout_type: z.string(),
@@ -547,6 +549,8 @@ const recentRoute = createRoute({
                 suffer_score: null,
                 city: null,
                 state: null,
+                start_lat: 47.6206,
+                start_lng: -122.3493,
                 polyline: '_wfbHb|niVD_@TEd@...',
                 is_race: false,
                 workout_type: 'default',
@@ -639,6 +643,8 @@ const activitiesRoute = createRoute({
                 suffer_score: null,
                 city: null,
                 state: null,
+                start_lat: 47.6206,
+                start_lng: -122.3493,
                 polyline: '_wfbHb|niVD_@TEd@...',
                 is_race: false,
                 workout_type: 'default',
@@ -805,6 +811,8 @@ const activityDetailRoute = createRoute({
             suffer_score: null,
             city: null,
             state: null,
+            start_lat: 47.6206,
+            start_lng: -122.3493,
             polyline: '_wfbHb|niVD_@TEd@...',
             is_race: false,
             workout_type: 'default',
@@ -1623,6 +1631,8 @@ const racesRoute = createRoute({
                 suffer_score: 250,
                 city: 'Portland',
                 state: 'OR',
+                start_lat: 45.5152,
+                start_lng: -122.6784,
                 polyline: null,
                 is_race: true,
                 workout_type: 'race',
@@ -1798,6 +1808,8 @@ const yearInReviewRoute = createRoute({
                 suffer_score: 120,
                 city: 'Portland',
                 state: 'OR',
+                start_lat: 45.5152,
+                start_lng: -122.6784,
                 polyline: null,
                 is_race: true,
                 workout_type: 'race',
@@ -1934,6 +1946,8 @@ function formatActivityResponse(a: {
   averageHeartrate: number | null;
   city: string | null;
   state: string | null;
+  startLat: number | null;
+  startLng: number | null;
   mapPolyline: string | null;
   isRace: number;
   workoutType: number | null;
@@ -1961,6 +1975,8 @@ function formatActivityResponse(a: {
     suffer_score: a.sufferScore,
     city: a.city,
     state: a.state,
+    start_lat: a.startLat,
+    start_lng: a.startLng,
     polyline: a.mapPolyline,
     is_race: a.isRace === 1,
     workout_type: getWorkoutTypeLabel(a.workoutType),

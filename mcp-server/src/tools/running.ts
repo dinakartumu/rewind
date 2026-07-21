@@ -12,10 +12,12 @@ import {
   dateFilterParams,
   type ContentBlock,
 } from './helpers.js';
+import { decodePolyline, sampleWaypoints, type LatLng } from './polyline.js';
 import {
   activitySchema,
   activityApiItemSchema,
   activityDetailsOutputSchema,
+  activityDetailApiSchema,
   runningStatsOutputSchema,
   recentRunsOutputSchema,
   personalRecordsOutputSchema,
@@ -36,6 +38,14 @@ type Activity = z.infer<typeof activitySchema>;
 type ActivityApiItem = z.infer<typeof activityApiItemSchema>;
 
 type ActivityDetail = z.infer<typeof activityDetailsOutputSchema>;
+
+/** Raw /running/activities/:id response: no `waypoints` yet. */
+type ActivityDetailApi = z.infer<typeof activityDetailApiSchema>;
+
+/** Decode an encoded polyline into at most 8 evenly-sampled stops. */
+function routeWaypoints(polyline: string | null | undefined): LatLng[] {
+  return polyline ? sampleWaypoints(decodePolyline(polyline)) : [];
+}
 
 export function registerRunningTools(
   server: McpServer,
@@ -92,7 +102,7 @@ export function registerRunningTools(
     {
       title: 'Recent runs',
       description:
-        'Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, and Strava activity resource links for top-N.',
+        'Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, start coordinates, sampled route waypoints as [lat, lng] pairs, and Strava activity resource links for top-N.',
       inputSchema: {
         limit: z
           .number()
@@ -127,10 +137,13 @@ export function registerRunningTools(
         }
 
         // Strip the encoded polyline from list items (context bloat) and
-        // surface a has_route flag instead.
+        // surface a has_route flag plus map-friendly sampled waypoints.
         const data: Activity[] = raw.map(({ polyline, ...rest }) => ({
           ...rest,
+          start_lat: rest.start_lat ?? null,
+          start_lng: rest.start_lng ?? null,
           has_route: Boolean(polyline),
+          waypoints: routeWaypoints(polyline),
         }));
 
         const lines = ['Recent runs:'];
@@ -259,7 +272,7 @@ export function registerRunningTools(
     {
       title: 'Run',
       description:
-        'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, the encoded route polyline, and a Strava resource link.',
+        'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, start coordinates, the encoded route polyline plus sampled [lat, lng] waypoints, and a Strava resource link.',
       inputSchema: {
         id: z
           .number()
@@ -272,9 +285,18 @@ export function registerRunningTools(
     },
     async ({ id }) =>
       withRichResponse(async () => {
-        const data = await client.get<ActivityDetail>(
+        const raw = await client.get<ActivityDetailApi>(
           `/running/activities/${id}`
         );
+
+        // Keep the full polyline on details, and add start coords plus
+        // sampled waypoints for map clients that chain stops.
+        const data: ActivityDetail = {
+          ...raw,
+          start_lat: raw.start_lat ?? null,
+          start_lng: raw.start_lng ?? null,
+          waypoints: routeWaypoints(raw.polyline),
+        };
 
         const lines = [
           `${data.name}${data.is_race ? ' [RACE]' : ''}`,

@@ -109,6 +109,8 @@ describe('Running routes with mixed sport types', () => {
         startDateLocal: '2024-06-15T07:00:00',
         paceMinPerMile: 8.0,
         paceFormatted: '8:00/mi',
+        startLat: 40.7128,
+        startLng: -74.006,
         isRace: 0,
         isDeleted: 0,
       },
@@ -149,6 +151,67 @@ describe('Running routes with mixed sport types', () => {
     expect(ride?.sport_type).toBe('Ride');
     const run = body.data.find((a) => a.strava_id === 9001);
     expect(run?.sport_type).toBe('Run');
+  });
+
+  it('GET /v1/running/recent exposes start_lat and start_lng on activities', async () => {
+    await seedMixedActivities();
+
+    const res = await SELF.fetch('http://localhost/v1/running/recent', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        strava_id: number;
+        start_lat: number | null;
+        start_lng: number | null;
+      }>;
+    };
+
+    const run = body.data.find((a) => a.strava_id === 9001);
+    expect(run?.start_lat).toBe(40.7128);
+    expect(run?.start_lng).toBe(-74.006);
+    // Activities without recorded coords serialize as explicit nulls.
+    const ride = body.data.find((a) => a.strava_id === 9002);
+    expect(ride?.start_lat).toBeNull();
+    expect(ride?.start_lng).toBeNull();
+  });
+
+  it('GET /v1/running/activities exposes start_lat and start_lng on list items', async () => {
+    await seedMixedActivities();
+
+    const res = await SELF.fetch('http://localhost/v1/running/activities', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        strava_id: number;
+        start_lat: number | null;
+        start_lng: number | null;
+      }>;
+    };
+
+    const run = body.data.find((a) => a.strava_id === 9001);
+    expect(run?.start_lat).toBe(40.7128);
+    expect(run?.start_lng).toBe(-74.006);
+  });
+
+  it('GET /v1/running/activities/:id exposes start_lat and start_lng', async () => {
+    await seedMixedActivities();
+
+    const res = await SELF.fetch(
+      'http://localhost/v1/running/activities/9001',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      start_lat: number | null;
+      start_lng: number | null;
+    };
+
+    expect(body.start_lat).toBe(40.7128);
+    expect(body.start_lng).toBe(-74.006);
   });
 
   it('GET /v1/running/stats includes total_activities alongside run-scoped total_runs', async () => {

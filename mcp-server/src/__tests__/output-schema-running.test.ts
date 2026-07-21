@@ -18,6 +18,15 @@ import { RewindClient } from '../client.js';
 
 // --- Fixtures (minimal valid API responses) -------------------------------
 
+// Canonical Google polyline example: decodes to
+// [[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]].
+const CANONICAL_POLYLINE = '_p~iF~ps|U_ulLnnqC_mqNvxq`@';
+const CANONICAL_POINTS = [
+  [38.5, -120.2],
+  [40.7, -120.95],
+  [43.252, -126.453],
+];
+
 const activityFixture = {
   id: 1,
   strava_id: 1001,
@@ -29,7 +38,9 @@ const activityFixture = {
   elevation_ft: 120,
   city: 'Brooklyn',
   state: 'NY',
-  polyline: '_wfbHb|niVD_@TEd@',
+  start_lat: 38.5,
+  start_lng: -120.2,
+  polyline: CANONICAL_POLYLINE,
   is_race: false,
   strava_url: 'https://strava.com/activities/1001',
 };
@@ -68,7 +79,9 @@ const activityDetailFixture = {
   suffer_score: 45,
   city: 'Brooklyn',
   state: 'NY',
-  polyline: '_wfbHb|niVD_@TEd@',
+  start_lat: 38.5,
+  start_lng: -120.2,
+  polyline: CANONICAL_POLYLINE,
   is_race: false,
   workout_type: 'Run',
   strava_url: 'https://strava.com/activities/1001',
@@ -206,6 +219,62 @@ describe('output-schema conformance — running', () => {
     expect(textBlock?.text).toContain('in Brooklyn, NY');
   });
 
+  it('get_recent_runs: items carry start coords and sampled waypoints', async () => {
+    const client = await buildClient();
+    const res = await client.callTool({
+      name: 'get_recent_runs',
+      arguments: {},
+    });
+    expect(res.isError).toBeFalsy();
+    const { items } = res.structuredContent as {
+      items: Array<Record<string, unknown>>;
+    };
+    expect(items[0].start_lat).toBe(38.5);
+    expect(items[0].start_lng).toBe(-120.2);
+    // Waypoints are [lat, lng] pairs decoded from the polyline, sampled
+    // to at most 8 including the start and end points.
+    const waypoints = items[0].waypoints as Array<[number, number]>;
+    expect(waypoints).toEqual(CANONICAL_POINTS);
+    expect(waypoints.length).toBeLessThanOrEqual(8);
+    // The raw polyline stays stripped from list items.
+    expect(items[0]).not.toHaveProperty('polyline');
+  });
+
+  it('get_recent_runs: null polyline yields empty waypoints', async () => {
+    const rewindClient = new RewindClient('https://api.test', 'rw_test');
+    vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
+      if (path === '/running/recent')
+        return {
+          data: [
+            {
+              ...activityFixture,
+              polyline: null,
+              start_lat: null,
+              start_lng: null,
+            },
+          ],
+        };
+      return {};
+    });
+    const server = createServer(rewindClient);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'no-waypoints-test', version: '1.0.0' });
+    await server.connect(st);
+    await client.connect(ct);
+
+    const res = await client.callTool({
+      name: 'get_recent_runs',
+      arguments: {},
+    });
+    expect(res.isError).toBeFalsy();
+    const { items } = res.structuredContent as {
+      items: Array<Record<string, unknown>>;
+    };
+    expect(items[0].waypoints).toEqual([]);
+    expect(items[0].start_lat).toBeNull();
+    expect(items[0].start_lng).toBeNull();
+  });
+
   it('get_recent_runs: has_route is false when the run has no polyline', async () => {
     const rewindClient = new RewindClient('https://api.test', 'rw_test');
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
@@ -241,7 +310,22 @@ describe('output-schema conformance — running', () => {
     const detail = res.structuredContent as Record<string, unknown>;
     expect(detail.city).toBe('Brooklyn');
     expect(detail.state).toBe('NY');
-    expect(detail.polyline).toBe('_wfbHb|niVD_@TEd@');
+    expect(detail.polyline).toBe(CANONICAL_POLYLINE);
+  });
+
+  it('get_activity_details: exposes start coords and sampled waypoints', async () => {
+    const client = await buildClient();
+    const res = await client.callTool({
+      name: 'get_activity_details',
+      arguments: { id: 1 },
+    });
+    expect(res.isError).toBeFalsy();
+    const detail = res.structuredContent as Record<string, unknown>;
+    expect(detail.start_lat).toBe(38.5);
+    expect(detail.start_lng).toBe(-120.2);
+    expect(detail.waypoints).toEqual(CANONICAL_POINTS);
+    // Details keep the full polyline alongside the sampled waypoints.
+    expect(detail.polyline).toBe(CANONICAL_POLYLINE);
   });
 
   it('every running tool advertises a clean outputSchema', async () => {

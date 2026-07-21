@@ -300,7 +300,7 @@
     },
     {
       "name": "get_activity_details",
-      "description": "Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, the encoded route polyline, and a Strava resource link.",
+      "description": "Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, start coordinates, the encoded route polyline plus sampled [lat, lng] waypoints, and a Strava resource link.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -381,11 +381,39 @@
               "null"
             ]
           },
+          "start_lat": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "start_lng": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "polyline": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "waypoints": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
           },
           "is_race": {
             "type": "boolean"
@@ -414,7 +442,10 @@
           "suffer_score",
           "city",
           "state",
+          "start_lat",
+          "start_lng",
           "polyline",
+          "waypoints",
           "is_race",
           "workout_type",
           "strava_url"
@@ -6286,7 +6317,7 @@
     },
     {
       "name": "get_recent_runs",
-      "description": "Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, and Strava activity resource links for top-N.",
+      "description": "Get recent running activities from Strava. Returns runs with ID, distance, pace, duration, location, start coordinates, sampled route waypoints as [lat, lng] pairs, and Strava activity resource links for top-N.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6363,8 +6394,36 @@
                     "null"
                   ]
                 },
+                "start_lat": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "start_lng": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "has_route": {
                   "type": "boolean"
+                },
+                "waypoints": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  }
                 },
                 "is_race": {
                   "type": "boolean"
@@ -6386,7 +6445,10 @@
                 "elevation_ft",
                 "city",
                 "state",
+                "start_lat",
+                "start_lng",
                 "has_route",
+                "waypoints",
                 "is_race"
               ],
               "additionalProperties": true

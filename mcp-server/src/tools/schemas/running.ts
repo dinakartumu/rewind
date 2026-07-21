@@ -15,11 +15,20 @@ import { z } from 'zod';
 // --- Element schemas ------------------------------------------------------
 
 /**
+ * A route waypoint: a [lat, lng] pair decoded from the activity's
+ * encoded polyline. Map clients that render markers and point-to-point
+ * directions (rather than polylines) can chain these as stops.
+ */
+export const waypointSchema = z.tuple([z.number(), z.number()]);
+
+/**
  * A single run, as listed by get_recent_runs.
  *
  * List items deliberately carry `has_route` (boolean) instead of the raw
  * encoded polyline the API returns -- polylines are large and would bloat
  * every list response. Fetch the full route via get_activity_details.
+ * `waypoints` holds at most 8 evenly-sampled [lat, lng] pairs (including
+ * start and end) decoded from that polyline; empty when there is no route.
  */
 export const activitySchema = z
   .object({
@@ -33,20 +42,29 @@ export const activitySchema = z
     elevation_ft: z.number(),
     city: z.string().nullable(),
     state: z.string().nullable(),
+    start_lat: z.number().nullable(),
+    start_lng: z.number().nullable(),
     has_route: z.boolean(),
+    waypoints: z.array(waypointSchema),
     is_race: z.boolean(),
     strava_url: z.string().nullish(),
   })
   .passthrough();
 
 /**
- * Raw /running/recent item as the API ships it: no `has_route`, but a
- * full encoded `polyline`. Internal only -- get_recent_runs collapses
- * this to `activitySchema` before returning.
+ * Raw /running/recent item as the API ships it: no `has_route` or
+ * `waypoints`, but a full encoded `polyline`. `start_lat`/`start_lng`
+ * are nullish (not just nullable) so the tool tolerates an API that
+ * predates the coordinate fields. Internal only -- get_recent_runs
+ * collapses this to `activitySchema` before returning.
  */
 export const activityApiItemSchema = activitySchema
-  .omit({ has_route: true })
-  .extend({ polyline: z.string().nullish() });
+  .omit({ has_route: true, waypoints: true })
+  .extend({
+    start_lat: z.number().nullish(),
+    start_lng: z.number().nullish(),
+    polyline: z.string().nullish(),
+  });
 
 /** A single personal record, as listed by get_personal_records. */
 export const personalRecordSchema = z
@@ -139,7 +157,12 @@ export const runningStreaksOutputSchema = z
   })
   .passthrough();
 
-/** outputSchema for get_activity_details (a single run's detail object). */
+/**
+ * outputSchema for get_activity_details (a single run's detail object).
+ * Unlike list items, details keep the full encoded `polyline` and add
+ * `waypoints` -- at most 8 evenly-sampled [lat, lng] pairs (including
+ * start and end) decoded from it.
+ */
 export const activityDetailsOutputSchema = z
   .object({
     id: z.number().optional(),
@@ -156,12 +179,28 @@ export const activityDetailsOutputSchema = z
     suffer_score: z.number().nullable(),
     city: z.string().nullable(),
     state: z.string().nullable(),
+    start_lat: z.number().nullable(),
+    start_lng: z.number().nullable(),
     polyline: z.string().nullable(),
+    waypoints: z.array(waypointSchema),
     is_race: z.boolean(),
     workout_type: z.string(),
     strava_url: z.string().nullable(),
   })
   .passthrough();
+
+/**
+ * Raw /running/activities/:id response as the API ships it: no
+ * `waypoints`, and coordinates nullish for older API deployments.
+ * Internal only -- get_activity_details augments it to
+ * `activityDetailsOutputSchema` before returning.
+ */
+export const activityDetailApiSchema = activityDetailsOutputSchema
+  .omit({ waypoints: true })
+  .extend({
+    start_lat: z.number().nullish(),
+    start_lng: z.number().nullish(),
+  });
 
 /**
  * outputSchema for get_activity_splits. The empty-state branch returns
