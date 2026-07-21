@@ -15,6 +15,16 @@ import {
 const ALBUM_URL = 'https://api.deezer.com/search/album';
 const ARTIST_URL = 'https://api.deezer.com/search/artist';
 
+/**
+ * Deezer serves a generic gray placeholder when an entity has no image:
+ * the URL's image-hash path segment is empty, e.g.
+ * https://cdn-images.dzcdn.net/images/artist//1000x1000-000000-80-0-0.jpg
+ * Treat those as missing so real photos further down the results win.
+ */
+function isBlankDeezerImage(url: string): boolean {
+  return /\/images\/[a-z]+\/\//.test(url);
+}
+
 export class DeezerClient implements SourceClient {
   name = 'deezer';
 
@@ -55,7 +65,7 @@ export class DeezerClient implements SourceClient {
     const results: ImageResult[] = [];
 
     for (const album of data.data ?? []) {
-      if (!album.cover_xl) continue;
+      if (!album.cover_xl || isBlankDeezerImage(album.cover_xl)) continue;
 
       // Validate artist and album name match
       if (
@@ -106,7 +116,7 @@ export class DeezerClient implements SourceClient {
     const results: ImageResult[] = [];
 
     for (const item of data.data ?? []) {
-      if (!item.picture_xl) continue;
+      if (!item.picture_xl || isBlankDeezerImage(item.picture_xl)) continue;
 
       // Validate artist name match
       if (item.name && !artistMatches(params.artistName, item.name)) {

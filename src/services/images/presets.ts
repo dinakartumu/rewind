@@ -23,7 +23,7 @@ export const SIZE_PRESETS: Record<string, SizePreset> = {
 
 export const VALID_SIZES = Object.keys(SIZE_PRESETS);
 
-export const CDN_BASE_URL = 'https://cdn.rewind.rest';
+export const CDN_BASE_URL = 'https://cdn.dinakartumu.com';
 
 export const CDN_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

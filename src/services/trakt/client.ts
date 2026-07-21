@@ -53,6 +53,60 @@ export interface TraktSearchResult {
   };
 }
 
+export interface TraktHistoryMovieItem {
+  id: number;
+  watched_at: string;
+  action: string;
+  type: 'movie';
+  movie: {
+    title: string;
+    year: number;
+    ids: TraktMovieIds;
+  };
+}
+
+export interface TraktHistoryEpisodeItem {
+  id: number;
+  watched_at: string;
+  action: string;
+  type: 'episode';
+  episode: {
+    season: number;
+    number: number;
+    title: string | null;
+    ids: { trakt: number; tmdb: number | null };
+  };
+  show: {
+    title: string;
+    year: number | null;
+    ids: TraktMovieIds;
+  };
+}
+
+export interface TraktRatingItem {
+  rated_at: string;
+  rating: number;
+  type: 'movie';
+  movie: {
+    title: string;
+    year: number;
+    ids: TraktMovieIds;
+  };
+}
+
+export interface TraktHistoryPage<T> {
+  items: T[];
+  page: number;
+  pageCount: number;
+}
+
+export interface TraktHistoryOptions {
+  startAt?: string;
+  endAt?: string;
+  page?: number;
+  limit?: number;
+}
+
 export class TraktClient {
   private accessToken: string;
   private clientId: string;
@@ -62,7 +116,10 @@ export class TraktClient {
     this.clientId = clientId;
   }
 
-  private async request<T>(path: string, options?: RequestInit): Promise<T> {
+  private async requestWithHeaders<T>(
+    path: string,
+    options?: RequestInit
+  ): Promise<{ data: T; headers: Headers }> {
     const url = `${BASE_URL}${path}`;
     const response = await fetch(url, {
       ...options,
@@ -83,7 +140,7 @@ export class TraktClient {
         `[INFO] Trakt rate limited, waiting ${waitMs}ms before retry`
       );
       await new Promise((resolve) => setTimeout(resolve, waitMs));
-      return this.request<T>(path, options);
+      return this.requestWithHeaders<T>(path, options);
     }
 
     if (!response.ok) {
@@ -93,7 +150,13 @@ export class TraktClient {
       );
     }
 
-    return response.json() as Promise<T>;
+    const data = (await response.json()) as T;
+    return { data, headers: response.headers };
+  }
+
+  private async request<T>(path: string, options?: RequestInit): Promise<T> {
+    const { data } = await this.requestWithHeaders<T>(path, options);
+    return data;
   }
 
   /**
@@ -150,5 +213,54 @@ export class TraktClient {
   async searchMovie(query: string): Promise<TraktSearchResult[]> {
     const encoded = encodeURIComponent(query);
     return this.request<TraktSearchResult[]>(`/search/movie?query=${encoded}`);
+  }
+
+  private async getHistoryPage<T>(
+    kind: 'movies' | 'episodes',
+    options: TraktHistoryOptions
+  ): Promise<TraktHistoryPage<T>> {
+    const params = new URLSearchParams({
+      page: String(options.page ?? 1),
+      limit: String(options.limit ?? 100),
+    });
+    if (options.startAt) {
+      params.set('start_at', options.startAt);
+    }
+    if (options.endAt) {
+      params.set('end_at', options.endAt);
+    }
+    const { data, headers } = await this.requestWithHeaders<T[]>(
+      `/sync/history/${kind}?${params.toString()}`
+    );
+    return {
+      items: data,
+      page: parseInt(headers.get('X-Pagination-Page') ?? '1', 10),
+      pageCount: parseInt(headers.get('X-Pagination-Page-Count') ?? '1', 10),
+    };
+  }
+
+  /**
+   * Get a page of the user's movie watch history, newest first.
+   */
+  async getMovieHistory(
+    options: TraktHistoryOptions = {}
+  ): Promise<TraktHistoryPage<TraktHistoryMovieItem>> {
+    return this.getHistoryPage<TraktHistoryMovieItem>('movies', options);
+  }
+
+  /**
+   * Get a page of the user's episode watch history, newest first.
+   */
+  async getEpisodeHistory(
+    options: TraktHistoryOptions = {}
+  ): Promise<TraktHistoryPage<TraktHistoryEpisodeItem>> {
+    return this.getHistoryPage<TraktHistoryEpisodeItem>('episodes', options);
+  }
+
+  /**
+   * Get all of the user's movie ratings.
+   */
+  async getMovieRatings(): Promise<TraktRatingItem[]> {
+    return this.request<TraktRatingItem[]>('/sync/ratings/movies');
   }
 }

@@ -343,6 +343,7 @@ function getMockResponse(path: string): unknown {
       suffer_score: null,
       city: 'Austin',
       state: 'TX',
+      polyline: '_wfbHb|niVD_@TEd@',
       is_race: false,
       workout_type: 'default',
       strava_url: 'https://www.strava.com/activities/123',
@@ -704,6 +705,53 @@ function getMockResponse(path: string): unknown {
     };
   }
 
+  // Places
+  if (path === '/places/recent') {
+    return {
+      data: [
+        {
+          id: 4821,
+          venue_id: '4b5b3f2af964a520fb0029e3',
+          venue_name: 'Analog Coffee',
+          venue_category: 'Coffee Shop',
+          venue_icon:
+            'https://cdn.rewind.rest/places/icons/food-coffeeshop_64.png',
+          venue_city: 'Seattle',
+          venue_state: 'WA',
+          venue_country: 'United States',
+          lat: 47.6205,
+          lng: -122.3212,
+          checked_in_at: new Date().toISOString(),
+          shout: 'Morning cortado',
+        },
+      ],
+      pagination: { page: 1, limit: 20, total: 4821, total_pages: 242 },
+    };
+  }
+  if (path === '/places/stats') {
+    return {
+      total: 4821,
+      unique_venues: 1289,
+      this_year: 143,
+      top_categories: [
+        {
+          category: 'Coffee Shop',
+          count: 612,
+          icon: 'https://cdn.rewind.rest/places/icons/food-coffeeshop_64.png',
+        },
+      ],
+      top_cities: [{ city: 'Seattle', count: 3120 }],
+      top_venues: [
+        {
+          venue_name: 'Analog Coffee',
+          count: 96,
+          icon: 'https://cdn.rewind.rest/places/icons/food-coffeeshop_64.png',
+          city: 'Seattle',
+        },
+      ],
+    };
+  }
+
   // Feed
   if (path.startsWith('/feed/on-this-day')) {
     return {
@@ -807,7 +855,7 @@ describe('MCP Server', () => {
       // an accompanying docs update. See manifest-snapshot.test.ts for
       // the structural snapshot and scripts/check-docs.mjs for the
       // MDX cross-check.
-      expect(tools.length).toBe(47);
+      expect(tools.length).toBe(49);
 
       const names = tools.map((t) => t.name);
       expect(names).toContain('get_health');
@@ -822,6 +870,8 @@ describe('MCP Server', () => {
       expect(names).toContain('semantic_search');
       expect(names).toContain('find_similar_articles');
       expect(names).toContain('get_article');
+      expect(names).toContain('get_recent_checkins');
+      expect(names).toContain('get_places_stats');
       expect(names).toContain('get_feed');
       expect(names).toContain('get_attended_players');
       expect(names).toContain('get_attended_player_stats');
@@ -895,6 +945,8 @@ describe('MCP Server', () => {
       { name: 'get_reading_highlights', args: {} },
       { name: 'get_random_highlight', args: {} },
       { name: 'get_reading_stats', args: {} },
+      { name: 'get_recent_checkins', args: {} },
+      { name: 'get_places_stats', args: {} },
       { name: 'search', args: { query: 'beastie' } },
       { name: 'get_feed', args: {} },
       { name: 'get_on_this_day', args: {} },
@@ -1594,6 +1646,56 @@ describe('MCP Server', () => {
         }
       ).structuredContent;
       expect(structured?.years[0].year).toBe(2025);
+    });
+  });
+
+  describe('places rich responses', () => {
+    it('get_recent_checkins includes venue, shout, and structuredContent', async () => {
+      const result = await client.callTool({
+        name: 'get_recent_checkins',
+        arguments: {},
+      });
+      const content = result.content as Array<{ type: string; text?: string }>;
+      expect(content[0].text).toContain('Analog Coffee');
+      expect(content[0].text).toContain('Coffee Shop');
+      expect(content[0].text).toContain('Morning cortado');
+      const structured = (
+        result as {
+          structuredContent?: {
+            items: Array<{ id: number; venue_icon: string | null }>;
+            pagination: { total: number };
+          };
+        }
+      ).structuredContent;
+      expect(structured?.items[0].id).toBe(4821);
+      expect(structured?.items[0].venue_icon).toContain('coffeeshop');
+      expect(structured?.pagination.total).toBe(4821);
+    });
+
+    it('get_places_stats returns structuredContent mirroring API', async () => {
+      const result = await client.callTool({
+        name: 'get_places_stats',
+        arguments: {},
+      });
+      const content = result.content as Array<{ type: string; text?: string }>;
+      expect(content[0].text).toContain('Unique venues: 1,289');
+      const structured = (
+        result as {
+          structuredContent?: {
+            total: number;
+            unique_venues: number;
+            this_year: number;
+            top_categories: Array<{ category: string; icon: string | null }>;
+            top_cities: Array<{ city: string }>;
+            top_venues: Array<{ venue_name: string }>;
+          };
+        }
+      ).structuredContent;
+      expect(structured?.total).toBe(4821);
+      expect(structured?.this_year).toBe(143);
+      expect(structured?.top_categories[0].icon).toContain('coffeeshop');
+      expect(structured?.top_cities[0].city).toBe('Seattle');
+      expect(structured?.top_venues[0].venue_name).toBe('Analog Coffee');
     });
   });
 });

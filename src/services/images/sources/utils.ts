@@ -57,12 +57,15 @@ const NUMBER_WORDS: Record<string, string> = {
 
 /**
  * Normalize a name for comparison.
- * Strips punctuation, extra whitespace, lowercases, and standardizes
- * number words and common abbreviations (pt/part, vol/volume).
+ * Folds diacritics, strips punctuation, collapses whitespace, lowercases,
+ * and standardizes number words and common abbreviations (pt/part,
+ * vol/volume).
  */
 function normalize(name: string): string {
   return name
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/['\u2018\u2019`]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -73,6 +76,69 @@ function normalize(name: string): string {
       /\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/g,
       (m) => NUMBER_WORDS[m] ?? m
     );
+}
+
+/** Minimum squashed length before fuzzy matching applies; shorter names must match exactly. */
+const FUZZY_MIN_LENGTH = 5;
+/** Maximum normalized edit distance (relative to the longer string) tolerated as a match. */
+const FUZZY_TOLERANCE = 0.2;
+
+/**
+ * Levenshtein edit distance between two strings (single-row DP).
+ */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  let prev: number[] = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const curr: number[] = [i];
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = curr;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Tolerant equality on squashed (whitespace-free) normalized strings.
+ * Allows small edit-distance differences to absorb transliteration
+ * doubles ("Kala" vs "Kaala", "Bheemudo" vs "Bheemudho") while keeping
+ * short names exact-only so "Blur" never matches "Blue".
+ */
+function fuzzyEquals(a: string, b: string): boolean {
+  if (a === b) return true;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen < FUZZY_MIN_LENGTH) return false;
+  const tolerance = Math.floor(maxLen * FUZZY_TOLERANCE);
+  if (tolerance === 0) return false;
+  if (Math.abs(a.length - b.length) > tolerance) return false;
+  return levenshtein(a, b) <= tolerance;
+}
+
+/**
+ * Check whether the returned name begins with the requested name, comparing
+ * squashed (whitespace-free) forms with edit-distance tolerance. The prefix
+ * boundary must fall on a word edge of the returned name, so "Glass Animals"
+ * still cannot match "Animals". Squashing fixes token-boundary shifts from
+ * punctuation variants: "A.R.Rahman", "A.R. Rahman", and "AR Rahman" all
+ * squash to "arrahman".
+ */
+function fuzzyPrefixMatch(requested: string, returned: string): boolean {
+  const target = requested.replace(/ /g, '');
+  if (!target) return false;
+  let joined = '';
+  for (const token of returned.split(' ')) {
+    joined += token;
+    if (fuzzyEquals(joined, target)) return true;
+    if (joined.length > target.length * (1 + FUZZY_TOLERANCE)) break;
+  }
+  return false;
 }
 
 /**
@@ -103,7 +169,10 @@ export function artistMatches(requested: string, returned: string): boolean {
   ) {
     return true;
   }
-  return false;
+  // Tolerant prefix on squashed forms: absorbs punctuation-driven token
+  // shifts ("A.R.Rahman" vs "AR Rahman") and transliteration doubles
+  // ("Kaala Bhairava & M.M. Kreem" for "Kala Bhairava").
+  return fuzzyPrefixMatch(req, ret);
 }
 
 /**
@@ -121,10 +190,57 @@ function wordBoundaryMatch(a: string, b: string): boolean {
 }
 
 /**
+ * Word-boundary match with edit-distance tolerance on squashed forms,
+ * in both directions.
+ */
+function tolerantBoundaryMatch(a: string, b: string): boolean {
+  if (wordBoundaryMatch(a, b)) return true;
+  return fuzzyPrefixMatch(a, b) || fuzzyPrefixMatch(b, a);
+}
+
+/**
+ * Extract the subject of a "(From X)" / "[From X]" clause, squashed and
+ * normalized, or null when absent. The clause names the film a single was
+ * lifted from, so two titles that only differ here are different releases.
+ */
+function extractFromClause(name: string): string | null {
+  const match = name.match(/[([]\s*from\s+([^)\]]*)[)\]]/i);
+  return match ? normalize(match[1]).replace(/ /g, '') : null;
+}
+
+/**
+ * Strip release-type suffixes from an album title for comparison:
+ * "- Single" / "- EP" dashes, "(From ...)" clauses, and parenthetical
+ * qualifiers like "(Original Motion Picture Soundtrack)" or "(Deluxe
+ * Edition)". Applied to BOTH sides of a comparison so
+ * 'Komuram Bheemudo (From "RRR")' meets
+ * 'Komuram Bheemudo (From "RRR") - Single' at the shared core.
+ */
+export function stripAlbumSuffixes(name: string): string {
+  return name
+    .replace(/[([]\s*from\s+[^)\]]*[)\]]/gi, ' ')
+    .replace(
+      /\s*[([][^)\]]*(?:deluxe|remaster|bonus|expanded|anniversary|edition|version|soundtrack|motion picture|\bep\b|\bsingle\b)[^)\]]*[)\]]/gi,
+      ' '
+    )
+    .replace(
+      /\s*-\s*(?:EP|Single|Original Motion Picture Soundtrack|Original Soundtrack|OST)\s*$/i,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Check if a returned album/collection name is a reasonable match.
  * The returned name must start with the requested name (allowing
- * suffixes like "(Deluxe Edition)"). Exact word boundary required.
- * "GUTS" matches "GUTS (Deluxe)" but "Gold" does NOT match "Golden Greats".
+ * suffixes like "(Deluxe Edition)"), with a small edit-distance tolerance
+ * for transliteration variants. "GUTS" matches "GUTS (Deluxe)" but "Gold"
+ * does NOT match "Golden Greats".
+ *
+ * Falls back to comparing suffix-stripped cores from both sides, guarded
+ * by "(From X)" agreement: when both titles carry a From clause the
+ * clauses must match, since they identify the source film.
  *
  * When artistName is provided, also tries stripping the artist name prefix
  * from the requested album. Last.fm sometimes stores albums as
@@ -139,14 +255,33 @@ export function albumMatches(
   const req = stripThe(normalize(requested));
   const ret = stripThe(normalize(returned));
   if (!req || !ret) return false;
-  if (wordBoundaryMatch(req, ret)) return true;
+  if (tolerantBoundaryMatch(req, ret)) return true;
+
+  // Compare suffix-stripped cores, but only when any From clauses agree:
+  // "(From X)" carries meaning, so it is stripped from both sides only
+  // after confirming both sides name the same source film.
+  const reqFrom = extractFromClause(requested);
+  const retFrom = extractFromClause(returned);
+  const fromCompatible = !reqFrom || !retFrom || fuzzyEquals(reqFrom, retFrom);
+  if (fromCompatible) {
+    const reqCore = stripThe(normalize(stripAlbumSuffixes(requested)));
+    const retCore = stripThe(normalize(stripAlbumSuffixes(returned)));
+    if (
+      reqCore &&
+      retCore &&
+      (reqCore !== req || retCore !== ret) &&
+      tolerantBoundaryMatch(reqCore, retCore)
+    ) {
+      return true;
+    }
+  }
 
   // Try stripping artist name prefix from requested album
   if (artistName) {
     const normArtist = stripThe(normalize(cleanArtistName(artistName)));
     if (normArtist && req.startsWith(normArtist + ' ')) {
       const stripped = req.slice(normArtist.length + 1);
-      if (stripped && wordBoundaryMatch(stripped, ret)) return true;
+      if (stripped && tolerantBoundaryMatch(stripped, ret)) return true;
     }
   }
 

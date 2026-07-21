@@ -3,7 +3,7 @@
   "info": {
     "title": "Rewind API",
     "version": "1.0.0",
-    "description": "Personal data aggregation API. Syncs and serves data from Last.fm, Apple Music, Strava, Plex, Letterboxd, Discogs, Trakt, Instapaper, Google Calendar, and Gmail.\n\n## Domains\n\n| Domain | Source | Description |\n|--------|--------|-------------|\n| **Listening** | Last.fm, Apple Music | Scrobbles, top artists/albums/tracks, streaks, stats |\n| **Running** | Strava | Activities, splits, gear, personal records, year summaries |\n| **Watching** | Plex, Letterboxd | Movies, TV shows, watch history, ratings, reviews |\n| **Collecting** | Discogs, Trakt | Vinyl/CD collection, physical media, wantlist |\n| **Reading** | Instapaper | Articles, highlights, reading progress, word count |\n| **Attending** | Google Calendar, Gmail | Live events, tickets, sports games, concerts, venues |\n\n## Authentication\n\nAll endpoints require a Bearer token. There are two key types:\n\n- **Read keys** (`rw_live_...`) — access all GET endpoints\n- **Admin keys** (`rw_admin_...`) — access all endpoints including sync triggers and data management\n\nPass your key in the Authorization header: `Authorization: Bearer rw_live_...`\n\n## Pagination\n\nList endpoints return paginated responses:\n\n```json\n{\n  \"data\": [...],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 150, \"total_pages\": 8 }\n}\n```\n\nThe activity feed uses cursor-based pagination instead.\n\n## Quick Start\n\n```bash\n# Check the API is up\ncurl https://api.rewind.rest/v1/health\n\n# Fetch recent scrobbles (requires read key)\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/listening/recent\n\n# Fetch running stats\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/running/stats\n```\n\n## Errors\n\nAll errors follow the same envelope:\n\n```json\n{ \"error\": \"Not found\", \"status\": 404 }\n```\n\nCommon status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500 (server error).",
+    "description": "Personal data aggregation API. Syncs and serves data from Last.fm, Apple Music, Strava, Plex, Letterboxd, Discogs, Trakt, Instapaper, Foursquare/Swarm, Google Calendar, and Gmail.\n\n## Domains\n\n| Domain | Source | Description |\n|--------|--------|-------------|\n| **Listening** | Last.fm, Apple Music | Scrobbles, top artists/albums/tracks, streaks, stats |\n| **Running** | Strava | Activities, splits, gear, personal records, year summaries |\n| **Watching** | Plex, Letterboxd | Movies, TV shows, watch history, ratings, reviews |\n| **Collecting** | Discogs, Trakt | Vinyl/CD collection, physical media, wantlist |\n| **Reading** | Instapaper | Articles, highlights, reading progress, word count |\n| **Places** | Foursquare/Swarm | Check-ins, venues, categories, cities |\n| **Attending** | Google Calendar, Gmail | Live events, tickets, sports games, concerts, venues |\n\n## Authentication\n\nAll endpoints require a Bearer token. There are two key types:\n\n- **Read keys** (`rw_live_...`) — access all GET endpoints\n- **Admin keys** (`rw_admin_...`) — access all endpoints including sync triggers and data management\n\nPass your key in the Authorization header: `Authorization: Bearer rw_live_...`\n\n## Pagination\n\nList endpoints return paginated responses:\n\n```json\n{\n  \"data\": [...],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 150, \"total_pages\": 8 }\n}\n```\n\nThe activity feed uses cursor-based pagination instead.\n\n## Quick Start\n\n```bash\n# Check the API is up\ncurl https://api.rewind.rest/v1/health\n\n# Fetch recent scrobbles (requires read key)\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/listening/recent\n\n# Fetch running stats\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/running/stats\n```\n\n## Errors\n\nAll errors follow the same envelope:\n\n```json\n{ \"error\": \"Not found\", \"status\": 404 }\n```\n\nCommon status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500 (server error).",
     "contact": {
       "url": "https://github.com/pdugan20/rewind"
     }
@@ -34,6 +34,10 @@
     {
       "name": "Reading",
       "description": "Articles, highlights, and reading stats from Instapaper."
+    },
+    {
+      "name": "Places",
+      "description": "Foursquare/Swarm check-ins, venues, and stats."
     },
     {
       "name": "Attending",
@@ -1633,6 +1637,16 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          },
+          "geocoded": {
+            "type": "integer",
+            "description": "Running only: activities reverse-geocoded in this call (bounded batch).",
+            "example": 200
+          },
+          "geocode_remaining": {
+            "type": "integer",
+            "description": "Running only: activities with coordinates still awaiting geocoding. Call again to drain.",
+            "example": 864
           }
         },
         "required": [
@@ -1647,6 +1661,9 @@
           },
           {
             "$ref": "#/components/schemas/WatchingLetterboxdSyncResponse"
+          },
+          {
+            "$ref": "#/components/schemas/WatchingTraktSyncResponse"
           }
         ]
       },
@@ -1708,6 +1725,35 @@
           "skipped"
         ]
       },
+      "WatchingTraktSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "trakt"
+            ]
+          },
+          "movies_synced": {
+            "type": "integer"
+          },
+          "episodes_synced": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success",
+          "source",
+          "movies_synced",
+          "episodes_synced"
+        ]
+      },
       "SyncStatusResponse": {
         "type": "object",
         "properties": {
@@ -1724,6 +1770,35 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "PlacesSyncResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "items_synced": {
+            "type": "integer",
+            "example": 250
+          },
+          "remaining": {
+            "type": "integer",
+            "example": 1830
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "items_synced",
+          "remaining",
+          "timestamp"
         ]
       },
       "ActivityDeletedResponse": {
@@ -6341,6 +6416,9 @@
                         "total_runs": {
                           "type": "number"
                         },
+                        "total_activities": {
+                          "type": "number"
+                        },
                         "total_distance_mi": {
                           "type": "number"
                         },
@@ -6371,6 +6449,7 @@
                       },
                       "required": [
                         "total_runs",
+                        "total_activities",
                         "total_distance_mi",
                         "total_elevation_ft",
                         "total_duration",
@@ -6388,6 +6467,7 @@
                 "example": {
                   "data": {
                     "total_runs": 1350,
+                    "total_activities": 1520,
                     "total_distance_mi": 6069.88,
                     "total_elevation_ft": 238690.03,
                     "total_duration": "828:56:08",
@@ -6840,6 +6920,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -6923,6 +7006,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -6954,6 +7038,7 @@
                       "id": 17748681520,
                       "strava_id": 17748681520,
                       "name": "Monday Evening Run",
+                      "sport_type": "Run",
                       "date": "2026-03-16T17:00:05Z",
                       "distance_mi": 4.49,
                       "duration": "36:02",
@@ -7135,6 +7220,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -7218,6 +7306,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -7273,6 +7362,7 @@
                       "id": 17748681520,
                       "strava_id": 17748681520,
                       "name": "Monday Evening Run",
+                      "sport_type": "Run",
                       "date": "2026-03-16T17:00:05Z",
                       "distance_mi": 4.49,
                       "duration": "36:02",
@@ -7348,6 +7438,9 @@
                       "type": "number"
                     },
                     "name": {
+                      "type": "string"
+                    },
+                    "sport_type": {
                       "type": "string"
                     },
                     "date": {
@@ -7433,6 +7526,7 @@
                     "id",
                     "strava_id",
                     "name",
+                    "sport_type",
                     "date",
                     "distance_mi",
                     "duration",
@@ -7456,6 +7550,7 @@
                   "id": 17748681520,
                   "strava_id": 17748681520,
                   "name": "Monday Evening Run",
+                  "sport_type": "Run",
                   "date": "2026-03-16T17:00:05Z",
                   "distance_mi": 4.49,
                   "duration": "36:02",
@@ -8479,6 +8574,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -8562,6 +8660,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -8593,6 +8692,7 @@
                       "id": 12345,
                       "strava_id": 12345,
                       "name": "Portland Marathon",
+                      "sport_type": "Run",
                       "date": "2024-10-06",
                       "distance_mi": 26.2,
                       "duration": "3:45:00",
@@ -8796,6 +8896,9 @@
                           "name": {
                             "type": "string"
                           },
+                          "sport_type": {
+                            "type": "string"
+                          },
                           "date": {
                             "type": "string"
                           },
@@ -8879,6 +8982,7 @@
                           "id",
                           "strava_id",
                           "name",
+                          "sport_type",
                           "date",
                           "distance_mi",
                           "duration",
@@ -8943,6 +9047,7 @@
                       "id": 12345,
                       "strava_id": 12345,
                       "name": "Portland Half Marathon",
+                      "sport_type": "Run",
                       "date": "2025-10-06",
                       "distance_mi": 13.1,
                       "duration": "1:45:00",
@@ -19062,6 +19167,560 @@
         }
       }
     },
+    "/v1/places/recent": {
+      "get": {
+        "operationId": "getPlacesRecent",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Recent check-ins",
+        "description": "Returns Foursquare/Swarm check-ins, newest first.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "example": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent check-ins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "venue_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "venue_name": {
+                            "type": "string"
+                          },
+                          "venue_category": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "venue_icon": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "venue_city": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "venue_state": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "venue_country": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lat": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "lng": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "checked_in_at": {
+                            "type": "string"
+                          },
+                          "shout": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "venue_id",
+                          "venue_name",
+                          "venue_category",
+                          "venue_icon",
+                          "venue_city",
+                          "venue_state",
+                          "venue_country",
+                          "lat",
+                          "lng",
+                          "checked_in_at",
+                          "shout"
+                        ]
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": 4821,
+                      "venue_id": "4b5b3f2af964a520fb0029e3",
+                      "venue_name": "Analog Coffee",
+                      "venue_category": "Coffee Shop",
+                      "venue_icon": "https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png",
+                      "venue_city": "Seattle",
+                      "venue_state": "WA",
+                      "venue_country": "United States",
+                      "lat": 47.6205,
+                      "lng": -122.3212,
+                      "checked_in_at": "2026-03-18T17:05:00.000Z",
+                      "shout": "Morning cortado"
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "limit": 20,
+                    "total": 4821,
+                    "total_pages": 242
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/stats": {
+      "get": {
+        "operationId": "getPlacesStats",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Check-in stats",
+        "description": "Returns aggregate check-in statistics: total check-ins, unique venues, this-year count, top categories, top cities, and top venues. Optional date/from/to params scope every aggregation to the range except this_year, which always counts the current UTC year.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check-in statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "number"
+                    },
+                    "unique_venues": {
+                      "type": "number"
+                    },
+                    "this_year": {
+                      "type": "number"
+                    },
+                    "top_categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          },
+                          "icon": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "count",
+                          "icon"
+                        ]
+                      }
+                    },
+                    "top_cities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "city",
+                          "count"
+                        ]
+                      }
+                    },
+                    "top_venues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "venue_name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          },
+                          "icon": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "city": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "venue_name",
+                          "count",
+                          "icon",
+                          "city"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "unique_venues",
+                    "this_year",
+                    "top_categories",
+                    "top_cities",
+                    "top_venues"
+                  ]
+                },
+                "example": {
+                  "total": 4821,
+                  "unique_venues": 1289,
+                  "this_year": 143,
+                  "top_categories": [
+                    {
+                      "category": "Coffee Shop",
+                      "count": 612,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png"
+                    },
+                    {
+                      "category": "Bar",
+                      "count": 402,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/nightlife/pub_64.png"
+                    }
+                  ],
+                  "top_cities": [
+                    {
+                      "city": "Seattle",
+                      "count": 3120
+                    },
+                    {
+                      "city": "Portland",
+                      "count": 288
+                    }
+                  ],
+                  "top_venues": [
+                    {
+                      "venue_name": "Analog Coffee",
+                      "count": 96,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/food/coffeeshop_64.png",
+                      "city": "Seattle"
+                    },
+                    {
+                      "venue_name": "Bait Shop",
+                      "count": 71,
+                      "icon": "https://ss3.4sqi.net/img/categories_v2/nightlife/pub_64.png",
+                      "city": "Seattle"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/trends": {
+      "get": {
+        "operationId": "getPlacesTrends",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Check-in trends",
+        "description": "Returns monthly check-in counts. Supports date filtering via from/to params.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trend data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "period": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "period",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "period",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "period": "monthly",
+                  "data": [
+                    {
+                      "period": "2026-01",
+                      "count": 14
+                    },
+                    {
+                      "period": "2026-02",
+                      "count": 9
+                    },
+                    {
+                      "period": "2026-03",
+                      "count": 17
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/attending/events": {
       "get": {
         "operationId": "listAttendedEvents",
@@ -24664,7 +25323,26 @@
           "Admin"
         ],
         "summary": "Trigger Strava sync",
-        "description": "Manually trigger a Strava running activities sync.",
+        "description": "Manually trigger a Strava activities sync (all sport types). Pass full=true to ignore the incremental cursor and re-walk the entire activity history.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ],
+              "description": "Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.",
+              "example": "true"
+            },
+            "required": false,
+            "description": "Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.",
+            "name": "full",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Sync completed successfully",
@@ -24672,6 +25350,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SyncCompletedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -24707,20 +25395,38 @@
           "Admin"
         ],
         "summary": "Trigger watching sync",
-        "description": "Manually trigger a watching sync from Plex or Letterboxd. Use the source query parameter to select the source.",
+        "description": "Manually trigger a watching sync from Plex, Letterboxd, or Trakt. Use the source query parameter to select the source. For Trakt, pass full=true to ignore the incremental cursor and re-walk the entire history.",
         "parameters": [
           {
             "schema": {
               "type": "string",
               "enum": [
                 "plex",
-                "letterboxd"
+                "letterboxd",
+                "trakt"
               ],
               "default": "plex",
               "example": "plex"
             },
             "required": false,
             "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ],
+              "description": "Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.",
+              "example": "true"
+            },
+            "required": false,
+            "description": "Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.",
+            "name": "full",
             "in": "query"
           }
         ],
@@ -24860,6 +25566,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SyncCompletedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/sync/places": {
+      "post": {
+        "operationId": "adminSyncPlaces",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Trigger Foursquare check-in sync",
+        "description": "Runs one bounded batch of the Foursquare check-in walk (end-anchored on the newest-first feed, resumable). Re-run until remaining: 0.",
+        "responses": {
+          "200": {
+            "description": "Sync batch completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesSyncResponse"
                 }
               }
             }

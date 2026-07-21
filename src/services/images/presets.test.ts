@@ -48,19 +48,19 @@ describe('buildCdnUrl', () => {
     expect(
       buildCdnUrl('watching/movies/456/original.jpg', 'poster-sm', 3)
     ).toBe(
-      'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/456/original.jpg?v=3'
+      'https://cdn.dinakartumu.com/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/456/original.jpg?v=3'
     );
   });
 
   it('serves original images without a transform segment', () => {
     expect(
       buildCdnUrl('listening/albums/abc/original.jpg', 'original', 2)
-    ).toBe('https://cdn.rewind.rest/listening/albums/abc/original.jpg?v=2');
+    ).toBe('https://cdn.dinakartumu.com/listening/albums/abc/original.jpg?v=2');
   });
 
   it('falls back to the original URL for an unknown preset', () => {
     expect(buildCdnUrl('test/key.jpg', 'missing', 4)).toBe(
-      'https://cdn.rewind.rest/test/key.jpg?v=4'
+      'https://cdn.dinakartumu.com/test/key.jpg?v=4'
     );
   });
 
@@ -72,7 +72,7 @@ describe('buildCdnUrl', () => {
         5
       )
     ).toBe(
-      'https://cdn.rewind.rest/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/tmdb%3A15%20%231/poster%3Ffinal%26crop%3D.jpg?v=5'
+      'https://cdn.dinakartumu.com/cdn-cgi/image/width=240,height=360,fit=cover,format=auto,quality=85/watching/movies/tmdb%3A15%20%231/poster%3Ffinal%26crop%3D.jpg?v=5'
     );
   });
 
@@ -80,7 +80,7 @@ describe('buildCdnUrl', () => {
     expect(
       buildCdnUrl('listening/albums/a+b=c/original #1.jpg', 'original', 6)
     ).toBe(
-      'https://cdn.rewind.rest/listening/albums/a%2Bb%3Dc/original%20%231.jpg?v=6'
+      'https://cdn.dinakartumu.com/listening/albums/a%2Bb%3Dc/original%20%231.jpg?v=6'
     );
   });
 });

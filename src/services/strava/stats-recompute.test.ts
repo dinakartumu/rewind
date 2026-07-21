@@ -17,11 +17,12 @@ function makeActivity(overrides: {
   movingTimeSeconds: number;
   elevationFeet?: number;
   isRace?: boolean;
+  sportType?: string;
 }) {
   return {
     stravaId: overrides.stravaId,
-    name: `Run ${overrides.stravaId}`,
-    sportType: 'Run',
+    name: `${overrides.sportType ?? 'Run'} ${overrides.stravaId}`,
+    sportType: overrides.sportType ?? 'Run',
     distanceMeters: overrides.distanceMiles * 1609.34,
     distanceMiles: overrides.distanceMiles,
     movingTimeSeconds: overrides.movingTimeSeconds,
@@ -235,6 +236,87 @@ describe('recomputeStats incremental vs full', () => {
       fullLifetime.totalDistanceMiles
     );
     expect(incLifetime.yearsActive).toBe(fullLifetime.yearsActive);
+  });
+
+  it('scopes run-only fields to run sport types while totals include all sports', async () => {
+    await db.insert(stravaActivities).values([
+      // Ride is earlier and longer than the run
+      makeActivity({
+        stravaId: 1,
+        startDateLocal: '2024-03-10T07:00:00',
+        distanceMiles: 30.0,
+        movingTimeSeconds: 5400,
+        sportType: 'Ride',
+      }),
+      makeActivity({
+        stravaId: 2,
+        startDateLocal: '2024-03-15T07:00:00',
+        distanceMiles: 5.0,
+        movingTimeSeconds: 2400,
+        sportType: 'Run',
+      }),
+    ]);
+
+    await recomputeStats(db);
+
+    const [y2024] = await db
+      .select()
+      .from(stravaYearSummaries)
+      .where(eq(stravaYearSummaries.year, 2024));
+
+    // Totals include all sports
+    expect(y2024.totalDistanceMiles).toBe(35.0);
+    expect(y2024.totalDurationSeconds).toBe(7800);
+    // Run-only fields exclude the ride
+    expect(y2024.totalRuns).toBe(1);
+    expect(y2024.avgPaceFormatted).toBe('8:00/mi'); // 2400s / 5mi, run only
+    expect(y2024.longestRunMiles).toBe(5.0);
+
+    const [lifetime] = await db
+      .select()
+      .from(stravaLifetimeStats)
+      .where(eq(stravaLifetimeStats.userId, 1));
+
+    expect(lifetime.totalDistanceMiles).toBe(35.0);
+    expect(lifetime.totalRuns).toBe(1);
+    expect(lifetime.avgPaceFormatted).toBe('8:00/mi');
+    // First run is the run, not the earlier ride
+    expect(lifetime.firstRun).toBe('2024-03-15T07:00:00');
+    // Eddington from runs only: one 5mi day -> 1 (2 if the 30mi ride counted)
+    expect(lifetime.eddingtonNumber).toBe(1);
+  });
+
+  it('incremental recompute keeps run-only fields run-scoped', async () => {
+    await db.insert(stravaActivities).values([
+      makeActivity({
+        stravaId: 1,
+        startDateLocal: '2024-03-15T07:00:00',
+        distanceMiles: 5.0,
+        movingTimeSeconds: 2400,
+        sportType: 'Run',
+      }),
+      makeActivity({
+        stravaId: 2,
+        startDateLocal: '2024-03-10T07:00:00',
+        distanceMiles: 30.0,
+        movingTimeSeconds: 5400,
+        sportType: 'Ride',
+      }),
+    ]);
+
+    // Incremental path (recomputeLifetimeFromSummaries)
+    await recomputeStats(db, new Set([2024]));
+
+    const [lifetime] = await db
+      .select()
+      .from(stravaLifetimeStats)
+      .where(eq(stravaLifetimeStats.userId, 1));
+
+    expect(lifetime.totalRuns).toBe(1);
+    expect(lifetime.totalDistanceMiles).toBe(35.0);
+    expect(lifetime.avgPaceFormatted).toBe('8:00/mi');
+    expect(lifetime.firstRun).toBe('2024-03-15T07:00:00');
+    expect(lifetime.eddingtonNumber).toBe(1);
   });
 
   it('incremental recompute handles year with all activities deleted', async () => {

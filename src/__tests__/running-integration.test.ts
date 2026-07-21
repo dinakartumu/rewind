@@ -144,6 +144,7 @@ describe('Running domain integration', () => {
       const activities = [
         {
           year: 2024,
+          sportType: 'Run',
           distanceMiles: 5.0,
           movingTimeSeconds: 2400,
           elevationFeet: 150,
@@ -152,6 +153,7 @@ describe('Running domain integration', () => {
         },
         {
           year: 2024,
+          sportType: 'Run',
           distanceMiles: 10.0,
           movingTimeSeconds: 5000,
           elevationFeet: 300,
@@ -160,6 +162,7 @@ describe('Running domain integration', () => {
         },
         {
           year: 2023,
+          sportType: 'Run',
           distanceMiles: 3.0,
           movingTimeSeconds: 1500,
           elevationFeet: 50,

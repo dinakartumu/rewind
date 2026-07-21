@@ -88,7 +88,7 @@ export const watchHistory = sqliteTable(
       .notNull()
       .references(() => movies.id),
     watchedAt: text('watched_at').notNull(),
-    source: text('source', { enum: ['plex', 'letterboxd', 'manual'] })
+    source: text('source', { enum: ['plex', 'letterboxd', 'manual', 'trakt'] })
       .notNull()
       .default('plex'),
     userRating: real('user_rating'),
@@ -97,6 +97,7 @@ export const watchHistory = sqliteTable(
     review: text('review'),
     reviewUrl: text('review_url'),
     letterboxdGuid: text('letterboxd_guid'),
+    traktHistoryId: integer('trakt_history_id'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -108,6 +109,7 @@ export const watchHistory = sqliteTable(
     index('idx_watch_history_source').on(table.source),
     index('idx_watch_history_movie_watched').on(table.movieId, table.watchedAt),
     uniqueIndex('idx_watch_history_letterboxd_guid').on(table.letterboxdGuid),
+    uniqueIndex('idx_watch_history_trakt_history_id').on(table.traktHistoryId),
   ]
 );
 
@@ -131,12 +133,13 @@ export const watchStats = sqliteTable(
   (table) => [index('idx_watch_stats_user_id').on(table.userId)]
 );
 
-export const plexShows = sqliteTable(
-  'plex_shows',
+export const shows = sqliteTable(
+  'shows',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     userId: integer('user_id').notNull().default(1),
-    plexRatingKey: text('plex_rating_key').notNull().unique(),
+    plexRatingKey: text('plex_rating_key').unique(),
+    traktId: integer('trakt_id').unique(),
     title: text('title').notNull(),
     year: integer('year'),
     tmdbId: integer('tmdb_id'),
@@ -153,37 +156,42 @@ export const plexShows = sqliteTable(
       .$defaultFn(() => new Date().toISOString()),
   },
   (table) => [
-    index('idx_plex_shows_user_id').on(table.userId),
-    index('idx_plex_shows_tmdb_id').on(table.tmdbId),
+    index('idx_shows_user_id').on(table.userId),
+    uniqueIndex('idx_shows_tmdb_id').on(table.tmdbId),
   ]
 );
 
-export const plexEpisodesWatched = sqliteTable(
-  'plex_episodes_watched',
+export const episodesWatched = sqliteTable(
+  'episodes_watched',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     userId: integer('user_id').notNull().default(1),
     showId: integer('show_id')
       .notNull()
-      .references(() => plexShows.id),
+      .references(() => shows.id),
     seasonNumber: integer('season_number').notNull(),
     episodeNumber: integer('episode_number').notNull(),
     title: text('title'),
     watchedAt: text('watched_at').notNull(),
+    source: text('source', { enum: ['plex', 'trakt'] })
+      .notNull()
+      .default('plex'),
+    traktHistoryId: integer('trakt_history_id'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
   },
   (table) => [
-    index('idx_plex_episodes_watched_show_id').on(table.showId),
-    index('idx_plex_episodes_watched_watched_at').on(table.watchedAt),
-    index('idx_plex_episodes_watched_user_id').on(table.userId),
-    index('idx_plex_episodes_timeline').on(table.userId, table.watchedAt),
-    uniqueIndex('idx_plex_episodes_unique').on(
+    index('idx_episodes_watched_show_id').on(table.showId),
+    index('idx_episodes_watched_watched_at').on(table.watchedAt),
+    index('idx_episodes_watched_user_id').on(table.userId),
+    index('idx_episodes_timeline').on(table.userId, table.watchedAt),
+    uniqueIndex('idx_episodes_unique').on(
       table.showId,
       table.seasonNumber,
       table.episodeNumber,
       table.watchedAt
     ),
+    uniqueIndex('idx_episodes_trakt_history_id').on(table.traktHistoryId),
   ]
 );

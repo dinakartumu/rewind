@@ -1,10 +1,10 @@
 # Running Domain
 
-14+ years of Strava running data since 2011. Activities with GPS routes, pace, heart rate, elevation, splits, gear tracking, and personal records. OAuth 2.0 with refresh token rotation.
+14+ years of Strava data since 2011, covering all activity types (runs, rides, hikes, walks, ...). Activities with GPS routes, pace, heart rate, elevation, splits, gear tracking, and personal records. Run-only derived data (PRs, pace stats, streaks, Eddington) is scoped to `sport_type` Run/TrailRun/VirtualRun; totals include all sports. OAuth 2.0 with refresh token rotation.
 
 ## Data Source
 
-- Strava -- all running activities via OAuth 2.0 API. App registered at <https://www.strava.com/settings/api>
+- Strava -- all activity types via OAuth 2.0 API. App registered at <https://www.strava.com/settings/api>
 
 ## Strava API
 

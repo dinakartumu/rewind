@@ -51,7 +51,7 @@ describe('getImageAttachment', () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result!.cdn_url).toContain('cdn.rewind.rest');
+    expect(result!.cdn_url).toContain('cdn.dinakartumu.com');
     expect(result!.cdn_url).toContain('listening/albums/123/original.jpg');
     expect(result!.cdn_url).toContain('v=2');
     expect(result!.thumbhash).toBe('abc123');

@@ -29,6 +29,7 @@ const activityFixture = {
   elevation_ft: 120,
   city: 'Brooklyn',
   state: 'NY',
+  polyline: '_wfbHb|niVD_@TEd@',
   is_race: false,
   strava_url: 'https://strava.com/activities/1001',
 };
@@ -67,6 +68,7 @@ const activityDetailFixture = {
   suffer_score: 45,
   city: 'Brooklyn',
   state: 'NY',
+  polyline: '_wfbHb|niVD_@TEd@',
   is_race: false,
   workout_type: 'Run',
   strava_url: 'https://strava.com/activities/1001',
@@ -178,6 +180,68 @@ describe('output-schema conformance — running', () => {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();
     }
+  });
+
+  it('get_recent_runs: items expose location + has_route, never raw polylines', async () => {
+    const client = await buildClient();
+    const res = await client.callTool({
+      name: 'get_recent_runs',
+      arguments: {},
+    });
+    expect(res.isError).toBeFalsy();
+    const { items } = res.structuredContent as {
+      items: Array<Record<string, unknown>>;
+    };
+    expect(items).toHaveLength(1);
+    expect(items[0].city).toBe('Brooklyn');
+    expect(items[0].state).toBe('NY');
+    // List items carry a boolean flag instead of the encoded polyline --
+    // full route data is reserved for get_activity_details (context bloat).
+    expect(items[0].has_route).toBe(true);
+    expect(items[0]).not.toHaveProperty('polyline');
+    // The place is woven into the text line.
+    const textBlock = (
+      res.content as Array<{ type: string; text?: string }>
+    ).find((b) => b.type === 'text');
+    expect(textBlock?.text).toContain('in Brooklyn, NY');
+  });
+
+  it('get_recent_runs: has_route is false when the run has no polyline', async () => {
+    const rewindClient = new RewindClient('https://api.test', 'rw_test');
+    vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
+      if (path === '/running/recent')
+        return { data: [{ ...activityFixture, polyline: null }] };
+      return {};
+    });
+    const server = createServer(rewindClient);
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'no-route-test', version: '1.0.0' });
+    await server.connect(st);
+    await client.connect(ct);
+
+    const res = await client.callTool({
+      name: 'get_recent_runs',
+      arguments: {},
+    });
+    expect(res.isError).toBeFalsy();
+    const { items } = res.structuredContent as {
+      items: Array<Record<string, unknown>>;
+    };
+    expect(items[0].has_route).toBe(false);
+    expect(items[0]).not.toHaveProperty('polyline');
+  });
+
+  it('get_activity_details: exposes city, state, and the full polyline', async () => {
+    const client = await buildClient();
+    const res = await client.callTool({
+      name: 'get_activity_details',
+      arguments: { id: 1 },
+    });
+    expect(res.isError).toBeFalsy();
+    const detail = res.structuredContent as Record<string, unknown>;
+    expect(detail.city).toBe('Brooklyn');
+    expect(detail.state).toBe('NY');
+    expect(detail.polyline).toBe('_wfbHb|niVD_@TEd@');
   });
 
   it('every running tool advertises a clean outputSchema', async () => {

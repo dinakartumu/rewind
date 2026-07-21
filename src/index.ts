@@ -13,6 +13,7 @@ import imagesRoute from './routes/images.js';
 import collecting from './routes/collecting.js';
 import feed from './routes/feed.js';
 import reading from './routes/reading.js';
+import places from './routes/places.js';
 import attending from './routes/attending.js';
 import search from './routes/search.js';
 import exportRoute from './routes/export.js';
@@ -27,7 +28,9 @@ import { syncWatching } from './services/plex/sync.js';
 import { syncLetterboxd } from './services/letterboxd/sync.js';
 import { syncCollecting } from './services/discogs/sync.js';
 import { syncTraktCollection } from './services/trakt/sync.js';
+import { syncTraktHistory } from './services/trakt/history-sync.js';
 import { syncReading } from './services/instapaper/sync.js';
+import { syncPlaces } from './services/foursquare/sync.js';
 import { reconcileReadingDeletions } from './services/instapaper/reconcile-deletions.js';
 import { backfillAttending } from './services/attending/backfill.js';
 import {
@@ -91,6 +94,7 @@ const routes = app
   .route('/', imagesRoute)
   .route('/', collecting)
   .route('/reading', reading)
+  .route('/places', places)
   .route('/attending', attending)
   .route('/feed', feed)
   .route('/search', search)
@@ -320,32 +324,76 @@ export default {
         break;
       }
       case '0 */6 * * *': {
-        const letterboxdRetry = await shouldRetry(db, 'watching');
-        if (letterboxdRetry.shouldRetry) {
+        const watchingRetry = await shouldRetry(db, 'watching');
+        if (
+          watchingRetry.shouldRetry &&
+          (env.LETTERBOXD_USERNAME || env.TRAKT_CLIENT_ID)
+        ) {
           console.log(
-            `[SYNC] Retrying failed watching sync (${letterboxdRetry.consecutiveFailures} consecutive failures)`
+            `[SYNC] Retrying failed watching sync (${watchingRetry.consecutiveFailures} consecutive failures)`
           );
         }
-        console.log('[SYNC] Letterboxd RSS sync');
-        ctx.waitUntil(
-          (async () => {
-            try {
-              await syncLetterboxd(db, env);
-              const skip = await shouldSkipWatchingImages(db);
-              if (skip) {
+        if (env.LETTERBOXD_USERNAME) {
+          console.log('[SYNC] Letterboxd RSS sync');
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await syncLetterboxd(db, env);
+                // When Trakt is configured, its block below owns watching
+                // image processing. Without Trakt, run it here so
+                // Letterboxd-only movies still get posters.
+                if (!env.TRAKT_CLIENT_ID) {
+                  const skip = await shouldSkipWatchingImages(db);
+                  if (skip) {
+                    console.log(
+                      '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
+                    );
+                  } else {
+                    await processWatchingImages(db, env);
+                  }
+                }
+              } catch (error) {
                 console.log(
-                  '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
+                  `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`
                 );
-              } else {
-                await processWatchingImages(db, env);
               }
-            } catch (error) {
+            })()
+          );
+        }
+
+        if (env.TRAKT_CLIENT_ID) {
+          console.log('[SYNC] Trakt watch history sync');
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await syncTraktHistory(env);
+                const skip = await shouldSkipWatchingImages(db);
+                if (skip) {
+                  console.log(
+                    '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
+                  );
+                } else {
+                  await processWatchingImages(db, env);
+                }
+              } catch (error) {
+                console.log(
+                  `[ERROR] Trakt history sync failed: ${error instanceof Error ? error.message : String(error)}`
+                );
+              }
+            })()
+          );
+        }
+
+        if (env.FOURSQUARE_ACCESS_TOKEN) {
+          console.log('[SYNC] Foursquare check-in sync');
+          ctx.waitUntil(
+            syncPlaces(env).catch((error) =>
               console.log(
-                `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`
-              );
-            }
-          })()
-        );
+                `[ERROR] Foursquare sync failed: ${error instanceof Error ? error.message : String(error)}`
+              )
+            )
+          );
+        }
 
         // Reading sync (Instapaper)
         const readingRetry = await shouldRetry(db, 'reading');

@@ -300,7 +300,7 @@
     },
     {
       "name": "get_activity_details",
-      "description": "Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, and a Strava resource link.",
+      "description": "Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, the encoded route polyline, and a Strava resource link.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -381,6 +381,12 @@
               "null"
             ]
           },
+          "polyline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "is_race": {
             "type": "boolean"
           },
@@ -408,6 +414,7 @@
           "suffer_score",
           "city",
           "state",
+          "polyline",
           "is_race",
           "workout_type",
           "strava_url"
@@ -5390,6 +5397,131 @@
       }
     },
     {
+      "name": "get_places_stats",
+      "description": "Get aggregate Foursquare/Swarm check-in statistics: total check-ins, unique venues, this-year count, top categories (with icon URLs), top cities, and top venues. Date filters scope every aggregation to the range except this_year, which always counts the current year.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "unique_venues": {
+            "type": "number"
+          },
+          "this_year": {
+            "type": "number"
+          },
+          "top_categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "category",
+                "count",
+                "icon"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "top_cities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "city",
+                "count"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "top_venues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "venue_name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "venue_name",
+                "count",
+                "icon",
+                "city"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "total",
+          "unique_venues",
+          "this_year",
+          "top_categories",
+          "top_cities",
+          "top_venues"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_random_highlight",
       "description": "Get a single random highlight from saved Instapaper articles. Great for daily inspiration or reflection.",
       "inputSchema": {
@@ -5636,6 +5768,157 @@
           "total_highlights",
           "total_word_count",
           "avg_estimated_read_min"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_recent_checkins",
+      "description": "Get recent Foursquare/Swarm check-ins, newest first. Returns venue name, category and icon URL, city/state/country, check-in time, and any shout (attached note). Supports date filtering.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20,
+            "description": "Number of recent check-ins to return (max 50)"
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "venue_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_name": {
+                  "type": "string"
+                },
+                "venue_category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_country": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lat": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "lng": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "checked_in_at": {
+                  "type": "string"
+                },
+                "shout": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "venue_id",
+                "venue_name",
+                "venue_category",
+                "venue_icon",
+                "venue_city",
+                "venue_state",
+                "venue_country",
+                "lat",
+                "lng",
+                "checked_in_at",
+                "shout"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "total_pages": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total",
+              "total_pages"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "items",
+          "pagination"
         ],
         "additionalProperties": true,
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -6080,6 +6363,9 @@
                     "null"
                   ]
                 },
+                "has_route": {
+                  "type": "boolean"
+                },
                 "is_race": {
                   "type": "boolean"
                 },
@@ -6100,6 +6386,7 @@
                 "elevation_ft",
                 "city",
                 "state",
+                "has_route",
                 "is_race"
               ],
               "additionalProperties": true
@@ -7833,7 +8120,7 @@
       "arguments": [
         {
           "name": "domain",
-          "description": "Domain to compare (listening, running, watching, collecting, reading)",
+          "description": "Domain to compare (listening, running, watching, collecting, reading, places)",
           "required": true
         },
         {

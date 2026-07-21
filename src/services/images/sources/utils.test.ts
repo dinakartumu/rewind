@@ -114,6 +114,52 @@ describe('artistMatches', () => {
       true
     );
   });
+
+  // Live regression: Apple Music credits the RRR single to "Kaala Bhairava"
+  // while Last.fm stores "Kala Bhairava". Doubled-vowel transliteration
+  // variants must match within a small edit-distance tolerance.
+  it('matches doubled-vowel transliteration variants', () => {
+    expect(artistMatches('Kala Bhairava', 'Kaala Bhairava')).toBe(true);
+    expect(artistMatches('Kaala Bhairava', 'Kala Bhairava')).toBe(true);
+  });
+
+  it('matches transliteration variant inside a multi-artist credit', () => {
+    expect(artistMatches('Kala Bhairava', 'Kaala Bhairava & M.M. Kreem')).toBe(
+      true
+    );
+    expect(
+      artistMatches('Kala Bhairava', 'Kaala Bhairava & M.M. Keeravani')
+    ).toBe(true);
+  });
+
+  // Live regression: Deezer indexes "A.R.Rahman" (no spaces), Apple Music
+  // indexes "A.R. Rahman" and "AR RAHMAN". Punctuation/spacing must not
+  // shift token boundaries and break the match.
+  it('matches dotted vs undotted initials', () => {
+    expect(artistMatches('A.R. Rahman', 'A.R.Rahman')).toBe(true);
+    expect(artistMatches('AR Rahman', 'A.R.Rahman')).toBe(true);
+    expect(artistMatches('AR Rahman', 'A.R. Rahman')).toBe(true);
+    expect(artistMatches('A.R. Rahman', 'AR RAHMAN')).toBe(true);
+    expect(artistMatches('A R Rahman', 'A.R. Rahman')).toBe(true);
+  });
+
+  it('matches diacritic spellings against plain ASCII', () => {
+    expect(artistMatches('Bjork', 'Björk')).toBe(true);
+    expect(artistMatches('Björk', 'Bjork')).toBe(true);
+    expect(artistMatches('Sigur Ros', 'Sigur Rós')).toBe(true);
+  });
+
+  it('rejects clearly wrong artists despite tolerance', () => {
+    expect(artistMatches('Kala Bhairava', 'Various Artists')).toBe(false);
+    expect(artistMatches('A.R. Rahman', 'A.R. Murugadoss')).toBe(false);
+    expect(artistMatches('Kala Bhairava', 'Rahul Sipligunj')).toBe(false);
+  });
+
+  it('does not let tolerance break short-name safety', () => {
+    // Short names must remain exact-only: no 1-edit fuzz on tiny strings
+    expect(artistMatches('Blur', 'Blue')).toBe(false);
+    expect(artistMatches('Zero 7', 'Zed 7')).toBe(false);
+  });
 });
 
 describe('albumMatches', () => {
@@ -200,5 +246,55 @@ describe('albumMatches', () => {
     expect(
       albumMatches('Greatest Hits Vol. 1', 'Greatest Hits Volume One')
     ).toBe(true);
+  });
+
+  // Live regression: Apple Music returns 'Komuram Bheemudo (From "RRR") -
+  // Single' for the stored album 'Komuram Bheemudo (From "RRR")'.
+  it('matches when returned adds "- Single" after a From clause', () => {
+    expect(
+      albumMatches(
+        'Komuram Bheemudo (From "RRR")',
+        'Komuram Bheemudo (From "RRR") - Single'
+      )
+    ).toBe(true);
+  });
+
+  // Apple's third candidate spells it "Bheemudho" — transliteration variant
+  // plus suffix must still match after suffix stripping on both sides.
+  it('matches transliteration variant with suffix differences', () => {
+    expect(
+      albumMatches(
+        'Komuram Bheemudo (From "RRR")',
+        'Komuram Bheemudho (From "RRR") - Single'
+      )
+    ).toBe(true);
+  });
+
+  it('matches soundtrack suffix stripped from both sides', () => {
+    expect(
+      albumMatches(
+        'RRR (Original Motion Picture Soundtrack)',
+        'RRR (Telugu) (Original Motion Picture Soundtrack)'
+      )
+    ).toBe(true);
+  });
+
+  // "(From X)" carries meaning: two songs sharing a title but lifted from
+  // different films must NOT match once suffixes are stripped.
+  it('rejects matching titles with conflicting From clauses', () => {
+    expect(
+      albumMatches(
+        'Jai Ho (From "Slumdog Millionaire")',
+        'Jai Ho (From "Some Other Film") - Single'
+      )
+    ).toBe(false);
+  });
+
+  it('still rejects unrelated albums despite tolerance', () => {
+    expect(albumMatches('Komuram Bheemudo', 'Naatu Naatu - Single')).toBe(
+      false
+    );
+    expect(albumMatches('Gold', '20 Golden Greats')).toBe(false);
+    expect(albumMatches('Blue', 'Blur')).toBe(false);
   });
 });

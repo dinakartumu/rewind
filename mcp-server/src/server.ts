@@ -11,6 +11,7 @@ import { registerRunningTools } from './tools/running.js';
 import { registerWatchingTools } from './tools/watching.js';
 import { registerCollectingTools } from './tools/collecting.js';
 import { registerReadingTools } from './tools/reading.js';
+import { registerPlacesTools } from './tools/places.js';
 import { registerCrossDomainTools } from './tools/cross-domain.js';
 import { registerAttendingTools } from './tools/attending.js';
 import { healthOutputSchema } from './tools/schemas/system.js';
@@ -26,10 +27,12 @@ import {
 const SERVER_INSTRUCTIONS = [
   "Rewind is the user's personal data archive: listening (Last.fm + Apple Music),",
   'running (Strava), watching (Plex + Letterboxd), collecting (Discogs + physical',
-  'media), and reading (Instapaper articles + highlights).',
+  'media), reading (Instapaper articles + highlights), and places',
+  '(Foursquare/Swarm check-ins).',
   '',
   'WHEN TO USE: any time the user references their own history — things they read,',
-  'listened to, watched, saved, bookmarked, ran, or collected. Prefer Rewind tools',
+  'listened to, watched, saved, bookmarked, ran, collected, or checked in to.',
+  'Prefer Rewind tools',
   'over web search or conversation history for "that article I saved", "what was I',
   'listening to", "the movie I watched", "find my highlight about X". Rewind owns',
   'this data; other sources do not.',
@@ -163,6 +166,7 @@ export function createServer(client: RewindClient): McpServer {
   registerWatchingTools(server, client);
   registerCollectingTools(server, client);
   registerReadingTools(server, client);
+  registerPlacesTools(server, client);
   registerCrossDomainTools(server, client);
   registerAttendingTools(server, client);
 
@@ -183,7 +187,7 @@ export function createServer(client: RewindClient): McpServer {
       // Allow poster <img> loads from the Rewind CDN. Without this the
       // default sandbox CSP (`img-src 'self' data:`) blocks external
       // images and the cards render as broken-image placeholders.
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -194,7 +198,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       'Interactive article card list for recently saved reads. Consumes get_recent_reads structuredContent.',
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -205,7 +209,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       'Interactive single-article card for a saved Instapaper read. Hero og:image, title + byline + domain, meta strip (read time, saved date, status, progress), description, top highlights, footer link to Instapaper. Consumes get_article structuredContent.',
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -216,7 +220,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       "Interactive single-artist card. Hero portrait + name + genre + 2-line bio, stat strip (total plays, listening since year, last played, all-time rank), yearly sparkline, top tracks, top albums grid, similar-artists chips (cross-referenced against the user's own listening), footer link to Apple Music. Consumes get_artist_details structuredContent.",
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -227,7 +231,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       "Interactive top-tracks list. Subtitle scopes period (e.g. 'Top tracks · All time'). Toggle between flat list and album-grouped views. Each row carries album art + track name + plays; album-grouped view adds an album header with cover, year, depth signal, and a Listen on Apple Music CTA. Consumes get_top_tracks structuredContent.",
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -238,7 +242,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       'Interactive album cover grid for top listened-to albums. Consumes get_top_albums structuredContent.',
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -249,7 +253,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       'Interactive artist portrait grid for top listened-to artists. Consumes get_top_artists structuredContent.',
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -260,7 +264,7 @@ export function createServer(client: RewindClient): McpServer {
     description:
       "Interactive season grid for attended sports games. Each card shows date, score, attendance, weather, and a strip of the game's notable performers as silo headshots. Consumes get_attended_season structuredContent.",
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest'],
+      resourceDomains: ['https://cdn.dinakartumu.com'],
     },
   });
 
@@ -274,7 +278,10 @@ export function createServer(client: RewindClient): McpServer {
       // mlbstatic.com hosts the league SVG cap logos that <TeamLogo> hot-links;
       // without it the host's default `img-src 'self' data:` blocks the logos
       // and team slots render empty.
-      resourceDomains: ['https://cdn.rewind.rest', 'https://www.mlbstatic.com'],
+      resourceDomains: [
+        'https://cdn.dinakartumu.com',
+        'https://www.mlbstatic.com',
+      ],
     },
   });
 
@@ -285,7 +292,10 @@ export function createServer(client: RewindClient): McpServer {
     description:
       'Interactive single-athlete card. Hero (headshot + team logo + name/#/position + bats/throws), two-column stats panel (live MLB Stats API season + your-attended summary), notable highlights aggregated across attended appearances, recent-appearances list. MLB-only for the live-stats panel. Consumes get_attended_player structuredContent.',
     csp: {
-      resourceDomains: ['https://cdn.rewind.rest', 'https://www.mlbstatic.com'],
+      resourceDomains: [
+        'https://cdn.dinakartumu.com',
+        'https://www.mlbstatic.com',
+      ],
     },
   });
 

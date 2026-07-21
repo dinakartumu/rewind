@@ -15,11 +15,14 @@ import {
   recomputeStats,
   deleteActivity,
 } from '../services/strava/sync.js';
+import { geocodeStravaActivities } from '../services/geo/reverse-geocode.js';
 import { syncWatching } from '../services/plex/sync.js';
 import { syncLetterboxd } from '../services/letterboxd/sync.js';
 import { syncCollecting } from '../services/discogs/sync.js';
 import { syncTraktCollection } from '../services/trakt/sync.js';
+import { syncTraktHistory } from '../services/trakt/history-sync.js';
 import { syncReading } from '../services/instapaper/sync.js';
+import { syncPlaces } from '../services/foursquare/sync.js';
 import {
   processReadingImages,
   processWatchingImages,
@@ -39,6 +42,16 @@ const SyncCompletedResponse = z
     status: z.literal('completed'),
     items_synced: z.number().int().openapi({ example: 42 }),
     timestamp: z.string().datetime().optional(),
+    geocoded: z.number().int().optional().openapi({
+      description:
+        'Running only: activities reverse-geocoded in this call (bounded batch).',
+      example: 200,
+    }),
+    geocode_remaining: z.number().int().optional().openapi({
+      description:
+        'Running only: activities with coordinates still awaiting geocoding. Call again to drain.',
+      example: 864,
+    }),
   })
   .openapi('SyncCompletedResponse');
 
@@ -66,12 +79,25 @@ const ListeningSyncBody = z.object({
     .openapi({ example: 'scrobbles' }),
 });
 
+const RunningSyncQuery = z.object({
+  full: z.enum(['true', 'false', '1', '0']).optional().openapi({
+    description:
+      'Ignore the incremental cursor and re-walk the entire Strava history (after=1). Already-imported activities are skipped before the per-activity detail fetch, so a re-walk costs roughly one list call per 200 existing activities. Needed once after the run-only filter removal: non-run activities older than the cursor were paged past and never stored.',
+    example: 'true',
+  }),
+});
+
 const WatchingSyncQuery = z.object({
   source: z
-    .enum(['plex', 'letterboxd'])
+    .enum(['plex', 'letterboxd', 'trakt'])
     .optional()
     .default('plex')
     .openapi({ example: 'plex' }),
+  full: z.enum(['true', 'false', '1', '0']).optional().openapi({
+    description:
+      'Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.',
+    example: 'true',
+  }),
 });
 
 const WatchingPlexResponse = z
@@ -92,8 +118,21 @@ const WatchingLetterboxdResponse = z
   })
   .openapi('WatchingLetterboxdSyncResponse');
 
+const WatchingTraktResponse = z
+  .object({
+    success: z.literal(true),
+    source: z.literal('trakt'),
+    movies_synced: z.number().int(),
+    episodes_synced: z.number().int(),
+  })
+  .openapi('WatchingTraktSyncResponse');
+
 const WatchingSyncResponse = z
-  .union([WatchingPlexResponse, WatchingLetterboxdResponse])
+  .union([
+    WatchingPlexResponse,
+    WatchingLetterboxdResponse,
+    WatchingTraktResponse,
+  ])
   .openapi('WatchingSyncResponse');
 
 const ActivityIdParam = z.object({
@@ -192,24 +231,47 @@ const syncRunningRoute = createRoute({
   'x-hidden': true,
   tags: ['Admin'],
   summary: 'Trigger Strava sync',
-  description: 'Manually trigger a Strava running activities sync.',
+  description:
+    'Manually trigger a Strava activities sync (all sport types). Pass full=true to ignore the incremental cursor and re-walk the entire activity history.',
+  request: {
+    query: RunningSyncQuery,
+  },
   responses: {
     200: {
       content: { 'application/json': { schema: SyncCompletedResponse } },
       description: 'Sync completed successfully',
     },
-    ...errorResponses(401, 500),
+    ...errorResponses(400, 401, 500),
   },
 });
 
 adminSync.openapi(syncRunningRoute, async (c) => {
   const db = createDb(c.env.DB);
+  const query = c.req.valid('query');
+  const full = query.full === 'true' || query.full === '1';
 
   try {
-    const itemsSynced = await syncRunning(c.env, db);
+    const itemsSynced = await syncRunning(c.env, db, { full });
+
+    // Drain another geocoding batch beyond the one syncRunning already
+    // ran, so repeated admin calls backfill locations quickly. Non-fatal.
+    let geocoded: number | undefined;
+    let geocodeRemaining: number | undefined;
+    try {
+      const geo = await geocodeStravaActivities(db, 200);
+      geocoded = geo.updated;
+      geocodeRemaining = geo.remaining;
+    } catch (e) {
+      console.log(`[ERROR] Post-sync geocoding failed: ${e}`);
+    }
+
     return c.json({
       status: 'completed' as const,
       items_synced: itemsSynced,
+      ...(geocoded !== undefined && { geocoded }),
+      ...(geocodeRemaining !== undefined && {
+        geocode_remaining: geocodeRemaining,
+      }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -226,7 +288,7 @@ const syncWatchingRoute = createRoute({
   tags: ['Admin'],
   summary: 'Trigger watching sync',
   description:
-    'Manually trigger a watching sync from Plex or Letterboxd. Use the source query parameter to select the source.',
+    'Manually trigger a watching sync from Plex, Letterboxd, or Trakt. Use the source query parameter to select the source. For Trakt, pass full=true to ignore the incremental cursor and re-walk the entire history.',
   request: {
     query: WatchingSyncQuery,
   },
@@ -241,7 +303,8 @@ const syncWatchingRoute = createRoute({
 
 adminSync.openapi(syncWatchingRoute, async (c) => {
   const db = createDb(c.env.DB);
-  const source = c.req.query('source') || 'plex';
+  const query = c.req.valid('query');
+  const source = query.source;
 
   try {
     if (source === 'letterboxd') {
@@ -260,6 +323,22 @@ adminSync.openapi(syncWatchingRoute, async (c) => {
         source: 'letterboxd' as const,
         synced: result.synced,
         skipped: result.skipped,
+      });
+    } else if (source === 'trakt') {
+      const full = query.full === 'true' || query.full === '1';
+      const result = await syncTraktHistory(c.env, 1, { full });
+      c.executionCtx.waitUntil(
+        processWatchingImages(db, c.env).catch((err) =>
+          console.log(
+            `[ERROR] Watching image processing failed: ${err instanceof Error ? err.message : String(err)}`
+          )
+        )
+      );
+      return c.json({
+        success: true as const,
+        source: 'trakt' as const,
+        movies_synced: result.moviesSynced,
+        episodes_synced: result.episodesSynced,
       });
     } else {
       const result = await syncWatching(db, c.env);
@@ -378,6 +457,52 @@ adminSync.openapi(syncReadingRoute, async (c) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
+// POST /v1/admin/sync/places
+// Bounded batch (default 8 pages of 250): returns `remaining` so the
+// caller can loop until 0 during the initial backfill.
+const PlacesSyncResponse = z
+  .object({
+    status: z.literal('completed'),
+    items_synced: z.number().int().openapi({ example: 250 }),
+    remaining: z.number().int().openapi({ example: 1830 }),
+    timestamp: z.string().datetime(),
+  })
+  .openapi('PlacesSyncResponse');
+
+const syncPlacesRoute = createRoute({
+  method: 'post',
+  path: '/admin/sync/places',
+  operationId: 'adminSyncPlaces',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary: 'Trigger Foursquare check-in sync',
+  description:
+    'Runs one bounded batch of the Foursquare check-in walk (end-anchored on the newest-first feed, resumable). Re-run until remaining: 0.',
+  responses: {
+    200: {
+      content: { 'application/json': { schema: PlacesSyncResponse } },
+      description: 'Sync batch completed',
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminSync.openapi(syncPlacesRoute, async (c) => {
+  try {
+    const result = await syncPlaces(c.env);
+    return c.json({
+      status: 'completed' as const,
+      items_synced: result.synced,
+      remaining: result.remaining,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ERROR] POST /admin/sync/places: ${message}`);
     return c.json({ error: message, status: 500 }, 500) as any;
   }
 });

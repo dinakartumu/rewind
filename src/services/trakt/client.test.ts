@@ -200,4 +200,111 @@ describe('TraktClient', () => {
       'Trakt API error: 404 Not Found'
     );
   });
+
+  describe('history endpoints', () => {
+    const historyHeaders = {
+      'X-Pagination-Page': '1',
+      'X-Pagination-Page-Count': '3',
+    };
+
+    it('getMovieHistory requests /sync/history/movies with pagination params', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('[]', { headers: historyHeaders }));
+
+      const result = await client.getMovieHistory({ page: 2, limit: 100 });
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('/sync/history/movies');
+      expect(url).toContain('page=2');
+      expect(url).toContain('limit=100');
+      expect(result.pageCount).toBe(3);
+      expect(result.items).toEqual([]);
+    });
+
+    it('getMovieHistory passes start_at when provided', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('[]', { headers: historyHeaders }));
+
+      await client.getMovieHistory({
+        startAt: '2026-01-01T00:00:00.000Z',
+        page: 1,
+        limit: 100,
+      });
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('start_at=2026-01-01T00%3A00%3A00.000Z');
+    });
+
+    it('getMovieHistory passes end_at when provided', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('[]', { headers: historyHeaders }));
+
+      await client.getMovieHistory({
+        endAt: '2026-02-01T00:00:00.000Z',
+        page: 1,
+        limit: 100,
+      });
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('end_at=2026-02-01T00%3A00%3A00.000Z');
+    });
+
+    it('getMovieHistory defaults pageCount to 1 when header missing', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]'));
+      const result = await client.getMovieHistory({ page: 1, limit: 100 });
+      expect(result.pageCount).toBe(1);
+    });
+
+    it('getEpisodeHistory requests /sync/history/episodes and parses items', async () => {
+      const item = {
+        id: 9001,
+        watched_at: '2026-05-01T20:00:00.000Z',
+        action: 'watch',
+        type: 'episode',
+        episode: {
+          season: 1,
+          number: 3,
+          title: 'The Pilot Ends',
+          ids: { trakt: 111, tmdb: 222 },
+        },
+        show: {
+          title: 'Severance',
+          year: 2022,
+          ids: {
+            trakt: 333,
+            slug: 'severance',
+            imdb: 'tt11280740',
+            tmdb: 95396,
+          },
+        },
+      };
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(JSON.stringify([item]), { headers: historyHeaders })
+        );
+
+      const result = await client.getEpisodeHistory({ page: 1, limit: 100 });
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('/sync/history/episodes');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].show.ids.tmdb).toBe(95396);
+      expect(result.items[0].episode.season).toBe(1);
+    });
+
+    it('getMovieRatings requests /sync/ratings/movies', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('[]'));
+
+      await client.getMovieRatings();
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain('/sync/ratings/movies');
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq, desc, asc, and, sql, gte, lte } from 'drizzle-orm';
+import { eq, desc, asc, and, sql, gte, lte, inArray } from 'drizzle-orm';
 import { createDb } from '../db/client.js';
 import { setCache } from '../lib/cache.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
@@ -20,6 +20,7 @@ import {
   formatPace,
   getWorkoutTypeLabel,
   calculateEddington,
+  RUN_SPORT_TYPES,
 } from '../services/strava/transforms.js';
 
 const running = createOpenAPIApp();
@@ -28,6 +29,7 @@ const running = createOpenAPIApp();
 
 const LifetimeStatsSchema = z.object({
   total_runs: z.number(),
+  total_activities: z.number(),
   total_distance_mi: z.number(),
   total_elevation_ft: z.number(),
   total_duration: z.string(),
@@ -63,6 +65,7 @@ const ActivitySchema = z.object({
   id: z.number(),
   strava_id: z.number(),
   name: z.string(),
+  sport_type: z.string(),
   date: z.string(),
   distance_mi: z.number(),
   duration: z.string(),
@@ -219,6 +222,7 @@ const statsRoute = createRoute({
           example: {
             data: {
               total_runs: 1350,
+              total_activities: 1520,
               total_distance_mi: 6069.88,
               total_elevation_ft: 238690.03,
               total_duration: '828:56:08',
@@ -245,10 +249,17 @@ running.openapi(statsRoute, async (c) => {
     .where(eq(stravaLifetimeStats.userId, 1))
     .limit(1);
 
+  const [activityCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(stravaActivities)
+    .where(eq(stravaActivities.isDeleted, 0));
+  const totalActivities = activityCount?.count ?? 0;
+
   if (!stats) {
     return c.json({
       data: {
         total_runs: 0,
+        total_activities: totalActivities,
         total_distance_mi: 0,
         total_elevation_ft: 0,
         total_duration: '0:00:00',
@@ -263,6 +274,7 @@ running.openapi(statsRoute, async (c) => {
   return c.json({
     data: {
       total_runs: stats.totalRuns,
+      total_activities: totalActivities,
       total_distance_mi: stats.totalDistanceMiles,
       total_elevation_ft: stats.totalElevationFeet,
       total_duration: formatTotalDuration(stats.totalDurationSeconds),
@@ -521,6 +533,7 @@ const recentRoute = createRoute({
                 id: 17748681520,
                 strava_id: 17748681520,
                 name: 'Monday Evening Run',
+                sport_type: 'Run',
                 date: '2026-03-16T17:00:05Z',
                 distance_mi: 4.49,
                 duration: '36:02',
@@ -612,6 +625,7 @@ const activitiesRoute = createRoute({
                 id: 17748681520,
                 strava_id: 17748681520,
                 name: 'Monday Evening Run',
+                sport_type: 'Run',
                 date: '2026-03-16T17:00:05Z',
                 distance_mi: 4.49,
                 duration: '36:02',
@@ -777,6 +791,7 @@ const activityDetailRoute = createRoute({
             id: 17748681520,
             strava_id: 17748681520,
             name: 'Monday Evening Run',
+            sport_type: 'Run',
             date: '2026-03-16T17:00:05Z',
             distance_mi: 4.49,
             duration: '36:02',
@@ -1228,6 +1243,8 @@ running.openapi(paceTrendRoute, async (c) => {
 
   const conditions = [
     eq(stravaActivities.isDeleted, 0),
+    // Pace trend is a run-only chart: pace is meaningless across sports
+    inArray(stravaActivities.sportType, RUN_SPORT_TYPES),
     sql`${stravaActivities.paceMinPerMile} IS NOT NULL`,
   ];
 
@@ -1592,6 +1609,7 @@ const racesRoute = createRoute({
                 id: 12345,
                 strava_id: 12345,
                 name: 'Portland Marathon',
+                sport_type: 'Run',
                 date: '2024-10-06',
                 distance_mi: 26.2,
                 duration: '3:45:00',
@@ -1691,7 +1709,13 @@ running.openapi(eddingtonRoute, async (c) => {
       distance: stravaActivities.distanceMiles,
     })
     .from(stravaActivities)
-    .where(eq(stravaActivities.isDeleted, 0));
+    .where(
+      and(
+        eq(stravaActivities.isDeleted, 0),
+        // Eddington is run-scoped: miles run, not ridden
+        inArray(stravaActivities.sportType, RUN_SPORT_TYPES)
+      )
+    );
 
   const dailyMilesMap = new Map<string, number>();
   for (const a of activities) {
@@ -1760,6 +1784,7 @@ const yearInReviewRoute = createRoute({
                 id: 12345,
                 strava_id: 12345,
                 name: 'Portland Half Marathon',
+                sport_type: 'Run',
                 date: '2025-10-06',
                 distance_mi: 13.1,
                 duration: '1:45:00',
@@ -1900,6 +1925,7 @@ running.openapi(yearInReviewRoute, async (c) => {
 function formatActivityResponse(a: {
   stravaId: number;
   name: string;
+  sportType: string;
   startDateLocal: string;
   distanceMiles: number;
   movingTimeSeconds: number;
@@ -1921,6 +1947,7 @@ function formatActivityResponse(a: {
     id: a.stravaId,
     strava_id: a.stravaId,
     name: a.name,
+    sport_type: a.sportType,
     date: a.startDateLocal,
     distance_mi: a.distanceMiles,
     duration: formatDuration(a.movingTimeSeconds),

@@ -152,6 +152,100 @@ describe('AppleMusicClient', () => {
     expect(requestUrl).not.toContain('Matt+%26+Kim');
   });
 
+  // Live regression: stored artist "Kala Bhairava", album 'Komuram Bheemudo
+  // (From "RRR")'. Apple Music credits the single to "Kaala Bhairava" with
+  // a "- Single" suffix on the title; both candidates must be accepted.
+  it('accepts transliteration-variant artist credits on album search', async () => {
+    const mockResponse = {
+      results: {
+        albums: {
+          data: [
+            {
+              attributes: {
+                name: 'Komuram Bheemudo (From "RRR") - Single',
+                artistName: 'Kaala Bhairava & M.M. Kreem',
+                artwork: {
+                  url: 'https://is1-ssl.mzstatic.com/image/thumb/Music/{w}x{h}bb.jpg',
+                  width: 3000,
+                  height: 3000,
+                },
+              },
+            },
+            {
+              attributes: {
+                name: 'Komuram Bheemudho (From "RRR") - Single',
+                artistName: 'Kaala Bhairava & Azad Varadaraj',
+                artwork: {
+                  url: 'https://is1-ssl.mzstatic.com/image/thumb/Music2/{w}x{h}bb.jpg',
+                  width: 3000,
+                  height: 3000,
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      })
+    );
+
+    const results = await client.search({
+      domain: 'listening',
+      entityType: 'albums',
+      entityId: 'komuram-bheemudo',
+      artistName: 'Kala Bhairava',
+      albumName: 'Komuram Bheemudo (From "RRR")',
+    });
+
+    expect(results).toHaveLength(2);
+  });
+
+  it('still rejects wrong-artist album candidates', async () => {
+    const mockResponse = {
+      results: {
+        albums: {
+          data: [
+            {
+              attributes: {
+                name: 'Komuram Bheemudo (From "RRR") - Single',
+                artistName: 'Various Artists',
+                artwork: {
+                  url: 'https://is1-ssl.mzstatic.com/image/thumb/Music/{w}x{h}bb.jpg',
+                  width: 3000,
+                  height: 3000,
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      })
+    );
+
+    const results = await client.search({
+      domain: 'listening',
+      entityType: 'albums',
+      entityId: 'komuram-bheemudo',
+      artistName: 'Kala Bhairava',
+      albumName: 'Komuram Bheemudo (From "RRR")',
+    });
+
+    expect(results).toEqual([]);
+  });
+
   it('returns empty array on API error', async () => {
     vi.stubGlobal(
       'fetch',

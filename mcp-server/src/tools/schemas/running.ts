@@ -14,7 +14,13 @@ import { z } from 'zod';
 
 // --- Element schemas ------------------------------------------------------
 
-/** A single run, as listed by get_recent_runs. */
+/**
+ * A single run, as listed by get_recent_runs.
+ *
+ * List items deliberately carry `has_route` (boolean) instead of the raw
+ * encoded polyline the API returns -- polylines are large and would bloat
+ * every list response. Fetch the full route via get_activity_details.
+ */
 export const activitySchema = z
   .object({
     id: z.number(),
@@ -27,10 +33,20 @@ export const activitySchema = z
     elevation_ft: z.number(),
     city: z.string().nullable(),
     state: z.string().nullable(),
+    has_route: z.boolean(),
     is_race: z.boolean(),
     strava_url: z.string().nullish(),
   })
   .passthrough();
+
+/**
+ * Raw /running/recent item as the API ships it: no `has_route`, but a
+ * full encoded `polyline`. Internal only -- get_recent_runs collapses
+ * this to `activitySchema` before returning.
+ */
+export const activityApiItemSchema = activitySchema
+  .omit({ has_route: true })
+  .extend({ polyline: z.string().nullish() });
 
 /** A single personal record, as listed by get_personal_records. */
 export const personalRecordSchema = z
@@ -140,6 +156,7 @@ export const activityDetailsOutputSchema = z
     suffer_score: z.number().nullable(),
     city: z.string().nullable(),
     state: z.string().nullable(),
+    polyline: z.string().nullable(),
     is_race: z.boolean(),
     workout_type: z.string(),
     strava_url: z.string().nullable(),

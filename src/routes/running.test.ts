@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { env, SELF } from 'cloudflare:test';
+import { createDb } from '../db/client.js';
+import { stravaActivities } from '../db/schema/strava.js';
+import { recomputeStats } from '../services/strava/sync.js';
+import { setupTestDb, createTestApiKey } from '../test-helpers.js';
 import {
   formatDuration,
   formatPace,
@@ -75,5 +80,97 @@ describe('Running route helpers', () => {
       const limit = 20;
       expect((page - 1) * limit).toBe(40);
     });
+  });
+});
+
+describe('Running routes with mixed sport types', () => {
+  let token: string;
+
+  beforeAll(async () => {
+    await setupTestDb();
+    token = await createTestApiKey({ scope: 'read', name: 'running-routes' });
+  });
+
+  async function seedMixedActivities() {
+    const db = createDb(env.DB);
+    await db.delete(stravaActivities);
+    await db.insert(stravaActivities).values([
+      {
+        stravaId: 9001,
+        name: 'Morning Run',
+        sportType: 'Run',
+        distanceMeters: 8046.7,
+        distanceMiles: 5.0,
+        movingTimeSeconds: 2400,
+        elapsedTimeSeconds: 2500,
+        totalElevationGainMeters: 30,
+        totalElevationGainFeet: 98.4,
+        startDate: '2024-06-15T14:00:00Z',
+        startDateLocal: '2024-06-15T07:00:00',
+        paceMinPerMile: 8.0,
+        paceFormatted: '8:00/mi',
+        isRace: 0,
+        isDeleted: 0,
+      },
+      {
+        stravaId: 9002,
+        name: 'Evening Ride',
+        sportType: 'Ride',
+        distanceMeters: 32186.9,
+        distanceMiles: 20.0,
+        movingTimeSeconds: 3600,
+        elapsedTimeSeconds: 3700,
+        totalElevationGainMeters: 150,
+        totalElevationGainFeet: 492.1,
+        startDate: '2024-06-16T02:00:00Z',
+        startDateLocal: '2024-06-15T19:00:00',
+        paceMinPerMile: 3.0,
+        paceFormatted: '3:00/mi',
+        isRace: 0,
+        isDeleted: 0,
+      },
+    ]);
+    await recomputeStats(db);
+    return db;
+  }
+
+  it('GET /v1/running/recent exposes sport_type on activities', async () => {
+    await seedMixedActivities();
+
+    const res = await SELF.fetch('http://localhost/v1/running/recent', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ strava_id: number; sport_type: string }>;
+    };
+
+    const ride = body.data.find((a) => a.strava_id === 9002);
+    expect(ride?.sport_type).toBe('Ride');
+    const run = body.data.find((a) => a.strava_id === 9001);
+    expect(run?.sport_type).toBe('Run');
+  });
+
+  it('GET /v1/running/stats includes total_activities alongside run-scoped total_runs', async () => {
+    await seedMixedActivities();
+
+    const res = await SELF.fetch('http://localhost/v1/running/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        total_runs: number;
+        total_activities: number;
+        total_distance_mi: number;
+        avg_pace: string | null;
+      };
+    };
+
+    expect(body.data.total_activities).toBe(2);
+    expect(body.data.total_runs).toBe(1);
+    // Distance totals include all sports; pace stays run-scoped
+    expect(body.data.total_distance_mi).toBe(25.0);
+    expect(body.data.avg_pace).toBe('8:00/mi');
   });
 });

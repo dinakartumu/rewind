@@ -24,12 +24,14 @@ import {
   TmdbClient,
   PlexClient,
   OgImageClient,
+  LastfmImageClient,
 } from './sources/index.js';
 
 export interface PipelineEnv {
   IMAGES: R2Bucket;
   IMAGE_TRANSFORMS: ImagesBinding;
   APPLE_MUSIC_DEVELOPER_TOKEN?: string;
+  LASTFM_API_KEY?: string;
   FANART_TV_API_KEY?: string;
   TMDB_API_KEY?: string;
   PLEX_URL?: string;
@@ -121,6 +123,11 @@ function getSourceClients(
           : []),
         new DeezerClient(),
         new ITunesClient(),
+        // Tail sweeper: album names came from Last.fm scrobbles, so
+        // album.getInfo matches titles the name-search sources miss.
+        ...(env.LASTFM_API_KEY
+          ? [new LastfmImageClient(env.LASTFM_API_KEY)]
+          : []),
       ];
 
     case 'listening/artists':

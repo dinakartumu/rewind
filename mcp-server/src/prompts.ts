@@ -223,7 +223,7 @@ export function registerPrompts(server: McpServer): void {
         domain: z
           .string()
           .describe(
-            'Domain to compare (listening, running, watching, collecting, reading)'
+            'Domain to compare (listening, running, watching, collecting, reading, places)'
           ),
         period1: z
           .string()

@@ -14,6 +14,7 @@ import {
 } from './helpers.js';
 import {
   activitySchema,
+  activityApiItemSchema,
   activityDetailsOutputSchema,
   runningStatsOutputSchema,
   recentRunsOutputSchema,
@@ -26,6 +27,13 @@ import {
 // Types below are derived from the Zod output schemas (schemas/running.ts)
 // so the declared schema and the TS type cannot drift.
 type Activity = z.infer<typeof activitySchema>;
+
+/**
+ * Raw /running/recent item: the API ships the full encoded polyline on
+ * every list item, which the tool collapses to `has_route` to keep list
+ * responses small. Full polylines come from get_activity_details.
+ */
+type ActivityApiItem = z.infer<typeof activityApiItemSchema>;
 
 type ActivityDetail = z.infer<typeof activityDetailsOutputSchema>;
 
@@ -106,17 +114,24 @@ export function registerRunningTools(
     },
     async ({ limit, page, date, from, to }) =>
       withRichResponse(async () => {
-        const { data } = await client.get<{ data: Activity[] }>(
+        const { data: raw } = await client.get<{ data: ActivityApiItem[] }>(
           '/running/recent',
           { limit, page, date, from, to }
         );
 
-        if (!data.length) {
+        if (!raw.length) {
           return {
             content: [text('No recent runs found.')],
             structuredContent: { items: [] },
           };
         }
+
+        // Strip the encoded polyline from list items (context bloat) and
+        // surface a has_route flag instead.
+        const data: Activity[] = raw.map(({ polyline, ...rest }) => ({
+          ...rest,
+          has_route: Boolean(polyline),
+        }));
 
         const lines = ['Recent runs:'];
         for (const [i, r] of data.entries()) {
@@ -244,7 +259,7 @@ export function registerRunningTools(
     {
       title: 'Run',
       description:
-        'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, and a Strava resource link.',
+        'Get detailed information about a specific running activity by ID, including distance, pace, heart rate, elevation, calories, location, the encoded route polyline, and a Strava resource link.',
       inputSchema: {
         id: z
           .number()
