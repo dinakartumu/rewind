@@ -5,6 +5,35 @@
 
 const log = (...args: unknown[]) => console.error('[rewind-mcp]', ...args);
 
+/** Shape returned by POST /v1/query. */
+export interface QueryResult {
+  columns: string[];
+  rows: unknown[][];
+  row_count: number;
+  truncated: boolean;
+}
+
+/** A single column entry in the annotated schema (GET /v1/schema). */
+export interface SchemaColumn {
+  name: string;
+  type: string;
+  note?: string;
+}
+
+/** A single table entry in the annotated schema (GET /v1/schema). */
+export interface SchemaTable {
+  name: string;
+  purpose: string;
+  columns: SchemaColumn[];
+  joins?: string[];
+}
+
+/** Shape returned by GET /v1/schema. */
+export interface SchemaDoc {
+  notes: string[];
+  tables: SchemaTable[];
+}
+
 export class RewindClient {
   private baseUrl: string;
   private apiKey: string;
@@ -43,6 +72,43 @@ export class RewindClient {
     }
 
     return res.json() as Promise<T>;
+  }
+
+  /**
+   * Run a read-only SQL query via POST /v1/query.
+   * The API gate rejects writes, DDL, multi-statement input, and access to
+   * secret tables, and auto-applies a LIMIT. Returns column names plus
+   * array-of-array row tuples.
+   */
+  async query(sql: string): Promise<QueryResult> {
+    const url = new URL('/v1/query', this.baseUrl);
+    log(`POST ${url.pathname}`);
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sql }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new RewindApiError(res.status, res.statusText, body);
+    }
+
+    return res.json() as Promise<QueryResult>;
+  }
+
+  /**
+   * Fetch the curated, annotated schema via GET /v1/schema.
+   * Returns global conventions plus every queryable table with columns,
+   * semantic notes, and join keys.
+   */
+  async getSchema(): Promise<SchemaDoc> {
+    return this.get<SchemaDoc>('/schema');
   }
 
   /**

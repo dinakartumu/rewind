@@ -17,16 +17,10 @@ import {
 } from './helpers.js';
 import { imageSchema } from './schemas/shared.js';
 import {
-  scrobbleSchema,
   topItemSchema,
   nowPlayingOutputSchema,
-  recentListensOutputSchema,
-  listeningStatsOutputSchema,
   topListOutputSchema,
   topTracksOutputSchema,
-  listeningStreaksOutputSchema,
-  albumDetailsOutputSchema,
-  listeningGenresOutputSchema,
   artistDetailsOutputSchema,
 } from './schemas/listening.js';
 
@@ -39,8 +33,6 @@ const TOP_N = 5;
 type Image = z.infer<ReturnType<typeof imageSchema>>;
 
 type NowPlaying = z.infer<typeof nowPlayingOutputSchema>;
-
-type Scrobble = z.infer<typeof scrobbleSchema>;
 
 type TopItem = z.infer<typeof topItemSchema>;
 
@@ -92,8 +84,6 @@ type ArtistDetail = {
     image: Image;
   }>;
 };
-
-type AlbumDetail = z.infer<typeof albumDetailsOutputSchema>;
 
 const PERIOD_ENUM = [
   '7day',
@@ -155,118 +145,6 @@ export function registerListeningTools(
         ];
 
         return { content, structuredContent: data };
-      })
-  );
-
-  // get_recent_listens ─────────────────────────────────────────────
-  server.registerTool(
-    'get_recent_listens',
-    {
-      title: 'Recent listens',
-      description:
-        'Get recently scrobbled tracks from Last.fm, with top-N album covers and Apple Music resource links. Supports date filtering.',
-      inputSchema: {
-        limit: z
-          .number()
-          .min(1)
-          .max(50)
-          .default(10)
-          .describe('Number of recent tracks to return (default 10, max 50)'),
-        page: z
-          .number()
-          .min(1)
-          .default(1)
-          .describe(
-            'Page number for pagination. Combine with limit to page through longer windows.'
-          ),
-        ...dateFilterParams,
-        ...includeImagesParam,
-      },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: recentListensOutputSchema,
-    },
-    async ({ limit, page, date, from, to, include_images }) =>
-      withRichResponse(async () => {
-        const { data } = await client.get<{ data: Scrobble[] }>(
-          '/listening/recent',
-          { limit, page, date, from, to }
-        );
-
-        if (!data.length) {
-          return {
-            content: [text('No recent listens found.')],
-            structuredContent: { items: [] },
-          };
-        }
-
-        const lines = ['Recent listens:'];
-        for (const [i, s] of data.entries()) {
-          const album = s.album?.name ? ` -- ${s.album.name}` : '';
-          lines.push(
-            `${i + 1}. "${s.track.name}" by ${s.artist.name}${album} (${timeAgo(s.scrobbled_at)})`
-          );
-        }
-
-        const topN = data.slice(0, TOP_N);
-        const images = include_images
-          ? await Promise.all(
-              topN.map((s) => imageBlock(client, s.album.image, LIST_IMAGE_PX))
-            )
-          : [];
-        const links = topN
-          .map((s) =>
-            resourceLink(
-              s.track.apple_music_url,
-              `Apple Music -- ${s.track.name}`,
-              { mimeType: 'text/html' }
-            )
-          )
-          .filter((b): b is NonNullable<typeof b> => b !== null);
-
-        const content: ContentBlock[] = [
-          text(lines.join('\n')),
-          ...images.filter((b): b is NonNullable<typeof b> => b !== null),
-          ...links,
-        ];
-
-        return { content, structuredContent: { items: data } };
-      })
-  );
-
-  // get_listening_stats ────────────────────────────────────────────
-  server.registerTool(
-    'get_listening_stats',
-    {
-      title: 'Listening stats',
-      description:
-        'Get overall listening statistics from Last.fm including total scrobbles, unique artists, albums, tracks, and daily average. Supports date filtering.',
-      inputSchema: { ...dateFilterParams },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: listeningStatsOutputSchema,
-    },
-    async ({ date, from, to }) =>
-      withRichResponse(async () => {
-        const data = await client.get<{
-          total_scrobbles: number;
-          unique_artists: number;
-          unique_albums: number;
-          unique_tracks: number;
-          registered_date: string | null;
-          years_tracking: number;
-          scrobbles_per_day: number;
-        }>('/listening/stats', { date, from, to });
-
-        const summary = [
-          'Listening Stats:',
-          `- Total scrobbles: ${fmt(data.total_scrobbles)}`,
-          `- Unique artists: ${fmt(data.unique_artists)}`,
-          `- Unique albums: ${fmt(data.unique_albums)}`,
-          `- Unique tracks: ${fmt(data.unique_tracks)}`,
-          `- Average per day: ${data.scrobbles_per_day.toFixed(1)}`,
-          `- Years tracking: ${data.years_tracking}`,
-        ].join('\n');
-
-        return { content: [text(summary)], structuredContent: data };
       })
   );
 
@@ -572,53 +450,6 @@ export function registerListeningTools(
       })
   );
 
-  // get_listening_streaks ──────────────────────────────────────────
-  server.registerTool(
-    'get_listening_streaks',
-    {
-      title: 'Listening streaks',
-      description:
-        'Get listening streak data from Last.fm -- current consecutive days with scrobbles and the longest streak ever.',
-      inputSchema: {},
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: listeningStreaksOutputSchema,
-    },
-    async () =>
-      withRichResponse(async () => {
-        const data = await client.get<{
-          current: {
-            days: number;
-            start_date: string | null;
-            total_scrobbles: number;
-          };
-          longest: {
-            days: number;
-            start_date: string | null;
-            end_date: string | null;
-            total_scrobbles: number;
-          };
-        }>('/listening/streaks');
-
-        const summary = [
-          'Listening Streaks:',
-          '',
-          `Current streak: ${data.current.days} days (${fmt(data.current.total_scrobbles)} scrobbles)`,
-          data.current.start_date
-            ? `  Started: ${formatDate(data.current.start_date)}`
-            : '',
-          '',
-          `Longest streak: ${data.longest.days} days (${fmt(data.longest.total_scrobbles)} scrobbles)`,
-          data.longest.start_date
-            ? `  ${formatDate(data.longest.start_date)} -- ${formatDate(data.longest.end_date)}`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n');
-
-        return { content: [text(summary)], structuredContent: data };
-      })
-  );
-
   // get_artist_details ─────────────────────────────────────────────
   // Registered via server.registerTool so we can attach `_meta.ui.resourceUri`.
   // Hosts that support MCP Apps render an interactive single-artist card
@@ -762,124 +593,6 @@ export function registerListeningTools(
         };
 
         return { content, structuredContent };
-      })
-  );
-
-  // get_album_details ──────────────────────────────────────────────
-  server.registerTool(
-    'get_album_details',
-    {
-      title: 'Album',
-      description:
-        'Get detailed information about a specific album by ID: artist, play count, track listing, cover art, and Apple Music link.',
-      inputSchema: {
-        id: z.number().describe('Album ID'),
-        ...includeImagesParam,
-      },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: albumDetailsOutputSchema,
-    },
-    async ({ id, include_images }) =>
-      withRichResponse(async () => {
-        const data = await client.get<AlbumDetail>(`/listening/albums/${id}`);
-
-        const lines = [
-          `${data.name} by ${data.artist.name}`,
-          `Total plays: ${fmt(data.playcount)}`,
-          '',
-        ];
-
-        if (data.tracks.length) {
-          lines.push('Tracks:');
-          for (const [i, t] of data.tracks.entries()) {
-            lines.push(
-              `  ${i + 1}. "${t.name}" (${fmt(t.scrobble_count)} plays)`
-            );
-          }
-        }
-
-        const cover = include_images
-          ? await imageBlock(client, data.image)
-          : null;
-
-        const links = [
-          resourceLink(data.apple_music_url, 'Apple Music -- album', {
-            mimeType: 'text/html',
-          }),
-          resourceLink(data.url, 'Last.fm -- album', { mimeType: 'text/html' }),
-        ].filter((b): b is NonNullable<typeof b> => b !== null);
-
-        const content: ContentBlock[] = [
-          text(lines.join('\n')),
-          ...(cover ? [cover] : []),
-          ...links,
-        ];
-
-        return { content, structuredContent: data };
-      })
-  );
-
-  // get_listening_genres ───────────────────────────────────────────
-  server.registerTool(
-    'get_listening_genres',
-    {
-      title: 'Listening genres',
-      description:
-        'Get genre breakdown over time from Last.fm listening history, grouped by week/month/year. Designed for stacked chart visualization.',
-      inputSchema: {
-        group_by: z
-          .enum(['week', 'month', 'year'])
-          .default('month')
-          .describe('Grouping period (default: month)'),
-        limit: z
-          .number()
-          .min(1)
-          .max(50)
-          .default(10)
-          .describe(
-            'Max genres to return -- rest grouped as "Other" (default 10)'
-          ),
-        ...dateFilterParams,
-      },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: listeningGenresOutputSchema,
-    },
-    async ({ group_by, limit, date, from, to }) =>
-      withRichResponse(async () => {
-        type GenrePeriod = {
-          period: string;
-          genres: Record<string, number>;
-          total: number;
-        };
-        const { data } = await client.get<{ data: GenrePeriod[] }>(
-          '/listening/genres',
-          { group_by, limit, date, from, to }
-        );
-
-        if (!data.length) {
-          return {
-            content: [text('No genre data available.')],
-            structuredContent: {
-              items: [] as GenrePeriod[],
-              group_by,
-            },
-          };
-        }
-
-        const lines = [`Genre breakdown by ${group_by}:`];
-        for (const row of data) {
-          const top = Object.entries(row.genres)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 3)
-            .map(([name, count]) => `${name}=${count}`)
-            .join(', ');
-          lines.push(`  ${row.period}: total ${fmt(row.total)}; top: ${top}`);
-        }
-
-        return {
-          content: [text(lines.join('\n'))],
-          structuredContent: { items: data, group_by },
-        };
       })
   );
 }

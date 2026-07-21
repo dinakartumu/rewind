@@ -233,11 +233,10 @@
           {
             "group": "Tools",
             "pages": [
+              "reference/mcp-tools/query",
               "reference/mcp-tools/listening",
-              "reference/mcp-tools/running",
               "reference/mcp-tools/watching",
               "reference/mcp-tools/reading",
-              "reference/mcp-tools/collecting",
               "reference/mcp-tools/attending",
               "reference/mcp-tools/cross-domain"
             ]

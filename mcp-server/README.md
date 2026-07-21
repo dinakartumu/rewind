@@ -49,20 +49,22 @@ Requires a [Rewind API key](https://docs.rewind.rest/authentication). `REWIND_AP
 
 ## Tools
 
-| Domain           | Source           | Tools                                                                                                                               |
-| ---------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Listening**    | Last.fm          | Now playing, recent scrobbles, stats, top artists/albums/tracks, streaks, artist and album details, genre breakdown over time       |
-| **Running**      | Strava           | Stats, recent runs, personal records, streaks, activity details, per-mile splits, per-year summaries                                |
-| **Watching**     | Plex, Letterboxd | Recent watches, movie details, browse by genre/decade/director, stats, genre/decade/director breakdowns                             |
-| **Collecting**   | Discogs, Trakt   | Vinyl collection, physical media, collection and media stats                                                                        |
-| **Reading**      | Instapaper       | Recent articles, highlights, random highlight, stats, semantic similar-article recall via `find_similar_articles`                   |
-| **Places**       | Foursquare/Swarm | Recent check-ins with venue, category, and shout; stats with top categories, cities, and venues                                     |
-| **Attending**    | Calendar, Gmail  | Attended events with filters, single event with player stat lines, sports season W/L, player photos and appearances, year-in-review |
-| **Cross-domain** | All              | Full-text search with keyword/semantic/hybrid modes, dedicated `semantic_search` for reading, unified feed, on-this-day, health     |
+Rewind exposes two general-purpose SQL primitives plus a small set of rich, card-rendering tools. For most questions, call `get_schema` then `query_rewind` with a SELECT.
 
-Tool responses include images, click-through resource links, and structured JSON. Pass `include_images: false` to keep responses compact.
+| Category               | Tools                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **SQL (any question)** | `get_schema` (annotated tables + conventions), `query_rewind` (read-only SELECT against the whole database) |
+| **Listening**          | `get_now_playing`, `get_top_artists`, `get_top_albums`, `get_top_tracks`, `get_artist_details`              |
+| **Watching**           | `get_recent_watches`                                                                                        |
+| **Reading**            | `get_recent_reads`, `get_article` (full body, cached even for paywalled sources)                            |
+| **Attending**          | `get_attended_season`, `get_attended_event`, `get_attended_player`                                          |
+| **Cross-domain**       | `search` (keyword/semantic/hybrid), `semantic_search` (reading), `get_health`                               |
 
-On clients that support [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) (Claude Desktop, Claude web, VS Code Copilot, Goose), `get_recent_watches`, `get_recent_reads`, `get_top_albums`, and `get_top_artists` render interactive grids inline; other clients see the standard text + image response.
+The SQL tools cover running, collecting, places, feeds, and any ad-hoc or cross-domain question — join watches to check-ins, rank sources by article count, compute streaks. `query_rewind` is read-only: writes, DDL, multi-statement input, and secret tables (API keys, OAuth tokens) are rejected server-side, and a LIMIT is applied automatically.
+
+The specialized tools return images, click-through resource links, and structured JSON; pass `include_images: false` to keep responses compact.
+
+On clients that support [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) (Claude Desktop, Claude web, VS Code Copilot, Goose), `get_recent_watches`, `get_recent_reads`, `get_article`, `get_artist_details`, `get_top_albums`, `get_top_artists`, `get_top_tracks`, `get_attended_season`, `get_attended_event`, and `get_attended_player` render interactive cards inline; other clients see the standard text + image response.
 
 ## Example queries
 

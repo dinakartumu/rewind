@@ -174,18 +174,13 @@ async function buildClient(): Promise<Client> {
 
 const CASES: Array<{ name: string; args: Record<string, unknown> }> = [
   { name: 'get_now_playing', args: { include_images: false } },
-  { name: 'get_recent_listens', args: { include_images: false } },
-  { name: 'get_listening_stats', args: {} },
   {
     name: 'get_top_artists',
     args: { include_images: false, include_sparklines: false },
   },
   { name: 'get_top_albums', args: { include_images: false } },
   { name: 'get_top_tracks', args: {} },
-  { name: 'get_listening_streaks', args: {} },
   { name: 'get_artist_details', args: { id: 1, include_images: false } },
-  { name: 'get_album_details', args: { id: 1, include_images: false } },
-  { name: 'get_listening_genres', args: {} },
 ];
 
 describe('output-schema conformance — listening', () => {
@@ -205,10 +200,8 @@ describe('output-schema conformance — listening', () => {
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
       if (path === '/listening/now-playing')
         return { is_playing: false, track: null, scrobbled_at: null };
-      if (path === '/listening/recent') return { data: [] };
       if (path === '/listening/top/artists')
         return { period: '1month', data: [] };
-      if (path === '/listening/genres') return { data: [] };
       return {};
     });
     const server = createServer(rewindClient);
@@ -219,9 +212,7 @@ describe('output-schema conformance — listening', () => {
 
     for (const [name, args] of [
       ['get_now_playing', { include_images: false }],
-      ['get_recent_listens', { include_images: false }],
       ['get_top_artists', { include_images: false, include_sparklines: false }],
-      ['get_listening_genres', {}],
     ] as const) {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();

@@ -259,14 +259,9 @@ async function buildClient(): Promise<Client> {
 }
 
 const CASES: Array<{ name: string; args: Record<string, unknown> }> = [
-  { name: 'get_attended_events', args: {} },
   { name: 'get_attended_season', args: { league: 'mlb', season: 2024 } },
-  { name: 'get_attended_players', args: {} },
   { name: 'get_attended_player', args: { id: 1, include_images: false } },
-  { name: 'get_attended_player_stats', args: { id: 1 } },
-  { name: 'get_attending_stats', args: {} },
   { name: 'get_attended_event', args: { id: 10 } },
-  { name: 'get_attending_year_in_review', args: { year: 2024 } },
 ];
 
 describe('output-schema conformance — attending', () => {
@@ -284,10 +279,6 @@ describe('output-schema conformance — attending', () => {
   it('empty-state branches still conform', async () => {
     const rewindClient = new RewindClient('https://api.test', 'rw_test');
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
-      if (path === '/attending/events')
-        return { data: [], pagination: PAGINATION() };
-      if (path === '/attending/players')
-        return { data: [], pagination: PAGINATION() };
       if (path.startsWith('/attending/seasons/'))
         return {
           league: 'mlb',
@@ -306,52 +297,11 @@ describe('output-schema conformance — attending', () => {
     await client.connect(ct);
 
     for (const [name, args] of [
-      ['get_attended_events', {}],
-      ['get_attended_players', {}],
       ['get_attended_season', { league: 'mlb', season: 2024 }],
     ] as const) {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();
     }
-  });
-
-  it('get_attended_player_stats unsupported branch conforms', async () => {
-    const rewindClient = new RewindClient('https://api.test', 'rw_test');
-    vi.spyOn(rewindClient, 'get').mockImplementation(async () => ({
-      supported: false,
-      league: 'nfl',
-      reason: 'Per-player stat-line parsing not yet supported.',
-      scope: 'career',
-      player: {
-        id: 2,
-        full_name: 'Some Player',
-        primary_position: 'QB',
-        primary_team: null,
-      },
-      appearances: [
-        {
-          event_id: 99,
-          event_date: '2024-09-08',
-          title: 'Seahawks vs 49ers',
-          home_team: 'Seahawks',
-          away_team: '49ers',
-          final_score: '24-17',
-          my_team_won: true,
-        },
-      ],
-    }));
-    const server = createServer(rewindClient);
-    const [ct, st] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: 'unsupported-test', version: '1.0.0' });
-    await server.connect(st);
-    await client.connect(ct);
-
-    const res = await client.callTool({
-      name: 'get_attended_player_stats',
-      arguments: { id: 2 },
-    });
-    expect(res.isError).toBeFalsy();
-    expect(res.structuredContent).toBeDefined();
   });
 
   it('every attending tool advertises a clean outputSchema', async () => {

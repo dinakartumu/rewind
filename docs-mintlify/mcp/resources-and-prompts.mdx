@@ -22,9 +22,12 @@ Every resource is addressed by a `rewind://` URI and returns the full detail rec
 | Highlight      | `rewind://highlight/{id}`       | `/v1/reading/highlights/{id}`                             |
 | Activity       | `rewind://activity/{id}`        | `/v1/running/activities/{id}`                             |
 | Sync status    | `rewind://sync/status`          | `/v1/health/sync`                                         |
+| Schema         | `rewind://schema`               | `/v1/schema`                                              |
 | Year in review | `rewind://{domain}/year/{year}` | `/v1/{domain}/year/{year}` (listening, running, watching) |
 
 The `{id}` in each URI is the internal Rewind id, not a Last.fm, TMDB, or Discogs id. You usually get one from a tool result or a search hit rather than typing it by hand.
+
+The `rewind://schema` resource is the annotated database schema — every queryable table with its columns, types, semantic notes, and join keys, plus global conventions. Pin it into context (or call the `get_schema` tool) before writing a `query_rewind` SELECT.
 
 ### Reference a resource with @-mention
 

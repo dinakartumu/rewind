@@ -6,12 +6,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RewindClient } from './client.js';
 import { READ_ONLY_ANNOTATIONS } from './tools/helpers.js';
+import { registerQueryTools } from './tools/query.js';
 import { registerListeningTools } from './tools/listening.js';
-import { registerRunningTools } from './tools/running.js';
 import { registerWatchingTools } from './tools/watching.js';
-import { registerCollectingTools } from './tools/collecting.js';
 import { registerReadingTools } from './tools/reading.js';
-import { registerPlacesTools } from './tools/places.js';
 import { registerCrossDomainTools } from './tools/cross-domain.js';
 import { registerAttendingTools } from './tools/attending.js';
 import { healthOutputSchema } from './tools/schemas/system.js';
@@ -25,38 +23,35 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 
 const SERVER_INSTRUCTIONS = [
-  "Rewind is the user's personal data archive: listening (Last.fm + Apple Music),",
-  'running (Strava), watching (Plex + Letterboxd), collecting (Discogs + physical',
-  'media), reading (Instapaper articles + highlights), and places',
-  '(Foursquare/Swarm check-ins).',
+  "Rewind is the user's personal data archive as a SQLite database: listening",
+  '(Last.fm), running (Strava), watching (Plex + Letterboxd), collecting (Discogs',
+  '+ physical media), reading (Instapaper), places (Swarm), and attended events.',
   '',
   'WHEN TO USE: any time the user references their own history — things they read,',
-  'listened to, watched, saved, bookmarked, ran, collected, or checked in to.',
-  'Prefer Rewind tools',
-  'over web search or conversation history for "that article I saved", "what was I',
-  'listening to", "the movie I watched", "find my highlight about X". Rewind owns',
-  'this data; other sources do not.',
+  'listened to, watched, saved, ran, collected, checked in to, or attended. Prefer',
+  'Rewind over web search or memory for "that article I saved", "what was I',
+  'listening to", "the movie I watched". Rewind owns this data.',
   '',
-  'ANTI-HALLUCINATION — when answering from retrieved articles:',
-  '1. Only assert facts that appear verbatim in the excerpt, description, or',
-  "   structured fields. Do not infer biographical details (e.g. 'X was a writer",
-  "   on SNL') to bridge a gap between the user's query and the retrieved article.",
-  "2. If the top result doesn't clearly match the query, say so. Offer 2-3",
-  '   candidates with one-line summaries from their excerpts and ask which one.',
-  '3. For article specifics past the first ~3000 chars of excerpt, call the',
-  '   `get_article` tool with the article id — it returns the full body',
-  '   (typically 5-30 KB). Do NOT fall back to web search or web fetch for',
-  '   article content; Rewind has the full text including for paywalled',
-  '   sources (nytimes, wsj, atlantic, etc.).',
-  '4. Quote a short phrase from the content or excerpt when citing a fact.',
+  'HOW TO ANSWER: for most questions, call `get_schema` (or read the',
+  'rewind://schema resource) once, then `query_rewind` with a single SELECT.',
+  'The schema lists every table, column, join key, and convention. Examples:',
+  '- Top sources I read: SELECT domain, count(*) c FROM reading_items GROUP BY domain ORDER BY c DESC',
+  '- Movies watched in cities I checked into: SELECT DISTINCT m.title, c.venue_city FROM watch_history w JOIN movies m ON w.movie_id=m.id JOIN checkins c ON date(w.watched_at)=date(c.checked_in_at)',
+  '- Runs on game days: SELECT r.name, e.title FROM strava_activities r JOIN attended_events e ON date(r.start_date)=e.event_date',
   '',
-  'LINKING — resource_link blocks are hidden in the tool-use accordion,',
-  'not inline with your response. When listing items, render each title as',
-  'a markdown link `[title](url)` in prose using the URL fields from',
-  'structuredContent: `url`, `apple_music_url`, `letterboxd_url`,',
-  '`strava_url`, or `instapaper_url` as appropriate. For reading, also',
-  "mention `instapaper_app_url` or the user's Instapaper archive when",
-  'useful. Images ship as image blocks; numbers live in structuredContent.',
+  'Use the visual tools when a rich card is wanted: get_now_playing, get_top_',
+  'artists/albums/tracks, get_artist_details, get_recent_watches,',
+  'get_recent_reads, get_article, get_attended_season/event/player. Use',
+  '`search` / `semantic_search` for fuzzy recall by topic. `get_article`',
+  'returns the full body, cached even for paywalled sources — do not web-fetch.',
+  '',
+  'ANTI-HALLUCINATION: only assert facts present in the returned rows or article',
+  "text. If a search's top result doesn't clearly match, offer 2-3 candidates.",
+  '',
+  'LINKING — resource_link blocks are hidden in the tool-use accordion. When',
+  'listing items, render each title as `[title](url)` in prose using URL fields',
+  'from structuredContent (url, apple_music_url, letterboxd_url, strava_url,',
+  'instapaper_url).',
 ].join('\n');
 
 export function createServer(client: RewindClient): McpServer {
@@ -160,13 +155,14 @@ export function createServer(client: RewindClient): McpServer {
     }
   );
 
-  // Register all domain tools
+  // SQL-first primitives — the general-purpose surface. Register first so
+  // they lead the tool list.
+  registerQueryTools(server, client);
+
+  // Rich/widget + search tools that remain after retiring the thin wrappers.
   registerListeningTools(server, client);
-  registerRunningTools(server, client);
   registerWatchingTools(server, client);
-  registerCollectingTools(server, client);
   registerReadingTools(server, client);
-  registerPlacesTools(server, client);
   registerCrossDomainTools(server, client);
   registerAttendingTools(server, client);
 

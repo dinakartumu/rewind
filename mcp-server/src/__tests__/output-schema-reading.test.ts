@@ -129,10 +129,6 @@ async function buildClient(): Promise<Client> {
 const CASES: Array<{ name: string; args: Record<string, unknown> }> = [
   { name: 'get_article', args: { id: 1 } },
   { name: 'get_recent_reads', args: { include_images: false } },
-  { name: 'get_reading_highlights', args: {} },
-  { name: 'get_random_highlight', args: {} },
-  { name: 'get_reading_stats', args: {} },
-  { name: 'find_similar_articles', args: { article_id: 1 } },
 ];
 
 describe('output-schema conformance — reading', () => {
@@ -151,12 +147,6 @@ describe('output-schema conformance — reading', () => {
     const rewindClient = new RewindClient('https://api.test', 'rw_test');
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
       if (path === '/reading/recent') return { data: [] };
-      if (path === '/reading/highlights')
-        return {
-          data: [],
-          pagination: { page: 1, limit: 10, total: 0, total_pages: 0 },
-        };
-      if (/^\/reading\/articles\/\d+\/related$/.test(path)) return { data: [] };
       return {};
     });
     const server = createServer(rewindClient);
@@ -167,8 +157,6 @@ describe('output-schema conformance — reading', () => {
 
     for (const [name, args] of [
       ['get_recent_reads', { include_images: false }],
-      ['get_reading_highlights', {}],
-      ['find_similar_articles', { article_id: 1 }],
     ] as const) {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();

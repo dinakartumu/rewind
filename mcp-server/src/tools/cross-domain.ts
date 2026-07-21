@@ -6,7 +6,6 @@ import {
   text,
   resourceLink,
   imageBlock,
-  timeAgo,
   fmt,
   hostOf,
   READ_ONLY_ANNOTATIONS,
@@ -15,22 +14,16 @@ import {
 } from './helpers.js';
 import {
   searchResultSchema,
-  feedItemSchema,
   searchOutputSchema,
   semanticSearchOutputSchema,
-  feedOutputSchema,
-  onThisDayOutputSchema,
 } from './schemas/cross-domain.js';
 
 const SEARCH_TOP_N = 5;
 
 // Types below are derived from the Zod output schemas (schemas/cross-domain.ts)
-// so the declared schema and the TS type cannot drift. The inline result types
-// the handlers use (search results, feed items, on-this-day) match a tool's
-// structuredContent shape exactly, so they are consolidated here.
+// so the declared schema and the TS type cannot drift. The search-result type
+// matches the tool's structuredContent shape exactly.
 type SearchResult = z.infer<typeof searchResultSchema>;
-type FeedItem = z.infer<typeof feedItemSchema>;
-type OnThisDay = z.infer<typeof onThisDayOutputSchema>;
 
 /**
  * Map a cross-domain entity reference to a Rewind resource URI.
@@ -353,142 +346,6 @@ export function registerCrossDomainTools(
         return {
           content,
           structuredContent: { items: data.data, pagination: data.pagination },
-        };
-      })
-  );
-
-  // get_feed ───────────────────────────────────────────────────────
-  server.registerTool(
-    'get_feed',
-    {
-      title: 'Activity feed',
-      description:
-        'Get the unified activity feed across all domains. Returns a chronological list of recent activities (listens, runs, watches, reads, collection adds). Supports date filtering.',
-      inputSchema: {
-        limit: z
-          .number()
-          .min(1)
-          .max(50)
-          .default(10)
-          .describe('Number of feed items to return'),
-        domain: z
-          .enum(['listening', 'running', 'watching', 'collecting', 'reading'])
-          .optional()
-          .describe('Optional: filter feed to a single domain'),
-        date: z
-          .string()
-          .optional()
-          .describe('Optional: filter to a specific date (YYYY-MM-DD)'),
-        from: z
-          .string()
-          .optional()
-          .describe('Optional: start of date range (ISO 8601)'),
-        to: z
-          .string()
-          .optional()
-          .describe('Optional: end of date range (ISO 8601)'),
-      },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: feedOutputSchema,
-    },
-    async ({ limit, domain, date, from, to }) =>
-      withRichResponse(async () => {
-        const params: Record<string, string | number | undefined> = {
-          limit,
-          date,
-          from,
-          to,
-        };
-
-        const path = domain ? `/feed/domain/${domain}` : '/feed';
-        const data = await client.get<{
-          data: FeedItem[];
-          pagination: { has_more: boolean };
-        }>(path, params);
-
-        if (!data.data.length) {
-          return {
-            content: [text('No feed activity found for the given filters.')],
-            structuredContent: { items: [], pagination: data.pagination },
-          };
-        }
-
-        const lines = ['Activity Feed:'];
-        for (const item of data.data) {
-          const sub = item.subtitle ? ` -- ${item.subtitle}` : '';
-          lines.push(
-            `- [${item.domain}] ${item.title}${sub} (${timeAgo(item.occurred_at)})`
-          );
-        }
-
-        if (data.pagination.has_more) {
-          lines.push(
-            '\nMore items available. Increase limit or narrow date range.'
-          );
-        }
-
-        return {
-          content: [text(lines.join('\n'))],
-          structuredContent: { items: data.data, pagination: data.pagination },
-        };
-      })
-  );
-
-  // get_on_this_day ────────────────────────────────────────────────
-  server.registerTool(
-    'get_on_this_day',
-    {
-      title: 'On this day',
-      description:
-        "Get historical 'on this day' items -- what happened on a given date in previous years across all domains. Defaults to today. Great for nostalgia and reflection.",
-      inputSchema: {
-        month: z
-          .number()
-          .min(1)
-          .max(12)
-          .optional()
-          .describe('Optional: month (1-12). Defaults to current month.'),
-        day: z
-          .number()
-          .min(1)
-          .max(31)
-          .optional()
-          .describe('Optional: day (1-31). Defaults to current day.'),
-      },
-      annotations: READ_ONLY_ANNOTATIONS,
-      outputSchema: onThisDayOutputSchema,
-    },
-    async ({ month, day }) =>
-      withRichResponse(async () => {
-        // The endpoint requires an explicit date. Default to today --
-        // which is what this tool's input schema already documents.
-        const today = new Date();
-        const params = {
-          month: month ?? today.getUTCMonth() + 1,
-          day: day ?? today.getUTCDate(),
-        };
-        const data = await client.get<OnThisDay>('/feed/on-this-day', params);
-
-        if (!data.years.length) {
-          return {
-            content: [text("No 'on this day' history found.")],
-            structuredContent: data,
-          };
-        }
-
-        const lines = [`On This Day (${data.month}/${data.day}):`];
-        for (const yearGroup of data.years) {
-          lines.push('');
-          lines.push(`${yearGroup.year}:`);
-          for (const item of yearGroup.items) {
-            const sub = item.subtitle ? ` -- ${item.subtitle}` : '';
-            lines.push(`  - [${item.domain}] ${item.title}${sub}`);
-          }
-        }
-
-        return {
-          content: [text(lines.join('\n'))],
-          structuredContent: data,
         };
       })
   );

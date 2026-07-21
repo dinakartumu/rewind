@@ -56,6 +56,13 @@ const DOMAINS: {
   description: string;
 }[] = [
   {
+    key: 'query',
+    title: 'SQL',
+    icon: 'database',
+    description:
+      'The general-purpose SQL surface: read the annotated schema, then run a read-only SELECT against the whole Rewind database. Covers any ad-hoc or cross-domain question the specialized tools do not.',
+  },
+  {
     key: 'listening',
     title: 'Listening',
     icon: 'headphones',
@@ -232,9 +239,14 @@ function generate(): Record<string, string> {
   }
   // One page per domain. The Tools nav group itself is the index, so there is
   // no generated overview page (the MCP overview covers the concept).
+  // One page per domain that has at least one registered tool. Domains whose
+  // tools were all retired (e.g. running/collecting after the SQL-first
+  // migration) emit no page and are pruned from the output dir below.
   const files: Record<string, string> = {};
   for (const d of DOMAINS) {
-    files[`${d.key}.mdx`] = domainPage(d, byDomain[d.key] ?? []);
+    const domainTools = byDomain[d.key] ?? [];
+    if (domainTools.length === 0) continue;
+    files[`${d.key}.mdx`] = domainPage(d, domainTools);
   }
   return files;
 }

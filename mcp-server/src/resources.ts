@@ -50,6 +50,32 @@ export function registerResources(
     }
   );
 
+  // Annotated database schema — the companion to the query_rewind tool.
+  // Same payload get_schema returns, exposed as a resource so hosts can
+  // pin it into context before the model writes a SELECT.
+  server.registerResource(
+    'schema',
+    'rewind://schema',
+    {
+      title: 'Database schema',
+      description:
+        'Annotated schema for the read-only SQL query surface: every queryable table with columns, types, semantic notes, join keys, and global conventions. Read this before writing a query_rewind SELECT.',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      const schema = await client.getSchema();
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(schema, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  );
+
   // Listening year-in-review
   server.registerResource(
     'listening-year',

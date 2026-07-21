@@ -133,12 +133,6 @@ async function buildClient(): Promise<Client> {
 
 const CASES: Array<{ name: string; args: Record<string, unknown> }> = [
   { name: 'get_recent_watches', args: { include_images: false } },
-  { name: 'get_movie_details', args: { id: 1, include_images: false } },
-  { name: 'get_watching_stats', args: {} },
-  { name: 'browse_movies', args: { include_images: false } },
-  { name: 'get_watching_genres', args: {} },
-  { name: 'get_watching_decades', args: {} },
-  { name: 'get_watching_directors', args: {} },
 ];
 
 describe('output-schema conformance — watching', () => {
@@ -157,11 +151,6 @@ describe('output-schema conformance — watching', () => {
     const rewindClient = new RewindClient('https://api.test', 'rw_test');
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
       if (path === '/watching/recent') return { data: [] };
-      if (path === '/watching/movies')
-        return { data: [], pagination: paginationFixture };
-      if (path === '/watching/stats/genres') return { data: [] };
-      if (path === '/watching/stats/decades') return { data: [] };
-      if (path === '/watching/stats/directors') return { data: [] };
       return {};
     });
     const server = createServer(rewindClient);
@@ -172,10 +161,6 @@ describe('output-schema conformance — watching', () => {
 
     for (const [name, args] of [
       ['get_recent_watches', { include_images: false }],
-      ['browse_movies', { include_images: false }],
-      ['get_watching_genres', {}],
-      ['get_watching_decades', {}],
-      ['get_watching_directors', {}],
     ] as const) {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();

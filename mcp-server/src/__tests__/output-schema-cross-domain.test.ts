@@ -95,8 +95,6 @@ async function buildClient(): Promise<Client> {
 const CASES: Array<{ name: string; args: Record<string, unknown> }> = [
   { name: 'search', args: { query: 'test' } },
   { name: 'semantic_search', args: { query: 'test' } },
-  { name: 'get_feed', args: {} },
-  { name: 'get_on_this_day', args: {} },
 ];
 
 describe('output-schema conformance — cross-domain', () => {
@@ -116,9 +114,6 @@ describe('output-schema conformance — cross-domain', () => {
     vi.spyOn(rewindClient, 'get').mockImplementation(async (path: string) => {
       if (path === '/search')
         return { data: [], pagination: paginationFixture };
-      if (path === '/feed')
-        return { data: [], pagination: { has_more: false } };
-      if (path === '/feed/on-this-day') return { month: 5, day: 15, years: [] };
       return {};
     });
     const server = createServer(rewindClient);
@@ -130,8 +125,6 @@ describe('output-schema conformance — cross-domain', () => {
     for (const [name, args] of [
       ['search', { query: 'nothing' }],
       ['semantic_search', { query: 'nothing' }],
-      ['get_feed', {}],
-      ['get_on_this_day', {}],
     ] as const) {
       const res = await client.callTool({ name, arguments: args });
       expect(res.isError, name).toBeFalsy();
