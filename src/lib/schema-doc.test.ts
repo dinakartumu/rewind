@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { isTable, getTableName } from 'drizzle-orm';
-import { SCHEMA_DOC, schemaDocTableNames } from './schema-doc.js';
-import { DENIED_TABLES } from './sql-guard.js';
+import {
+  SCHEMA_DOC,
+  schemaDocTableNames,
+  allowedTableNames,
+} from './schema-doc.js';
+import { DENIED_TABLES, ALLOWED_TABLES } from './sql-guard.js';
 
 // Import every schema module. Enumerating the exported Drizzle table objects
 // (rather than parsing source files) is the source of truth that survives the
@@ -97,6 +101,22 @@ describe('schema-doc coverage', () => {
   it('has no duplicate table entries', () => {
     const names = schemaDocTableNames();
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('ALLOWED_TABLES is exactly the documented set (lower-cased)', () => {
+    const expected = new Set(schemaDocTableNames().map((n) => n.toLowerCase()));
+    // Same helper the guard consumes.
+    expect(new Set(allowedTableNames())).toEqual(expected);
+    // The guard's frozen set matches the documented set exactly — no more, no
+    // less. This makes SCHEMA_DOC the single source of truth for the gate.
+    expect(new Set(ALLOWED_TABLES)).toEqual(expected);
+    expect(ALLOWED_TABLES.size).toBe(schemaDocTableNames().length);
+  });
+
+  it('no denied table is in the allow-list', () => {
+    for (const denied of DENIED_TABLES) {
+      expect(ALLOWED_TABLES.has(denied.toLowerCase())).toBe(false);
+    }
   });
 
   it('includes the global orientation notes a model needs', () => {

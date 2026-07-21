@@ -936,3 +936,18 @@ export const SCHEMA_DOC: SchemaDoc = {
 export function schemaDocTableNames(): string[] {
   return SCHEMA_DOC.tables.map((t) => t.name);
 }
+
+/**
+ * The allow-list of table names the read-only query endpoint may target.
+ *
+ * SCHEMA_DOC is the single, curated source of truth for what is safe to read:
+ * every table documented here is intentionally exposed, and secret/system
+ * tables (api_keys, *_tokens, revalidation_hooks, webhook_events, sqlite_*)
+ * are deliberately absent. The SQL guard derives its FROM/JOIN allow-list from
+ * this set, so adding a table to the query surface means documenting it here —
+ * there is no separate list to keep in sync. Names are lower-cased so the
+ * guard can match case-insensitively.
+ */
+export function allowedTableNames(): Set<string> {
+  return new Set(SCHEMA_DOC.tables.map((t) => t.name.toLowerCase()));
+}

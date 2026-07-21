@@ -3,42 +3,64 @@
  *
  * This is the single server-side choke point that keeps a read-scope SQL tool
  * from mutating data or exfiltrating secrets. OAuth already gates the surface
- * to the owner; this gate is defense in depth. It is deliberately conservative:
- * ambiguity resolves to rejection.
+ * to the owner, but two of these controls are LOAD-BEARING, not merely
+ * defense-in-depth:
+ *   - Multi-statement blocking: D1 executes chained `;`-separated statements,
+ *     so a single missed `;` would let a write ride along behind a SELECT.
+ *   - The table gate is an ALLOW-list: the DB holds `api_keys` hashes and
+ *     OAuth tokens, and D1 gives no read-side row protection, so anything not
+ *     explicitly documented as safe must be unreachable by default.
+ * It is deliberately conservative: ambiguity resolves to rejection.
  *
  * Pipeline:
  *   1. Strip SQL comments (`-- … EOL` and `/* … *\/`, nested-safe) BEFORE any
  *      analysis, so comment-smuggled keywords/tables can't hide.
- *   2. The value we return (and therefore execute) is the comment-stripped,
- *      whitespace-normalized, LIMIT-enforced form. Executing the normalized
- *      form rather than the raw input means what the guard inspected is exactly
- *      what runs — no divergence between validated text and executed text.
- *   3. Reject > 1 statement (a `;` outside a string literal or comment).
- *   4. First meaningful keyword must be SELECT or WITH.
- *   5. Deny-token scan (word-boundary, case-insensitive) for write / DDL /
- *      side-effecting keywords anywhere in the stripped SQL.
- *   6. Denied-table scan (word-boundary) anywhere in the stripped SQL.
- *   7. LIMIT enforcement: append `LIMIT 200` when absent; cap any explicit
- *      top-level LIMIT count at 500.
+ *   2. Reject > 1 statement (a `;` outside a string literal or comment).
+ *   3. First meaningful keyword must be SELECT or WITH.
+ *   4. Deny-token scan (word-boundary, case-insensitive) for write / DDL /
+ *      side-effecting keywords, on string-BLANKED SQL.
+ *   5. Denied-table scan (word-boundary) on the un-blanked SQL — redundant
+ *      belt-and-suspenders now that the allow-list is authoritative.
+ *   6. ALLOW-list table gate: every FROM/JOIN target must be a documented
+ *      table (from SCHEMA_DOC) or a CTE name defined in the same query.
+ *   7. LIMIT enforcement: wrap the validated query in
+ *      `SELECT * FROM (<query>) AS _rewind_q LIMIT <n>` so the cap is genuinely
+ *      top-level and robust to UNION/compound and expression LIMITs.
+ *
+ * The value we return (and therefore execute) is the comment-stripped,
+ * whitespace-normalized, LIMIT-wrapped form. Executing the normalized form
+ * rather than the raw input means what the guard inspected is exactly what
+ * runs — no divergence between validated text and executed text.
  */
+
+import { allowedTableNames } from './schema-doc.js';
 
 export type SqlGuardResult =
   | { ok: true; sql: string }
   | { ok: false; error: string };
 
 /**
+ * The allow-list of table names any FROM/JOIN may target, derived from the
+ * curated SCHEMA_DOC (the single source of truth for safe tables). Computed
+ * once at module load; the set is lower-cased for case-insensitive matching.
+ */
+export const ALLOWED_TABLES: ReadonlySet<string> = allowedTableNames();
+
+/**
  * Tables that must never be reachable from the query endpoint.
  *
- * Derived by reading every `src/db/schema/*.ts` file:
+ * NOTE: this is NO LONGER the authoritative control — `ALLOWED_TABLES` (derived
+ * from SCHEMA_DOC) is. Any table not documented in the schema is unreachable by
+ * default, so a future secret table is safe even if it is never added here.
+ * This list is kept as cheap, redundant belt-and-suspenders and to give a
+ * precise, named error for the well-known secret tables:
  *   - `api_keys` — hashed API key material.
  *   - `*_tokens` — OAuth access/refresh tokens (Strava, Trakt, Google).
  *   - `revalidation_hooks` — cache-purge secrets.
  *   - `webhook_events` — inbound webhook payloads / provider secrets.
- *   - `sqlite_master` / `sqlite_schema` — live schema introspection is out of
- *     scope; the curated `/v1/schema` resource is the only schema surface.
- *
- * Everything else in the schema (domain data + `geo_cities`, `sync_runs`,
- * `activity_feed`, `images`, `genres`, `directors`, etc.) is allowed.
+ *   - `sqlite_master` / `sqlite_schema` / other SQLite/D1 internals — schema
+ *     introspection is out of scope; the curated `/v1/schema` resource is the
+ *     only schema surface.
  */
 export const DENIED_TABLES: readonly string[] = [
   'api_keys',
@@ -65,6 +87,12 @@ export const DENIED_TABLES: readonly string[] = [
  * Keywords that indicate a write, DDL, or side-effecting operation. A match on
  * any of these as a whole word (after comment stripping) rejects the query —
  * this also covers write-bodied CTEs (`WITH x AS (DELETE …)`).
+ *
+ * `REPLACE` is deliberately absent here: it collides with the very common
+ * `replace(str, from, to)` scalar function. The only side-effecting form of
+ * REPLACE is a statement (`REPLACE INTO …` / a statement-initial `REPLACE`),
+ * which is caught separately (first-keyword check + the dedicated REPLACE-INTO
+ * scan below) without breaking legitimate `replace()` calls.
  */
 const DENY_TOKENS = [
   'ATTACH',
@@ -76,7 +104,6 @@ const DENY_TOKENS = [
   'DROP',
   'ALTER',
   'CREATE',
-  'REPLACE',
   'VACUUM',
   'REINDEX',
   'TRIGGER',
@@ -257,13 +284,170 @@ function hasWord(sql: string, word: string): boolean {
 }
 
 /**
- * Enforce the LIMIT policy on a single-statement SELECT/WITH query.
- *   - If there is no top-level LIMIT, append `LIMIT 200`.
- *   - If there is a top-level LIMIT with a count > 500, cap the count at 500.
+ * A single table reference extracted from a FROM/JOIN clause.
+ *   - `name` is the lower-cased, unquoted table identifier.
+ *   - `ok` is false when the reference is structurally disallowed regardless of
+ *     the allow-list (a cross-schema qualifier other than `main`).
+ */
+interface TableRef {
+  name: string;
+  ok: boolean;
+  raw: string;
+}
+
+/**
+ * Unwrap a quoted identifier: `"x"`, `[x]`, `` `x` ``, or a bare word. Returns
+ * the inner name (lower-cased) or null if the token isn't an identifier.
+ */
+function unquoteIdentifier(token: string): string | null {
+  const t = token.trim();
+  if (t.length === 0) return null;
+  const first = t[0];
+  const last = t[t.length - 1];
+  if (first === '"' && last === '"') return t.slice(1, -1).toLowerCase();
+  if (first === '[' && last === ']') return t.slice(1, -1).toLowerCase();
+  if (first === '`' && last === '`') return t.slice(1, -1).toLowerCase();
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) return t.toLowerCase();
+  return null;
+}
+
+/**
+ * Parse one dotted-or-bare table reference token (e.g. `movies`, `main.movies`,
+ * `"main"."movies"`, `db.schema.tbl`). Rules:
+ *   - bare name → that name
+ *   - `main.x` → `x` (the only allowed schema qualifier)
+ *   - any other single qualifier, or more than one dot → reject (ok:false),
+ *     since we never need cross-schema access and won't reason about it.
+ */
+function parseTableToken(token: string): TableRef {
+  const raw = token.trim();
+  // Split on dots that are not inside quotes/brackets/backticks.
+  const parts: string[] = [];
+  let cur = '';
+  let quote = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote) {
+      cur += ch;
+      if (
+        (quote === '"' && ch === '"') ||
+        (quote === '`' && ch === '`') ||
+        (quote === '[' && ch === ']')
+      ) {
+        quote = '';
+      }
+      continue;
+    }
+    if (ch === '"' || ch === '`' || ch === '[') {
+      quote = ch === '[' ? '[' : ch;
+      cur += ch;
+      continue;
+    }
+    if (ch === '.') {
+      parts.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  parts.push(cur);
+
+  if (parts.length === 1) {
+    const name = unquoteIdentifier(parts[0]);
+    if (name === null) return { name: '', ok: false, raw };
+    return { name, ok: true, raw };
+  }
+  if (parts.length === 2) {
+    const schema = unquoteIdentifier(parts[0]);
+    const name = unquoteIdentifier(parts[1]);
+    if (name === null) return { name: '', ok: false, raw };
+    // Only the default `main` schema is acceptable.
+    if (schema === 'main') return { name, ok: true, raw };
+    return { name: name ?? '', ok: false, raw };
+  }
+  // Three-part (or more) qualifiers are always rejected.
+  return { name: '', ok: false, raw };
+}
+
+/**
+ * Extract the CTE names defined by a top-level `WITH [RECURSIVE] a AS (…), b AS
+ * (…)` prelude. These are reference targets that are allowed IN ADDITION to the
+ * base-table allow-list — their bodies' own FROM/JOIN targets are still
+ * validated by the FROM/JOIN scan (which runs over the whole query).
  *
- * We match the LAST `LIMIT … [OFFSET …]` clause, which for a well-formed query
- * is the top-level one (subquery/CTE LIMITs are followed by a closing paren
- * and more query text, so a trailing LIMIT is the outermost).
+ * Run on comment-stripped, string-blanked SQL.
+ */
+function extractCteNames(sql: string): Set<string> {
+  const names = new Set<string>();
+  const m = sql.match(/^[\s(]*WITH\s+(?:RECURSIVE\s+)?/i);
+  if (!m) return names;
+
+  // A CTE name is `<ident> [(col, …)] AS (`. Match each such definition; the
+  // `AS (` anchor keeps us from picking up table names in the bodies. We match
+  // anywhere in the query (a `<ident> AS (SELECT …)` following FROM/WHERE isn't
+  // a CTE, but adding it as an allowed reference target is harmless — its body
+  // FROM/JOIN targets are still validated separately). The point of this set is
+  // only to WHITELIST names that would otherwise fail the FROM/JOIN scan.
+  const cteRe =
+    /("[^"]+"|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s*(?:\([^)]*\))?\s+AS\s*\(/gi;
+  let match: RegExpExecArray | null;
+  while ((match = cteRe.exec(sql)) !== null) {
+    const name = unquoteIdentifier(match[1]);
+    if (name) names.add(name);
+  }
+  return names;
+}
+
+/**
+ * Extract every table reference targeted by a FROM or JOIN clause (all join
+ * types). Returns the parsed refs. Run on comment-stripped, string-blanked SQL
+ * so a table-name-looking token inside a string literal is not treated as a
+ * table reference.
+ *
+ * We match the identifier token immediately following the FROM/JOIN keyword.
+ * A subquery source (`FROM (SELECT …)`) has `(` next, not an identifier, so it
+ * produces no ref here — the inner SELECT's own FROM/JOIN is matched on its own.
+ * A table-valued function (`FROM foo(...)`) still yields `foo`, which then
+ * fails the allow-list (e.g. `pragma_table_info` is already blocked upstream).
+ */
+function extractTableRefs(sql: string): TableRef[] {
+  const refs: TableRef[] = [];
+  // FROM/JOIN, then optional whitespace, then a table token that is NOT an
+  // opening paren (subquery). The token allows dotted/quoted identifiers.
+  const re =
+    /\b(?:FROM|JOIN)\s+("[^"]+"(?:\.[^\s,()]+)?|\[[^\]]+\](?:\.[^\s,()]+)?|`[^`]+`(?:\.[^\s,()]+)?|[A-Za-z_][A-Za-z0-9_."[\]`]*)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(sql)) !== null) {
+    const token = match[1];
+    // Skip a subquery/paren source that slipped through (shouldn't, but safe).
+    if (token.startsWith('(')) continue;
+    refs.push(parseTableToken(token));
+  }
+  return refs;
+}
+
+const DEFAULT_LIMIT = 200;
+const MAX_LIMIT = 500;
+
+/**
+ * Enforce the LIMIT policy by WRAPPING the validated query in an outer SELECT:
+ *
+ *   SELECT * FROM (<validated user sql>) AS _rewind_q LIMIT <n>
+ *
+ * Wrapping (rather than appending `LIMIT` to the user's text) makes the cap
+ * genuinely top-level and robust to compound/expression LIMITs: a bare append
+ * would break `… LIMIT 5 UNION …` and `… LIMIT 10+10`. ORDER BY inside the
+ * user query (including inside each arm of a compound/UNION select) still
+ * applies within the subquery; the outer LIMIT only bounds the row count.
+ *
+ * The row cap is:
+ *   - `DEFAULT_LIMIT` (200) when the user gave no top-level LIMIT, or
+ *   - min(userTopLevelLimit, MAX_LIMIT) when they did.
+ *
+ * We detect a trailing top-level LIMIT the same way as before (a well-formed
+ * query's outermost LIMIT is the trailing one; subquery/CTE LIMITs are followed
+ * by a closing paren and more text). If detection is ambiguous we fall back to
+ * the default cap, which is always safe (never larger than MAX_LIMIT).
  */
 function enforceLimit(sql: string): string {
   const trimmed = sql.trim();
@@ -272,29 +456,18 @@ function enforceLimit(sql: string): string {
   //   LIMIT <count> [OFFSET <n>]
   //   LIMIT <offset>, <count>
   const trailingLimit =
-    /\bLIMIT\s+(\d+)\s*(?:,\s*(\d+))?\s*(?:OFFSET\s+(\d+)\s*)?$/i;
+    /\bLIMIT\s+(\d+)\s*(?:,\s*(\d+))?\s*(?:OFFSET\s+\d+\s*)?$/i;
   const m = trimmed.match(trailingLimit);
 
-  if (!m) {
-    return `${trimmed} LIMIT 200`;
+  let cap = DEFAULT_LIMIT;
+  if (m) {
+    const commaForm = m[2] !== undefined;
+    // In comma form `LIMIT a, b`, a=offset, b=count; else group 1 is the count.
+    const userLimit = commaForm ? Number(m[2]) : Number(m[1]);
+    cap = Math.min(userLimit, MAX_LIMIT);
   }
 
-  const commaForm = m[2] !== undefined;
-  // In comma form `LIMIT a, b`, a=offset, b=count. In standard form, group 1
-  // is the count.
-  const count = commaForm ? Number(m[2]) : Number(m[1]);
-
-  if (count <= 500) {
-    return trimmed;
-  }
-
-  // Rebuild the clause with the count capped at 500.
-  const start = trimmed.slice(0, m.index);
-  if (commaForm) {
-    return `${start.trimEnd()} LIMIT ${m[1]}, 500`;
-  }
-  const offsetPart = m[3] !== undefined ? ` OFFSET ${m[3]}` : '';
-  return `${start.trimEnd()} LIMIT 500${offsetPart}`;
+  return `SELECT * FROM (${trimmed}) AS _rewind_q LIMIT ${cap}`;
 }
 
 export function validateReadOnlySql(input: unknown): SqlGuardResult {
@@ -340,7 +513,22 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
     }
   }
 
-  // 6. Denied-table scan (word-boundary, anywhere — conservative).
+  // 5b. REPLACE is not in DENY_TOKENS (it collides with the `replace()` scalar
+  //     function, which is common and legitimate). The only side-effecting
+  //     form is a statement: `REPLACE INTO …` or a statement-initial REPLACE.
+  //     Statement-initial REPLACE is already blocked by the first-keyword check
+  //     above; catch `REPLACE INTO` explicitly here so `replace(a,b,c)` passes.
+  if (/\bREPLACE\s+INTO\b/i.test(codeOnly)) {
+    return {
+      ok: false,
+      error:
+        'Disallowed keyword: REPLACE. Only read-only queries are permitted.',
+    };
+  }
+
+  // 6. Denied-table scan (word-boundary, anywhere — conservative). Redundant
+  //    belt-and-suspenders now that the allow-list (step 7) is authoritative,
+  //    but cheap and it gives a precise error for known-secret tables.
   const lowered = trimmed.toLowerCase();
   for (const table of DENIED_TABLES) {
     if (hasWord(lowered, table)) {
@@ -372,7 +560,27 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
     };
   }
 
-  // 7. LIMIT enforcement.
+  // 7. ALLOW-list table gate (load-bearing). Every FROM/JOIN target must be a
+  //    documented table or a CTE name defined in this query. Runs on the
+  //    string-blanked SQL so a table-name-looking token inside a string literal
+  //    isn't treated as a table reference.
+  const cteNames = extractCteNames(codeOnly);
+  const refs = extractTableRefs(codeOnly);
+  for (const ref of refs) {
+    if (!ref.ok) {
+      return {
+        ok: false,
+        error: `Disallowed table reference: \`${ref.raw.trim()}\`. Cross-schema/qualified table names are not permitted.`,
+      };
+    }
+    if (ALLOWED_TABLES.has(ref.name) || cteNames.has(ref.name)) continue;
+    return {
+      ok: false,
+      error: `Access to table \`${ref.name}\` is not allowed. Only documented tables (see GET /v1/schema) may be queried.`,
+    };
+  }
+
+  // 8. LIMIT enforcement (subquery wrap — robust to UNION/compound queries).
   const finalSql = enforceLimit(trimmed);
 
   return { ok: true, sql: finalSql };

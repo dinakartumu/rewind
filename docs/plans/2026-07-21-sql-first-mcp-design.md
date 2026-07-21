@@ -24,19 +24,31 @@ truncated: boolean }`.
 
 **The gate (server-side, single choke point):**
 
-1. Single statement only (reject embedded `;` outside string literals).
+1. **Single statement only (LOAD-BEARING).** Reject any embedded `;` outside
+   string literals. D1 executes chained `;`-separated statements, so a missed
+   `;` would let a write ride behind a SELECT — this is not just hygiene.
 2. Must parse as `SELECT` / `WITH … SELECT` (first meaningful token).
-3. Deny-tokens anywhere: `ATTACH`, `PRAGMA`, `INSERT`, `UPDATE`, `DELETE`,
-   `DROP`, `ALTER`, `CREATE`, `REPLACE`, `VACUUM`, `REINDEX`, `TRIGGER`.
-4. **Table allowlist — the load-bearing control.** The DB holds secrets
+3. Deny-tokens anywhere (on string-blanked SQL): `ATTACH`, `DETACH`, `PRAGMA`,
+   `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `VACUUM`,
+   `REINDEX`, `TRIGGER`. `REPLACE` is handled separately as `REPLACE INTO` /
+   statement-initial only, so the `replace()` scalar function still works.
+4. **Table ALLOW-list — the load-bearing control.** The DB holds secrets
    (`api_keys` hashes, `trakt_tokens`/`strava_tokens`/`google_tokens` OAuth
-   tokens, `revalidation_hooks` secrets, `oauth_*`). Scan the SQL for any
-   word-token matching a DENIED table name and reject the query outright
-   (conservative: even inside strings). Allowlist = the domain data tables +
-   `geo_cities` + `sync_runs` + `activity_feed` + `images` + `genres` etc.;
-   deny everything else including `sqlite_master` (schema comes from the
-   curated resource instead).
-5. Enforce LIMIT: append `LIMIT 200` when absent; cap any explicit LIMIT at 500. Response size ceiling ~256 KB → `truncated: true`.
+   tokens, `revalidation_hooks` secrets) and D1 gives no read-side row
+   protection, so the gate is an allow-list, not a deny-list: a future secret
+   table is unreachable by default. Extract every FROM/JOIN target (handling
+   quoted `"x"`/`[x]`/`` `x` ``, `main.x` qualifiers, and CTE names) and
+   require each to be a table documented in `SCHEMA_DOC` — the single source of
+   truth — or a CTE defined in the same query. A CTE name is an allowed
+   reference target, but its body's own FROM/JOIN targets are still validated.
+   The legacy denied-table word-scan is kept as cheap redundant defense.
+   `sqlite_master`/`pragma_*` are excluded (schema comes from the curated
+   resource instead).
+5. Enforce LIMIT by WRAPPING: `SELECT * FROM (<validated sql>) AS _rewind_q
+LIMIT <n>` where n = min(user's top-level LIMIT, 500) or 200 if absent.
+   Wrapping (not appending) keeps the cap top-level and robust to
+   UNION/compound and expression LIMITs. Response size ceiling ~256 KB →
+   `truncated: true`.
 6. Read keys allowed; per-key rate limiting already applies.
 
 ### API: GET /v1/schema (read scope)
@@ -66,8 +78,10 @@ silently.
 
 ## Safety posture
 
-OAuth already gates the surface to the owner; the SQL gate is defense in
-depth. Adversarial tests are part of the deliverable: multi-statement
+OAuth gates the surface to the owner, but the SQL gate is not merely defense in
+depth: multi-statement blocking and the ALLOW-list table gate are load-bearing
+controls (D1 chains statements; the DB holds secrets with no read-side row
+protection). Adversarial tests are part of the deliverable: multi-statement
 smuggling, comment tricks (`/**/`, `--`), CTE writes, `PRAGMA` via whitespace
 variants, denied-table references through aliases and quoted identifiers,
 LIMIT bypass attempts.

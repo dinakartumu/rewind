@@ -102,6 +102,37 @@ describe('POST /v1/query + GET /v1/schema', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a non-documented (but non-denied) table with 400', async () => {
+    // C1 regression at the HTTP boundary: allow-list, not deny-list.
+    const res = await query('SELECT * FROM plex_credentials');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/plex_credentials|not allowed/i);
+  });
+
+  it('executes a UNION query through the LIMIT wrap (valid SQL)', async () => {
+    // The wrap form (`SELECT * FROM (<union>) AS _rewind_q LIMIT n`) must be
+    // valid SQL that D1 accepts — an append-LIMIT would have been rejected.
+    const res = await query(
+      'SELECT title FROM movies WHERE year = 1999 UNION SELECT title FROM movies WHERE year = 2001 ORDER BY title'
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[][]; columns: string[] };
+    expect(body.columns).toEqual(['title']);
+    expect(body.rows.map((r) => r[0])).toEqual([
+      'Query Movie A',
+      'Query Movie B',
+    ]);
+  });
+
+  it('executes a wrapped query with a user LIMIT capping the row count', async () => {
+    const res = await query('SELECT title FROM movies ORDER BY title LIMIT 1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[][] };
+    expect(body.rows.length).toBe(1);
+    expect(body.rows[0]).toEqual(['Query Movie A']);
+  });
+
   it('maps a D1 execution error (bad column) to a clean 400', async () => {
     const res = await query('SELECT no_such_column FROM movies');
     expect(res.status).toBe(400);

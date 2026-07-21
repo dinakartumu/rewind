@@ -11,9 +11,12 @@ import { SCHEMA_DOC } from '../lib/schema-doc.js';
  *   - POST /v1/query  — run a gated, read-only SELECT/WITH query.
  *   - GET  /v1/schema — the curated annotated schema for the query endpoint.
  *
- * The security gate (single-statement, SELECT/WITH only, deny-token scan,
- * denied-table scan, LIMIT enforcement) lives in `lib/sql-guard.ts`; this
- * route just wires it in and executes the validated SQL against D1.
+ * The security gate lives in `lib/sql-guard.ts`; this route wires it in and
+ * executes the validated SQL against D1. Two of the gate's controls are
+ * LOAD-BEARING (not merely defense-in-depth): multi-statement blocking (D1
+ * executes chained `;`-separated statements, so one missed `;` would let a
+ * write ride along behind a SELECT) and the ALLOW-list table gate (the DB
+ * holds `api_keys` hashes and OAuth tokens with no read-side row protection).
  */
 
 /**
@@ -130,6 +133,14 @@ query.openapi(runQueryRoute, async (c) => {
   const gate = validateReadOnlySql(parsed.sql);
   if (!gate.ok) {
     return badRequest(c, gate.error) as never;
+  }
+
+  // Belt-and-suspenders: the validated SQL is a single statement and the LIMIT
+  // wrap adds no `;`. If one is somehow present, refuse to hand it to D1 (which
+  // would execute chained statements). This should be unreachable.
+  if (gate.sql.includes(';')) {
+    console.log('[ERROR] /v1/query: validated SQL contained a semicolon');
+    return badRequest(c, 'Query failed validation.') as never;
   }
 
   let raw: [string[], ...unknown[][]];
