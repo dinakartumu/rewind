@@ -280,3 +280,165 @@ describe('query_rewind inline artwork', () => {
     await client.close();
   });
 });
+
+// Helper: pull the `art` / `art_truncated` fields out of structuredContent.
+function artOf(result: unknown): Record<string, string> | undefined {
+  return (result as { structuredContent?: { art?: Record<string, string> } })
+    .structuredContent?.art;
+}
+function artTruncatedOf(result: unknown): boolean | undefined {
+  return (result as { structuredContent?: { art_truncated?: boolean } })
+    .structuredContent?.art_truncated;
+}
+
+describe('query_rewind embed_art', () => {
+  it('omits the art field entirely when embed_art is false (default)', async () => {
+    const url = `${CDN}/listening/albums/5/original.jpg?v=3`;
+    const { client } = await createTestClient({
+      columns: ['album', 'art'],
+      rows: [['Blonde', url]],
+      row_count: 1,
+      truncated: false,
+    });
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1' },
+    });
+    expect(artOf(result)).toBeUndefined();
+    expect(artTruncatedOf(result)).toBeUndefined();
+    // Default inline image blocks are unchanged.
+    expect(imageBlocksOf(result)).toHaveLength(1);
+    await client.close();
+  });
+
+  it('returns a base64 WebP data URI map keyed by the original URL', async () => {
+    const a = `${CDN}/listening/albums/1/original.jpg?v=1`;
+    const b = `${CDN}/listening/albums/2/original.jpg?v=1`;
+    const { client } = await createTestClient({
+      columns: ['album', 'art'],
+      rows: [
+        ['One', a],
+        ['Two', b],
+      ],
+      row_count: 2,
+      truncated: false,
+    });
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    const art = artOf(result);
+    expect(art).toBeDefined();
+    // Keyed by the ORIGINAL url exactly as it appeared in the cell.
+    expect(Object.keys(art!).sort()).toEqual([a, b].sort());
+    for (const uri of Object.values(art!)) {
+      expect(uri.startsWith('data:image/webp;base64,')).toBe(true);
+    }
+    expect(artTruncatedOf(result)).toBeFalsy();
+    await client.close();
+  });
+
+  it('forces a width=64 webp transform on the fetched CDN URL', async () => {
+    const orig = `${CDN}/cdn-cgi/image/width=300,height=300,fit=cover,format=auto,quality=85/listening/albums/5/original.jpg?v=3`;
+    const seen: string[] = [];
+    const { client } = await createTestClient(
+      {
+        columns: ['art'],
+        rows: [[orig]],
+        row_count: 1,
+        truncated: false,
+      },
+      async (url: string) => {
+        seen.push(url);
+        return { bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/webp' };
+      }
+    );
+    await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    // The embed fetch (last) must force width=64 + webp + quality=70.
+    const embedFetch = seen[seen.length - 1];
+    expect(embedFetch).toContain('width=64');
+    expect(embedFetch).toContain('format=webp');
+    expect(embedFetch).toContain('quality=70');
+    // Source asset path + version preserved.
+    expect(embedFetch).toContain('listening/albums/5/original.jpg');
+    expect(embedFetch).toContain('v=3');
+    await client.close();
+  });
+
+  it('de-duplicates and caps embedded art at 16 distinct URLs', async () => {
+    // 20 distinct URLs, each appearing twice → 40 cells.
+    const rows: unknown[][] = [];
+    for (let i = 0; i < 20; i++) {
+      const u = `${CDN}/listening/albums/${i}/original.jpg?v=1`;
+      rows.push([`Album ${i}`, u]);
+      rows.push([`Album ${i} dup`, u]);
+    }
+    const { client } = await createTestClient({
+      columns: ['album', 'art'],
+      rows,
+      row_count: rows.length,
+      truncated: false,
+    });
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    const art = artOf(result)!;
+    expect(Object.keys(art)).toHaveLength(16);
+    await client.close();
+  });
+
+  it('stops and sets art_truncated when the byte ceiling is exceeded', async () => {
+    // Each fetch returns 100KB of bytes → base64 ~137KB. One cover fits under
+    // the ~256KB ceiling; a second would push the total past it and is dropped.
+    const a = `${CDN}/listening/albums/1/original.jpg?v=1`;
+    const b = `${CDN}/listening/albums/2/original.jpg?v=1`;
+    const big = new Uint8Array(100 * 1024).fill(65);
+    const { client } = await createTestClient(
+      {
+        columns: ['art'],
+        rows: [[a], [b]],
+        row_count: 2,
+        truncated: false,
+      },
+      async () => ({ bytes: big, mimeType: 'image/webp' })
+    );
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    const art = artOf(result)!;
+    // Only the first cover fit under the ceiling.
+    expect(Object.keys(art)).toEqual([a]);
+    expect(artTruncatedOf(result)).toBe(true);
+    await client.close();
+  });
+
+  it('omits the key for a failed fetch but keeps the others (no throw)', async () => {
+    const ok = `${CDN}/listening/albums/1/original.jpg?v=1`;
+    const bad = `${CDN}/listening/albums/2/original.jpg?v=1`;
+    const { client } = await createTestClient(
+      {
+        columns: ['art'],
+        rows: [[ok], [bad]],
+        row_count: 2,
+        truncated: false,
+      },
+      async (url: string) => {
+        if (url.includes('/albums/2/')) throw new Error('boom');
+        return { bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/webp' };
+      }
+    );
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', embed_art: true },
+    });
+    const art = artOf(result)!;
+    expect(Object.keys(art)).toEqual([ok]);
+    expect((result as { isError?: boolean }).isError).toBeFalsy();
+    await client.close();
+  });
+});

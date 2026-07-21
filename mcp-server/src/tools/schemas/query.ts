@@ -13,6 +13,15 @@ export const queryOutputSchema = z
     rows: z.array(z.array(z.unknown())),
     row_count: z.number(),
     truncated: z.boolean(),
+    /**
+     * Present only when `embed_art: true`. Maps each matched CDN image URL —
+     * exactly as it appears in a result cell — to a small base64 WebP data URI
+     * (64px) so sandboxed artifact HTML can inline the artwork without fetching
+     * the CDN directly. The base64 lives here, never in the text table.
+     */
+    art: z.record(z.string(), z.string()).optional(),
+    /** True when the cumulative base64 byte ceiling cut off some `art` entries. */
+    art_truncated: z.boolean().optional(),
   })
   .passthrough();
 

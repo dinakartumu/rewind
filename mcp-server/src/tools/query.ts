@@ -5,6 +5,8 @@ import {
   withRichResponse,
   text,
   imageBlock,
+  resizeCdnUrl,
+  bytesToBase64,
   READ_ONLY_ANNOTATIONS,
   type ContentBlock,
 } from './helpers.js';
@@ -17,6 +19,21 @@ const MAX_QUERY_IMAGES = 8;
 /** Thumbnail size (px) for inline artwork rendered from SQL results. */
 const QUERY_IMAGE_PX = 120;
 /**
+ * Max distinct CDN URLs embedded as base64 data URIs when `embed_art` is true.
+ * Independent of MAX_QUERY_IMAGES (the native inline-image card cap).
+ */
+const MAX_EMBED_ART = 16;
+/** Forced pixel size for embedded art thumbnails — hard-downsampled for artifacts. */
+const EMBED_ART_PX = 64;
+/** WebP quality for embedded art thumbnails. */
+const EMBED_ART_QUALITY = 70;
+/**
+ * Cumulative base64 byte ceiling for the whole `art` map (~256KB). Once a
+ * fetched thumbnail would push the total past this, we stop and flag
+ * art_truncated so the payload stays bounded.
+ */
+const EMBED_ART_BYTE_CEILING = 256 * 1024;
+/**
  * Domains that can prefix a bare r2_key (a value with no scheme). Mirrors the
  * `images.domain` enum so we don't treat an arbitrary "a/b/c" string as art.
  */
@@ -24,30 +41,87 @@ const R2_KEY_RE =
   /^(listening|watching|collecting|reading|places|attending|running)\/[\w./-]+$/;
 
 /**
- * Detect image URLs among the result cells, in row-major order, de-duplicated,
- * capped at MAX_QUERY_IMAGES. A cell qualifies if it is a full CDN URL, or a
- * bare r2_key (no scheme) that we can compose into one.
+ * A matched image cell: the `original` string exactly as it appears in the
+ * result row (used as the `art` map key), and the composed `cdnUrl` we fetch.
+ * For a full CDN URL these are identical; for a bare r2_key they differ.
  */
-function collectImageUrls(result: QueryResult): string[] {
-  const urls: string[] = [];
+type ImageMatch = { original: string; cdnUrl: string };
+
+/**
+ * Detect image URLs among the result cells, in row-major order, de-duplicated
+ * (by original cell value), capped at `limit`. A cell qualifies if it is a full
+ * CDN URL, or a bare r2_key (no scheme) that we can compose into one.
+ */
+function collectImageMatches(result: QueryResult, limit: number): ImageMatch[] {
+  const matches: ImageMatch[] = [];
   const seen = new Set<string>();
 
   outer: for (const row of result.rows) {
     for (const cell of row) {
       if (typeof cell !== 'string') continue;
-      let url: string | null = null;
+      let cdnUrl: string | null = null;
       if (cell.startsWith(`${CDN_ORIGIN}/`)) {
-        url = cell;
+        cdnUrl = cell;
       } else if (!cell.includes('://') && R2_KEY_RE.test(cell)) {
-        url = `${CDN_ORIGIN}/${cell}`;
+        cdnUrl = `${CDN_ORIGIN}/${cell}`;
       }
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      urls.push(url);
-      if (urls.length >= MAX_QUERY_IMAGES) break outer;
+      if (!cdnUrl || seen.has(cell)) continue;
+      seen.add(cell);
+      matches.push({ original: cell, cdnUrl });
+      if (matches.length >= limit) break outer;
     }
   }
-  return urls;
+  return matches;
+}
+
+/** Composed CDN URLs for the inline image-block card (deduped, capped). */
+function collectImageUrls(result: QueryResult): string[] {
+  return collectImageMatches(result, MAX_QUERY_IMAGES).map((m) => m.cdnUrl);
+}
+
+/**
+ * Fetch hard-downsampled base64 WebP thumbnails for the CDN URLs found in the
+ * result and return them as a map keyed by the ORIGINAL cell value. Enforces a
+ * cumulative base64 byte ceiling; once exceeded we stop and flag truncation.
+ * Failed fetches are skipped (key omitted) — never throws.
+ */
+async function collectEmbedArt(
+  client: RewindClient,
+  result: QueryResult
+): Promise<{ art: Record<string, string>; truncated: boolean }> {
+  const matches = collectImageMatches(result, MAX_EMBED_ART);
+  const art: Record<string, string> = {};
+  let totalBytes = 0;
+  let truncated = false;
+
+  // Fetch all thumbnails concurrently, then fold in row order so the byte
+  // ceiling cuts off deterministically from the front.
+  const fetched = await Promise.all(
+    matches.map(async (m) => {
+      const url = resizeCdnUrl(m.cdnUrl, EMBED_ART_PX, {
+        format: 'webp',
+        quality: EMBED_ART_QUALITY,
+      });
+      try {
+        const { bytes } = await client.getBinaryFromUrl(url);
+        return { original: m.original, base64: bytesToBase64(bytes) };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  for (const item of fetched) {
+    if (!item) continue;
+    if (totalBytes + item.base64.length > EMBED_ART_BYTE_CEILING) {
+      truncated = true;
+      break;
+    }
+    totalBytes += item.base64.length;
+    art[item.original] = `data:image/webp;base64,${item.base64}`;
+  }
+
+  return { art, truncated };
 }
 
 type QueryStructured = z.infer<typeof queryOutputSchema>;
@@ -176,7 +250,7 @@ export function registerQueryTools(
     {
       title: 'Query Rewind (SQL)',
       description:
-        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order).',
+        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.',
       inputSchema: {
         sql: z
           .string()
@@ -184,11 +258,17 @@ export function registerQueryTools(
           .describe(
             'A single read-only SELECT (or WITH … SELECT) statement. Do not include a trailing semicolon. A LIMIT is applied automatically. Call get_schema first for table and column names.'
           ),
+        embed_art: z
+          .boolean()
+          .default(false)
+          .describe(
+            'Opt-in. When true, matched CDN image URLs in the result are returned as small base64 WebP data URIs (64px) in structuredContent.art, keyed by the original URL, so sandboxed artifact HTML that cannot fetch the CDN can inline the artwork. Capped at 16 distinct URLs and a ~256KB total; adds payload, so leave false for normal data queries.'
+          ),
       },
       annotations: READ_ONLY_ANNOTATIONS,
       outputSchema: queryOutputSchema,
     },
-    async ({ sql }) =>
+    async ({ sql, embed_art }) =>
       withRichResponse(async () => {
         const result = await client.query(sql);
 
@@ -207,9 +287,23 @@ export function registerQueryTools(
 
         const content: ContentBlock[] = [text(renderResult(result)), ...images];
 
+        const structuredContent = { ...result } as QueryStructured & {
+          art?: Record<string, string>;
+          art_truncated?: boolean;
+        };
+
+        // Opt-in: additionally embed matched artwork as base64 WebP data URIs
+        // in structuredContent.art for sandboxed-artifact authors. Purely
+        // additive — the text table and inline image blocks are untouched.
+        if (embed_art) {
+          const { art, truncated } = await collectEmbedArt(client, result);
+          if (Object.keys(art).length > 0) structuredContent.art = art;
+          if (truncated) structuredContent.art_truncated = true;
+        }
+
         return {
           content,
-          structuredContent: result as QueryStructured,
+          structuredContent,
         };
       })
   );

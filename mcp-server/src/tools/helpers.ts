@@ -102,11 +102,21 @@ export async function imageBlock(
  * Output: https://cdn.rewind.rest/cdn-cgi/image/width=150,height=150,fit=cover,format=auto,quality=85/watching/movies/707/original.jpg?v=1
  *
  * Returns the input unchanged if it is not a valid URL.
+ *
+ * Pass `opts` to override the transform (format/quality) — e.g. a hard-
+ * downsampled WebP thumbnail for `embed_art`. Defaults to square cover crop
+ * at format=auto, quality=85.
  */
-function resizeCdnUrl(url: string, targetPx: number): string {
+export function resizeCdnUrl(
+  url: string,
+  targetPx: number,
+  opts?: { format?: string; quality?: number }
+): string {
   try {
     const u = new URL(url);
-    const opts = `width=${targetPx},height=${targetPx},fit=cover,format=auto,quality=85`;
+    const format = opts?.format ?? 'auto';
+    const quality = opts?.quality ?? 85;
+    const transform = `width=${targetPx},height=${targetPx},fit=cover,format=${format},quality=${quality}`;
     const transformPrefix = '/cdn-cgi/image/';
     let sourcePath = u.pathname;
     if (sourcePath.startsWith(transformPrefix)) {
@@ -116,7 +126,7 @@ function resizeCdnUrl(url: string, targetPx: number): string {
     }
     const version = u.searchParams.get('v');
     const versionSuffix = version ? `?v=${version}` : '';
-    return `${u.origin}/cdn-cgi/image/${opts}${sourcePath}${versionSuffix}`;
+    return `${u.origin}/cdn-cgi/image/${transform}${sourcePath}${versionSuffix}`;
   } catch {
     return url;
   }
@@ -139,7 +149,7 @@ export function hostOf(url: string | null | undefined): string {
  * Convert bytes to base64. Uses globalThis.Buffer when available (Node / Workers),
  * falls back to a manual encoding that works in any JS runtime.
  */
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   const g = globalThis as {
     Buffer?: { from(b: Uint8Array): { toString(enc: 'base64'): string } };
   };

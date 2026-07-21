@@ -3464,7 +3464,7 @@
     },
     {
       "name": "query_rewind",
-      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order).",
+      "description": "Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3472,6 +3472,11 @@
             "type": "string",
             "minLength": 1,
             "description": "A single read-only SELECT (or WITH … SELECT) statement. Do not include a trailing semicolon. A LIMIT is applied automatically. Call get_schema first for table and column names."
+          },
+          "embed_art": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in. When true, matched CDN image URLs in the result are returned as small base64 WebP data URIs (64px) in structuredContent.art, keyed by the original URL, so sandboxed artifact HTML that cannot fetch the CDN can inline the artwork. Capped at 16 distinct URLs and a ~256KB total; adds payload, so leave false for normal data queries."
           }
         },
         "required": [
@@ -3500,6 +3505,15 @@
             "type": "number"
           },
           "truncated": {
+            "type": "boolean"
+          },
+          "art": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "art_truncated": {
             "type": "boolean"
           }
         },
