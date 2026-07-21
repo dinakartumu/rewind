@@ -332,7 +332,8 @@ describe('query_rewind embed_art', () => {
     // Keyed by the ORIGINAL url exactly as it appeared in the cell.
     expect(Object.keys(art!).sort()).toEqual([a, b].sort());
     for (const uri of Object.values(art!)) {
-      expect(uri.startsWith('data:image/webp;base64,')).toBe(true);
+      // MIME follows the CDN response content-type (jpeg from the default mock).
+      expect(/^data:image\/[a-z]+;base64,/.test(uri)).toBe(true);
     }
     expect(artTruncatedOf(result)).toBeFalsy();
     await client.close();
