@@ -17,8 +17,8 @@ export const queryOutputSchema = z
      * Echo of the requested render view for the generic query-result UI
      * bundle: 'auto' (auto-detect) or a forced 'table' | 'chart' | 'map' |
      * 'grid' | 'calendar' | 'clock' | 'stat' | 'list' | 'histogram' |
-     * 'scatter' | 'stacked' | 'treemap' | 'sankey' | 'mosaic'. Present on every
-     * result; ignored by non-UI hosts.
+     * 'scatter' | 'stacked' | 'treemap' | 'sankey' | 'mosaic' | 'density' |
+     * 'gallery' | 'streak'. Present on every result; ignored by non-UI hosts.
      */
     view: z
       .enum([
@@ -37,6 +37,9 @@ export const queryOutputSchema = z
         'treemap',
         'sankey',
         'mosaic',
+        'density',
+        'gallery',
+        'streak',
       ])
       .optional(),
     /**

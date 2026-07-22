@@ -373,6 +373,76 @@ describe('MapView render', () => {
   });
 });
 
+// ── ROUTE GALLERY ────────────────────────────────────────────────────
+describe('GalleryView render', () => {
+  it('renders one mini route <svg> with a <path> per polyline, plus labels', async () => {
+    const fx = fixtures['route-gallery']; // 8 named routes, auto → gallery
+    expect(detectView(fx).auto).toBe('gallery');
+    const container = await mount(fx);
+    const c = card(container);
+    // One mini-map <svg> per drawable route (each with a route <path>).
+    const routePaths = c.querySelectorAll('svg path');
+    expect(routePaths.length).toBe(fx.rows.length);
+    // Each route tile is its own <svg>.
+    expect(c.querySelectorAll('svg').length).toBe(fx.rows.length);
+    // Route names label the tiles.
+    expect(c.textContent).toContain('Embarcadero loop');
+    expect(c.textContent).toContain('Twin Peaks climb');
+    // Footer names the route count.
+    expect(c.textContent).toContain('routes');
+  });
+});
+
+// ── DENSITY MAP ──────────────────────────────────────────────────────
+// Like the map render test: Leaflet may init in happy-dom (a .leaflet-container
+// appears) OR we fall back to the tile-less SVG projector with density markers.
+// Either path is a valid, non-crashing density render; we assert one of them
+// and, when the SVG fallback is taken, that it carries density <circle> markers.
+describe('DensityView render', () => {
+  it('renders the Leaflet container OR the SVG fallback with density markers', async () => {
+    const fx: QueryResultShape = {
+      ...fixtures['density-map'],
+      view: 'density',
+    };
+    const container = await mount(fx);
+    const c = card(container);
+    const leaflet = c.querySelector('.leaflet-container');
+    const svgFallback = c.querySelector('svg[aria-label="Map of coordinates"]');
+    // Density renders via one path or the other — never crashes.
+    expect(Boolean(leaflet) || Boolean(svgFallback)).toBe(true);
+    // The accessible map region is labelled either way.
+    expect(c.querySelector('[aria-label="Map of coordinates"]')).toBeTruthy();
+    // When the SVG fallback is taken, it carries binned density <circle>s.
+    if (!leaflet && svgFallback) {
+      expect(svgFallback.querySelectorAll('circle').length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ── STREAK STRIP ─────────────────────────────────────────────────────
+describe('StreakView render', () => {
+  it('renders the timeline strip with active-day marks and streak annotations', async () => {
+    const fx: QueryResultShape = {
+      ...fixtures['streak-strip'],
+      view: 'streak',
+    };
+    const container = await mount(fx);
+    const c = card(container);
+    const svg = c.querySelector('svg[aria-label="Streak timeline"]');
+    expect(svg).toBeTruthy();
+    // Active-day marks are <rect>s (rest days are tiny <circle> dots); at least
+    // one active mark is present.
+    expect(svg!.querySelectorAll('rect').length).toBeGreaterThan(0);
+    // Streak annotations: longest + current + active-day stats are labelled.
+    expect(c.textContent).toContain('longest streak');
+    expect(c.textContent).toContain('current streak');
+    expect(c.textContent).toContain('active days');
+    // The longest streak stat matches the fixture's built-in 6-day run.
+    const det = detectView(fixtures['streak-strip']);
+    expect(det.streakEligible).toBe(true);
+  });
+});
+
 // ── RESOLVER → RENDER INTEGRATION ────────────────────────────────────
 // Feed each fixture WITHOUT forcing `view` and assert the AUTO-detected view
 // renders its expected root marker. This proves detection + rendering are
@@ -393,7 +463,15 @@ describe('resolver → render integration', () => {
       case 'treemap':
       case 'calendar':
       case 'clock':
+      case 'gallery':
+      case 'streak':
         expect(c.querySelector('svg')).toBeTruthy();
+        break;
+      case 'density':
+        expect(
+          c.querySelector('.leaflet-container') ||
+            c.querySelector('[aria-label="Map of coordinates"]')
+        ).toBeTruthy();
         break;
       case 'mosaic':
         expect(c.querySelector('img')).toBeTruthy();

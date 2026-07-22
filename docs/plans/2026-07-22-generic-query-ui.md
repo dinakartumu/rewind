@@ -121,6 +121,32 @@ Never throws; **table is always available and is the universal fallback.**
   value doesn't dwarf the wall), wrapping via flexbox; names are tooltips/
   captions. Images load straight from the CDN (already CSP-allowed). **Never the
   `auto` default** — grid/list keep that; mosaic is purely an extra tab.
+- **density** (density map) — an **additional tab** on the SAME lat/lng POINT
+  shape `map` fires on: offered whenever there ARE lat/lng point columns AND
+  **≥1 in-range point** (NOT for a route-only/polyline result). Renders a
+  heat/density read over the SAME Leaflet base map — a **hand-rolled binned
+  aggregation** (snap each point to a lat/lng grid cell sized off the data
+  bounds, sum points per cell) drawn as **graduated `circleMarker`s** with
+  radius (`sqrt`-scaled so area trends with count) + opacity scaled by the
+  cell's local point count, so clusters read as "where I go most". **No heatmap
+  plugin dep.** The tile-less SVG fallback draws the same density dots on the
+  SVG projector when Leaflet can't init. **Never the `auto` default** — `map`
+  keeps that; density is purely an extra tab.
+- **gallery** (route gallery) — a POLYLINE column with **MANY route rows (≥4
+  decodable encoded polylines)** → **small-multiples**: a grid of individual
+  mini route-shape SVGs, **each route normalized into its OWN box** (its own
+  bounds → its own projector via `boundsOf` + `makeProjector` + `routeToPath`),
+  labeled by a name/label column when present. The "wall of run shapes". NO
+  tiles, zero network — pure decoded polyline paths. A **NEW auto default** at
+  ≥4 routes (placed at map's altitude); a single/few-route result stays `map`
+  (which is still offered as a tab).
+- **streak** (streak strip) — the SAME daily-date (YYYY-MM-DD) + numeric shape
+  as `calendar`, offered as an **additional tab**. A **horizontal timeline**
+  from first→last dated day: consecutive-day runs where count>0 are streaks;
+  active days are filled marks, rest days muted dots, and the **longest streak**,
+  **current (trailing) streak**, and **active-day count** are annotated.
+  Complements the calendar grid with a streak-focused read. **Never the `auto`
+  default** — `calendar` keeps that; streak is purely an extra tab.
 - **table** — everything else, and the fallback whenever a richer view fails.
 
 **Stacked-vs-sankey default rule.** `stacked` and `sankey` share the 3-col
@@ -137,7 +163,12 @@ free-form text) satisfies sankey and, because col0 (`genre`) isn't period-ish,
 defaults to **sankey** (with a `stacked` tab still available).
 
 **Auto priority (finalized):**
-`map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+`gallery > map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+`gallery` (≥4 polyline routes) is a NEW auto default sitting just above `map` (a
+wall of route shapes beats a single overlaid map). `density` (point-map tab) and
+`streak` (daily-date tab) are **additional tabs** layered onto shapes that
+already resolve (point-map / daily-date+count) and never change `auto` — `map`
+and `calendar` keep those defaults.
 The `stacked`/`sankey` (3-col cat+series/target+num), `scatter` (2 numerics),
 and `histogram` (1 numeric) views are MORE specific than the generic chart, so
 they sit just before it; each guard stays tight so an ordinary category+metric
@@ -147,7 +178,7 @@ that already resolve (category+metric / image+metric); `sankey` is a **new auto
 view** for the free-form source+target+value shape (default chosen by the
 stacked-vs-sankey rule above). The `view` arg forces one mode (validated by the
 input enum:
-`auto | table | chart | map | grid | calendar | clock | stat | list | histogram | scatter | stacked | treemap | sankey | mosaic`).
+`auto | table | chart | map | grid | calendar | clock | stat | list | histogram | scatter | stacked | treemap | sankey | mosaic | density | gallery | streak`).
 The UI always shows a **table** tab plus a tab for each detected richer view;
 table is the safe default tab, and `auto` selects the richest applicable view on
 first render.
@@ -190,6 +221,21 @@ decade` (source + target + value flow → genre→decade ribbons); "sport → ci
 FROM lastfm_albums ORDER BY plays DESC LIMIT 24` (image + label + metric →
   a cover wall with each cover sized by plays). Same shape as list/grid; mosaic
   is the extra tab, never the auto default.
+- **density** — `SELECT venue, lat, lng FROM places_checkins` (lat/lng points →
+  the point `map` by default, with a **density** tab binning the points into
+  graduated markers so clusters read as "where I go most"). Same shape as the
+  point map; density is the extra tab, never the auto default. Not offered for a
+  route-only result.
+- **gallery** — `SELECT name, map_polyline FROM strava_activities WHERE
+map_polyline IS NOT NULL ORDER BY started_at DESC LIMIT 24` (≥4 encoded
+  polylines → a wall of individual mini route shapes, each labeled by name).
+  Four-plus routes make gallery the auto default; a single-route result stays
+  `map`.
+- **streak** — `SELECT date(started_at) AS day, COUNT(*) AS runs FROM
+strava_activities GROUP BY day` (daily dates + a count → the `calendar` heatmap
+  by default, with a **streak** tab annotating consecutive-day runs — longest /
+  current streak). Same shape as calendar; streak is the extra tab, never the
+  auto default.
 
 ## Map view — Leaflet with a configurable tile provider
 
@@ -311,14 +357,27 @@ a metric; an extra tab on the image+metric shape, never the auto default). The
 the 3-col text+text+num shape with `stacked` and is disambiguated by the
 **stacked-vs-sankey default rule** (period col0 → stacked, free-form col0 →
 sankey). The `view` input enum + result schema grew to
-`… | treemap | sankey | mosaic`. Final auto priority:
-`map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter >
-histogram > (chart | treemap) > table`.
+`… | treemap | sankey | mosaic`.
+
+**Added later (visualization batch, issue #6):** three more views, again
+pure-detection + inline-SVG/Leaflet, **zero new runtime deps** (reusing
+`geo-projection.ts` + the existing Leaflet dep) — **density** (a binned
+graduated-marker heat/density overlay on the SAME point-map shape; hand-rolled
+lat/lng grid binning, no heatmap plugin, with density dots on the SVG fallback;
+an extra tab, never the auto default), **gallery** (small-multiples of route
+shapes — ≥4 decodable polylines each normalized into its own mini-SVG box; a NEW
+auto default at ≥4 routes, single-route stays `map`), and **streak** (a
+horizontal consecutive-day-streak timeline on the SAME daily-date+count shape as
+calendar — longest/current streak annotated; an extra tab, never the auto
+default). The `view` input enum + result schema grew to
+`… | density | gallery | streak`. Final auto priority:
+`gallery > map > calendar > clock > stat > (grid | list) > (stacked | sankey) >
+scatter > histogram > (chart | treemap) > table`.
 
 **Added:** `web/lib/query-view.ts` (detection), `web/lib/geo-projection.ts`
 (SVG fallback projector, ported from the website), `leaflet` (bundled
 dependency powering the OSM slippy map), `web/components/QueryResult.tsx`
-(11 views
+(18 views
 
 - switcher), `web/query-result.{tsx,html,fixtures.ts}`, and the `view` input
   arg + result `_meta` wiring in `query.ts`.

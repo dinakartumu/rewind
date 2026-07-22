@@ -276,6 +276,83 @@ const coverMosaic: QueryResultShape = {
   ],
 };
 
+/**
+ * Many lat/lng points clustered into 2-3 geographic areas → the SAME point-map
+ * shape `map` fires on, with `density` offered as an extra tab. Deterministic
+ * jitter around three SF-area centroids so the binned density read has real
+ * clusters. `auto` stays map; density is a tab.
+ */
+const densityMap: QueryResultShape = (() => {
+  const centers: [number, number][] = [
+    [37.7749, -122.4194], // downtown SF
+    [37.8044, -122.2712], // Oakland
+    [37.7599, -122.4148], // Mission
+  ];
+  const rows: (string | number)[][] = [];
+  let seed = 19;
+  for (let i = 0; i < 90; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const [clat, clng] = centers[i % centers.length];
+    // ±~0.01° deterministic jitter around the chosen centroid.
+    const jLat = ((seed % 1000) / 1000 - 0.5) * 0.02;
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const jLng = ((seed % 1000) / 1000 - 0.5) * 0.02;
+    rows.push([`Check-in ${i + 1}`, clat + jLat, clng + jLng]);
+  }
+  return { columns: ['venue', 'lat', 'lng'], rows };
+})();
+
+/**
+ * SIX+ encoded polyline rows with names → route gallery (small-multiples). Same
+ * two real encodings from polyline-map, repeated with distinct run names so the
+ * ≥4-route gallery fires and `auto` flips to gallery.
+ */
+const routeGallery: QueryResultShape = (() => {
+  const encA =
+    'aowkFtqjaVv@sBd@qBHm@AeAKm@Um@a@e@e@Wm@Ei@Fe@Vc@d@Wl@Kt@?t@Nn@Zh@d@Zh@Nl@?l@Ml@Wd@e@Xk@Jm@Ai@Kg@Yc@_@';
+  const encB =
+    'g}wkFrpjaV_@}BQ}@O_ASo@_@k@e@Yk@Ki@?g@Le@\\W`@Kd@?d@L`@X\\d@Rf@Dh@?';
+  const names = [
+    'Embarcadero loop',
+    'Bay run',
+    'Presidio hills',
+    'Marina sprint',
+    'Lake Merritt lap',
+    'Golden Gate out-and-back',
+    'Twin Peaks climb',
+    'Ocean Beach long run',
+  ];
+  const rows = names.map((name, i) => [name, i % 2 === 0 ? encA : encB]);
+  return { columns: ['name', 'map_polyline'], rows };
+})();
+
+/**
+ * Daily date + count over ~60 days with SOME consecutive runs → the SAME
+ * calendar shape, with `streak` offered as an extra tab. Hand-built so there
+ * are clear consecutive-day streaks (a 6-day run, a 4-day run) plus gaps, and
+ * the tail ends on active days (a current streak). `auto` stays calendar.
+ */
+const streakStrip: QueryResultShape = (() => {
+  const rows: (string | number)[][] = [];
+  const start = new Date('2025-03-01T00:00:00Z');
+  // 1 = active day, 0 = rest day. 60 days with deliberate runs and gaps.
+  const active = [
+    1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1,
+    1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1,
+    1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+  ];
+  let seed = 5;
+  for (let i = 0; i < active.length; i++) {
+    if (!active[i]) continue; // rest days are simply absent (sparse)
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const d = new Date(start.getTime() + i * 86400000);
+    const iso = d.toISOString().slice(0, 10);
+    const count = 2 + (seed % 8); // 2..9 km
+    rows.push([iso, count]);
+  }
+  return { columns: ['day', 'km'], rows };
+})();
+
 /** Same image-grid data but forced to the table view via `view`. */
 const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 
@@ -296,5 +373,8 @@ export const fixtures: Record<string, QueryResultShape> = {
   'treemap-shares': treemapShares,
   'sankey-flow': sankeyFlow,
   'cover-mosaic': coverMosaic,
+  'density-map': densityMap,
+  'route-gallery': routeGallery,
+  'streak-strip': streakStrip,
   'forced-table': forcedTable,
 };

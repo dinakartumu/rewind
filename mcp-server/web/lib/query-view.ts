@@ -49,7 +49,10 @@ export type ViewMode =
   | 'stacked'
   | 'treemap'
   | 'sankey'
-  | 'mosaic';
+  | 'mosaic'
+  | 'density'
+  | 'gallery'
+  | 'streak';
 
 /** Public CDN origin — a cell under this host is Rewind artwork. */
 export const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
@@ -299,6 +302,29 @@ export type Detection = {
    * Reuses imageIndex / labelIndex / metricIndex; this flag records eligibility.
    */
   mosaicMetricIndex: number | null;
+  /**
+   * Density map: the SAME lat/lng point shape `map` fires on, offered as an
+   * ADDITIONAL tab whenever there are POINT rows (lat + lng) with ≥1 point. A
+   * heat/density read over the same base map (binned graduated markers). Not
+   * offered for route-only (polyline) results. Reuses latIndex/lngIndex; this
+   * flag records eligibility. Never becomes `auto` — `map` keeps that.
+   */
+  densityEligible: boolean;
+  /**
+   * Route gallery: a POLYLINE column with MANY route rows (≥4 encoded
+   * polylines) → small-multiples of individual mini route shapes. `gallery` is
+   * a NEW auto default at ≥4 routes (a single/few-route result stays `map`).
+   * Reuses polylineIndex; galleryLabelIndex names each tile when present.
+   */
+  galleryPolylineIndex: number | null;
+  galleryLabelIndex: number | null;
+  /**
+   * Streak strip: the SAME daily-date + count shape as `calendar`, offered as
+   * an ADDITIONAL tab. A horizontal timeline highlighting consecutive-day
+   * streaks. Reuses calendarDateIndex/calendarValueIndex; this flag records
+   * eligibility. Never becomes `auto` — `calendar` keeps that.
+   */
+  streakEligible: boolean;
 };
 
 /** One histogram bucket: half-open [lo, hi) with the count of values inside. */
@@ -314,6 +340,12 @@ const HISTOGRAM_MIN_ROWS = 8;
 const HISTOGRAM_MAX_BINS = 30;
 /** Minimum rows for a scatter plot to read as a cloud, not a couple of dots. */
 const SCATTER_MIN_ROWS = 5;
+/**
+ * Minimum decodable route rows for the route gallery to read as a "wall of run
+ * shapes" (small-multiples) rather than a single/few-route map. At or above
+ * this, `auto` flips to `gallery`; below it, a route result stays `map`.
+ */
+const GALLERY_MIN_ROUTES = 4;
 
 /**
  * Bin an array of finite numbers into a histogram. Bucket count uses the
@@ -397,6 +429,52 @@ export function detectView(result: QueryResultShape): Detection {
     ((latIndex !== null && lngIndex !== null) || polylineIndex !== null);
   if (hasMap) available.push('map');
 
+  // DENSITY MAP: an ADDITIONAL tab on the SAME point shape `map` fires on —
+  // there ARE lat/lng point columns AND ≥1 in-range point. Offered alongside
+  // map so clusters read as "where I go most" via binned graduated markers.
+  // NOT offered for a route-only (polyline, no lat/lng) result. Reuses
+  // latIndex/lngIndex; never the `auto` default — map keeps that.
+  let pointCount = 0;
+  if (latIndex !== null && lngIndex !== null) {
+    for (const row of rows) {
+      const lat = toNumber(row[latIndex]);
+      const lng = toNumber(row[lngIndex]);
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180
+      ) {
+        pointCount++;
+      }
+    }
+  }
+  const densityEligible = hasMap && pointCount >= 1;
+  if (densityEligible) available.push('density');
+
+  // ROUTE GALLERY: a POLYLINE column with MANY decodable route rows (≥4). Small
+  // multiples — a grid of individual mini route-shape SVGs. A NEW auto default
+  // at ≥4 routes; a single/few-route result stays `map`. galleryLabelIndex
+  // names each tile (a name/title/label column) when present.
+  let routeCount = 0;
+  if (polylineIndex !== null) {
+    for (const row of rows) {
+      const v = row[polylineIndex];
+      if (typeof v === 'string' && v.length >= 8 && !looksNumericString(v)) {
+        routeCount++;
+      }
+    }
+  }
+  const galleryPolylineIndex =
+    polylineIndex !== null && routeCount >= GALLERY_MIN_ROUTES
+      ? polylineIndex
+      : null;
+  const galleryLabelIndex = galleryPolylineIndex !== null ? labelIndex : null;
+  const hasGallery = galleryPolylineIndex !== null;
+  if (hasGallery) available.push('gallery');
+
   // CALENDAR: col0 is a DAY-precision date (YYYY-MM-DD, ≥60% of samples) AND
   // exactly one numeric column. Distinct from the time-series chart, which
   // fires on coarser YYYY / YYYY-MM period granularity. Requires ≥1 row.
@@ -414,6 +492,13 @@ export function detectView(result: QueryResultShape): Detection {
   }
   const hasCalendar = calendarDateIndex !== null && calendarValueIndex !== null;
   if (hasCalendar) available.push('calendar');
+
+  // STREAK STRIP: the SAME daily-date + count shape as calendar, offered as an
+  // ADDITIONAL tab. A horizontal timeline highlighting consecutive-day streaks
+  // (longest / current). Reuses calendarDateIndex/calendarValueIndex; never the
+  // `auto` default — calendar keeps that.
+  const streakEligible = hasCalendar;
+  if (streakEligible) available.push('streak');
 
   // CLOCK: col0 is a cyclic category — integer hours [0,23], integer weekday
   // [0,6], or weekday names — plus exactly one numeric count column. Guarded
@@ -710,8 +795,12 @@ export function detectView(result: QueryResultShape): Detection {
   if (hasTreemap) available.push('treemap');
 
   // Default view priority:
-  //   map > calendar > clock > stat > (grid|list) > (stacked|sankey) > scatter >
-  //   histogram > (chart|treemap) > table.
+  //   gallery > map > calendar > clock > stat > (grid|list) >
+  //   (stacked|sankey) > scatter > histogram > (chart|treemap) > table.
+  // gallery (≥4 polyline routes) is a NEW auto default sitting just above map:
+  // a wall of route shapes beats a single overlaid map. density (point-map
+  // tab) and streak (daily-date tab) are ADDITIONAL tabs on existing shapes and
+  // never change `auto` — map / calendar keep those defaults.
   // stacked/sankey (3-col cat+series/target+num), scatter (2 numerics), and
   // histogram (1 numeric) are MORE specific than the generic chart, so they sit
   // just before it. Table is always the safe default tab in the UI, but `auto`
@@ -726,7 +815,10 @@ export function detectView(result: QueryResultShape): Detection {
   // distinct categories (share-of-whole reads better than a long bar row);
   // both tabs remain available.
   let auto: ViewMode = 'table';
-  if (hasMap) auto = 'map';
+  // GALLERY sits at the same altitude as map: a ≥4-route polyline result reads
+  // best as a wall of route shapes, so it wins over the single-route `map`.
+  if (hasGallery) auto = 'gallery';
+  else if (hasMap) auto = 'map';
   else if (hasCalendar) auto = 'calendar';
   else if (hasClock) auto = 'clock';
   else if (hasStat) auto = 'stat';
@@ -769,5 +861,9 @@ export function detectView(result: QueryResultShape): Detection {
     sankeyTargetIndex,
     sankeyValueIndex,
     mosaicMetricIndex,
+    densityEligible,
+    galleryPolylineIndex,
+    galleryLabelIndex,
+    streakEligible,
   };
 }

@@ -2129,6 +2129,76 @@ function useMapData(
   }, [rows, latIndex, lngIndex, polylineIndex, labelIndex]);
 }
 
+// ── density binning ──────────────────────────────────────────────────
+// Hand-rolled binned aggregation for the density map: no heatmap plugin dep. We
+// snap each point to a lat/lng grid cell (cell size derived from the data
+// bounds), sum points per cell, and emit one graduated marker per non-empty
+// cell — radius + opacity scaled by the cell's share of the busiest cell. This
+// reads as "where I go most" without a heat raster.
+const DENSITY_GRID = 24; // grid resolution across the longer bounds axis
+const DENSITY_MIN_R = 5; // min circle radius (px, Leaflet) / units (SVG)
+const DENSITY_MAX_R = 22; // max circle radius
+
+type DensityBin = {
+  lat: number; // cell centroid latitude
+  lng: number; // cell centroid longitude
+  count: number;
+};
+
+/**
+ * Bin points into a lat/lng grid over `bounds` and return non-empty cells with
+ * their centroids + counts, plus the max count for scaling. Pure; deterministic.
+ * A degenerate (single-point / zero-span) bounds still yields one bin.
+ */
+function binPoints(
+  points: { lat: number; lng: number }[],
+  bounds: Bounds
+): { bins: DensityBin[]; maxCount: number } {
+  if (!points.length) return { bins: [], maxCount: 0 };
+  const spanLat = bounds.maxLat - bounds.minLat || 1e-6;
+  const spanLng = bounds.maxLng - bounds.minLng || 1e-6;
+  // Square-ish cells: size the grid off the longer axis.
+  const cell = Math.max(spanLat, spanLng) / DENSITY_GRID || 1e-6;
+  const cells = new Map<
+    string,
+    { sumLat: number; sumLng: number; count: number }
+  >();
+  for (const p of points) {
+    const gi = Math.floor((p.lat - bounds.minLat) / cell);
+    const gj = Math.floor((p.lng - bounds.minLng) / cell);
+    const key = `${gi}:${gj}`;
+    const c = cells.get(key) ?? { sumLat: 0, sumLng: 0, count: 0 };
+    c.sumLat += p.lat;
+    c.sumLng += p.lng;
+    c.count += 1;
+    cells.set(key, c);
+  }
+  const bins: DensityBin[] = [];
+  let maxCount = 0;
+  for (const c of cells.values()) {
+    bins.push({
+      lat: c.sumLat / c.count,
+      lng: c.sumLng / c.count,
+      count: c.count,
+    });
+    if (c.count > maxCount) maxCount = c.count;
+  }
+  return { bins, maxCount };
+}
+
+/** Radius for a density bin, sqrt-scaled so area trends with count. */
+function densityRadius(count: number, maxCount: number): number {
+  if (maxCount <= 0) return DENSITY_MIN_R;
+  const frac = Math.sqrt(count / maxCount);
+  return DENSITY_MIN_R + frac * (DENSITY_MAX_R - DENSITY_MIN_R);
+}
+
+/** Opacity for a density bin: busier cells read stronger. */
+function densityOpacity(count: number, maxCount: number): number {
+  if (maxCount <= 0) return 0.35;
+  return 0.25 + 0.5 * (count / maxCount);
+}
+
 function mapLegend(data: MapData, source: string): string {
   const parts: string[] = [];
   if (data.points.length > 0) {
@@ -2145,14 +2215,28 @@ function mapLegend(data: MapData, source: string): string {
   return parts.join(' · ');
 }
 
-/** Tile-less SVG projector render — the fallback when Leaflet can't init. */
-function SvgMapView({ data }: { data: MapData }) {
+/**
+ * Tile-less SVG projector render — the fallback when Leaflet can't init. In
+ * `density` mode it draws binned graduated circles (density dots on the SVG
+ * projector) instead of one dot per point; routes are omitted in density mode
+ * since density is a point-only read.
+ */
+function SvgMapView({
+  data,
+  density = false,
+}: {
+  data: MapData;
+  density?: boolean;
+}) {
   const { points, routes, bounds } = data;
   if (!bounds) {
     return <div style={emptyStyle}>No mappable coordinates</div>;
   }
   const project = makeProjector(bounds, MAP_W, MAP_H, MAP_PAD);
   const dotR = points.length > 200 ? 1.5 : points.length > 50 ? 2.5 : 4;
+  const { bins, maxCount } = density
+    ? binPoints(points, bounds)
+    : { bins: [], maxCount: 0 };
 
   return (
     <div>
@@ -2171,37 +2255,56 @@ function SvgMapView({ data }: { data: MapData }) {
           fill="var(--color-background-secondary, rgba(0,0,0,0.03))"
           stroke="var(--color-border-tertiary, rgba(0,0,0,0.1))"
         />
-        {routes.map((r, i) => {
-          const d = routeToPath(r, project);
-          return d ? (
-            <path
-              key={i}
-              d={d}
-              fill="none"
-              stroke={ACCENT}
-              strokeWidth={2}
-              opacity={0.75}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ) : null;
-        })}
-        {points.map(({ lat, lng }, i) => {
-          const [x, y] = project(lat, lng);
-          return (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r={dotR}
-              fill={ACCENT}
-              opacity={0.8}
-            />
-          );
-        })}
+        {!density &&
+          routes.map((r, i) => {
+            const d = routeToPath(r, project);
+            return d ? (
+              <path
+                key={i}
+                d={d}
+                fill="none"
+                stroke={ACCENT}
+                strokeWidth={2}
+                opacity={0.75}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ) : null;
+          })}
+        {density
+          ? bins.map((b, i) => {
+              const [x, y] = project(b.lat, b.lng);
+              return (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={round1(densityRadius(b.count, maxCount))}
+                  fill={ACCENT}
+                  opacity={densityOpacity(b.count, maxCount)}
+                >
+                  <title>{`${b.count} point${b.count === 1 ? '' : 's'}`}</title>
+                </circle>
+              );
+            })
+          : points.map(({ lat, lng }, i) => {
+              const [x, y] = project(lat, lng);
+              return (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={dotR}
+                  fill={ACCENT}
+                  opacity={0.8}
+                />
+              );
+            })}
       </svg>
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
-        {mapLegend(data, 'tile-less')}
+        {density
+          ? `${bins.length} density cell${bins.length === 1 ? '' : 's'} · tile-less`
+          : mapLegend(data, 'tile-less')}
       </div>
     </div>
   );
@@ -2214,6 +2317,7 @@ function MapView({
   polylineIndex,
   labelIndex,
   mapConfig,
+  density = false,
 }: {
   rows: unknown[][];
   latIndex: number | null;
@@ -2221,6 +2325,12 @@ function MapView({
   polylineIndex: number | null;
   labelIndex: number | null;
   mapConfig?: MapConfig;
+  /**
+   * Density mode: draw a binned heat/density overlay (graduated circleMarkers
+   * scaled by local point count) on the SAME base map instead of one marker per
+   * point. Routes are omitted — density is a point-only read.
+   */
+  density?: boolean;
 }) {
   const data = useMapData(rows, latIndex, lngIndex, polylineIndex, labelIndex);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2253,27 +2363,43 @@ function MapView({
         zoomOffset: 0,
       }).addTo(map);
 
-      // Routes as polylines.
-      for (const r of data.routes) {
-        L.polyline(r, {
-          color: ROUTE_STROKE,
-          weight: 3,
-          opacity: 0.85,
-          lineJoin: 'round',
-          lineCap: 'round',
-        }).addTo(map);
-      }
+      if (density && data.bounds) {
+        // Density overlay: hand-rolled binned aggregation → one graduated
+        // circleMarker per non-empty grid cell, radius + opacity scaled by the
+        // cell's local point count. No heatmap plugin dep. Routes omitted.
+        const { bins, maxCount } = binPoints(data.points, data.bounds);
+        for (const b of bins) {
+          const marker = L.circleMarker([b.lat, b.lng], {
+            radius: densityRadius(b.count, maxCount),
+            stroke: false,
+            fillColor: POINT_STROKE,
+            fillOpacity: densityOpacity(b.count, maxCount),
+          }).addTo(map);
+          marker.bindTooltip(`${b.count} point${b.count === 1 ? '' : 's'}`);
+        }
+      } else {
+        // Routes as polylines.
+        for (const r of data.routes) {
+          L.polyline(r, {
+            color: ROUTE_STROKE,
+            weight: 3,
+            opacity: 0.85,
+            lineJoin: 'round',
+            lineCap: 'round',
+          }).addTo(map);
+        }
 
-      // Points as circleMarkers (never the default PNG icon).
-      for (const p of data.points) {
-        const marker = L.circleMarker([p.lat, p.lng], {
-          radius: 5,
-          color: POINT_STROKE,
-          weight: 2,
-          fillColor: POINT_STROKE,
-          fillOpacity: 0.7,
-        }).addTo(map);
-        if (p.label) marker.bindTooltip(p.label);
+        // Points as circleMarkers (never the default PNG icon).
+        for (const p of data.points) {
+          const marker = L.circleMarker([p.lat, p.lng], {
+            radius: 5,
+            color: POINT_STROKE,
+            weight: 2,
+            fillColor: POINT_STROKE,
+            fillOpacity: 0.7,
+          }).addTo(map);
+          if (p.label) marker.bindTooltip(p.label);
+        }
       }
 
       // Fit to combined geometry; a lone point gets a sensible zoom.
@@ -2318,15 +2444,15 @@ function MapView({
         /* ignore */
       }
     };
-  }, [data, tiles.tileUrl, tiles.attribution, tiles.maxZoom]);
+  }, [data, tiles.tileUrl, tiles.attribution, tiles.maxZoom, density]);
 
   if (!data.bounds) {
     return <div style={emptyStyle}>No mappable coordinates</div>;
   }
 
-  // Fell back: render the tile-less SVG map instead.
+  // Fell back: render the tile-less SVG map instead (density dots when density).
   if (leafletOk === false) {
-    return <SvgMapView data={data} />;
+    return <SvgMapView data={data} density={density} />;
   }
 
   return (
@@ -2344,7 +2470,342 @@ function MapView({
         }}
       />
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
-        {mapLegend(data, tiles.source)}
+        {density
+          ? `${data.points.length} point${data.points.length === 1 ? '' : 's'} · density · ${tiles.source}`
+          : mapLegend(data, tiles.source)}
+      </div>
+    </div>
+  );
+}
+
+// ── ROUTE GALLERY ────────────────────────────────────────────────────
+// Small-multiples of route SHAPES: ≥4 encoded polylines rendered as a grid of
+// individual mini SVGs, each route normalized into its own little box (its own
+// bounds → its own projector) so shape reads regardless of geography. NO tiles,
+// zero network — pure decoded polyline paths. Each tile labeled when a
+// name/label column is present.
+const GALLERY_TILE = 120; // mini-map edge (px)
+const GALLERY_PAD = 8; // inner padding inside each tile
+
+type RouteTile = { path: string | null; label: string };
+
+function GalleryView({
+  rows,
+  polylineIndex,
+  labelIndex,
+}: {
+  rows: unknown[][];
+  polylineIndex: number;
+  labelIndex: number | null;
+}) {
+  const tiles = useMemo<RouteTile[]>(() => {
+    const out: RouteTile[] = [];
+    for (const row of rows) {
+      const v = row[polylineIndex];
+      if (typeof v !== 'string' || v.length < 8) continue;
+      const pts = decodePolyline(v);
+      if (pts.length < 2) continue;
+      const b = boundsOf(pts);
+      if (!b) continue;
+      // Each route gets its OWN projector fit to its OWN bounds so the shape
+      // fills its box regardless of where on earth it is.
+      const project = makeProjector(b, GALLERY_TILE, GALLERY_TILE, GALLERY_PAD);
+      const path = routeToPath(pts, project);
+      const label = labelIndex !== null ? displayCell(row[labelIndex]) : '';
+      out.push({ path, label });
+    }
+    return out;
+  }, [rows, polylineIndex, labelIndex]);
+
+  const drawable = tiles.filter((t) => t.path);
+  if (!drawable.length) {
+    return <div style={emptyStyle}>No routes to plot</div>;
+  }
+
+  return (
+    <div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(auto-fill, minmax(${GALLERY_TILE}px, 1fr))`,
+          gap: 12,
+        }}
+      >
+        {tiles.map((t, i) =>
+          t.path ? (
+            <div key={i}>
+              <svg
+                viewBox={`0 0 ${GALLERY_TILE} ${GALLERY_TILE}`}
+                role="img"
+                aria-label={t.label ? `Route: ${t.label}` : 'Route shape'}
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  display: 'block',
+                  borderRadius: 8,
+                  background:
+                    'var(--color-background-secondary, rgba(0,0,0,0.03))',
+                }}
+              >
+                <rect
+                  x={0.5}
+                  y={0.5}
+                  width={GALLERY_TILE - 1}
+                  height={GALLERY_TILE - 1}
+                  rx={8}
+                  fill="none"
+                  stroke="var(--color-border-tertiary, rgba(0,0,0,0.1))"
+                />
+                <path
+                  d={t.path}
+                  fill="none"
+                  stroke={ACCENT}
+                  strokeWidth={2}
+                  opacity={0.85}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {t.label ? (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    marginTop: 4,
+                    lineHeight: 1.25,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={t.label}
+                >
+                  {t.label}
+                </div>
+              ) : null}
+            </div>
+          ) : null
+        )}
+      </div>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
+        {drawable.length} route{drawable.length === 1 ? '' : 's'}
+      </div>
+    </div>
+  );
+}
+
+// ── STREAK STRIP ─────────────────────────────────────────────────────
+// A horizontal timeline over a daily-date + count result, highlighting
+// CONSECUTIVE-day streaks. Days are laid out left→right from first to last
+// dated day; a day is "active" when its (summed) count > 0. Runs of consecutive
+// active days are streaks — the longest streak and the current (trailing)
+// streak are annotated. Complements the calendar's grid with a streak read.
+const STRIP_H = 44; // marks band height
+const STRIP_MARK_H = 28; // active-day mark height
+const STRIP_MIN_W = 3; // min per-day column width
+const STRIP_MAX_W = 14; // max per-day column width
+const STRIP_GAP = 1;
+
+/** Days between two YYYY-MM-DD-parsed UTC dates, b - a. */
+function stripDaysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+type StripModel = {
+  days: { active: boolean; date: string; value: number }[];
+  longest: number;
+  current: number;
+  activeCount: number;
+};
+
+/** Build the dense day timeline + streak stats from date→value pairs. */
+function buildStrip(valueByDate: Map<string, number>): StripModel {
+  const dates = [...valueByDate.keys()].sort();
+  if (!dates.length) {
+    return { days: [], longest: 0, current: 0, activeCount: 0 };
+  }
+  const first = new Date(`${dates[0]}T00:00:00Z`);
+  const last = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
+  const span = stripDaysBetween(first, last);
+  const days: StripModel['days'] = [];
+  for (let i = 0; i <= span; i++) {
+    const d = new Date(first.getTime() + i * 86400000);
+    const iso = d.toISOString().slice(0, 10);
+    const value = valueByDate.get(iso) ?? 0;
+    days.push({ active: value > 0, date: iso, value });
+  }
+  // Streak stats: longest run of consecutive active days, and the current
+  // (trailing) run ending at the last day.
+  let longest = 0;
+  let run = 0;
+  let activeCount = 0;
+  for (const day of days) {
+    if (day.active) {
+      run++;
+      activeCount++;
+      if (run > longest) longest = run;
+    } else {
+      run = 0;
+    }
+  }
+  let current = 0;
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (days[i].active) current++;
+    else break;
+  }
+  return { days, longest, current, activeCount };
+}
+
+function StreakView({
+  rows,
+  dateIndex,
+  valueIndex,
+}: {
+  rows: unknown[][];
+  dateIndex: number;
+  valueIndex: number;
+}) {
+  const model = useMemo(() => {
+    const valueByDate = new Map<string, number>();
+    for (const r of rows) {
+      const raw = r[dateIndex];
+      if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) continue;
+      const v = toNumber(r[valueIndex]);
+      const value = Number.isFinite(v) ? v : 0;
+      valueByDate.set(raw, (valueByDate.get(raw) ?? 0) + value);
+    }
+    return buildStrip(valueByDate);
+  }, [rows, dateIndex, valueIndex]);
+
+  if (!model.days.length) {
+    return <div style={emptyStyle}>No dated data to chart</div>;
+  }
+
+  const n = model.days.length;
+  // Fit column width into a sensible band, clamped.
+  const colW = Math.max(
+    STRIP_MIN_W,
+    Math.min(STRIP_MAX_W, Math.floor(480 / n) - STRIP_GAP)
+  );
+  const step = colW + STRIP_GAP;
+  const width = n * step;
+  const first = model.days[0].date;
+  const last = model.days[n - 1].date;
+
+  return (
+    <div>
+      {/* streak stat summary */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 20,
+          marginBottom: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {model.longest}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+            longest streak
+          </div>
+        </div>
+        <div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {model.current}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+            current streak
+          </div>
+        </div>
+        <div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {model.activeCount}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+            active days
+          </div>
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${STRIP_H}`}
+        role="img"
+        aria-label="Streak timeline"
+        style={{ width: '100%', height: 'auto', maxWidth: width }}
+      >
+        {/* baseline track */}
+        <line
+          x1={0}
+          y1={STRIP_H - 8}
+          x2={width}
+          y2={STRIP_H - 8}
+          stroke="var(--color-border-tertiary, rgba(0,0,0,0.12))"
+          strokeWidth={1}
+        />
+        {model.days.map((day, i) => {
+          const x = i * step;
+          if (!day.active) {
+            // Rest day: a small muted dot on the baseline.
+            return (
+              <circle
+                key={i}
+                cx={round1(x + colW / 2)}
+                cy={STRIP_H - 8}
+                r={1}
+                fill="var(--color-border-tertiary, rgba(0,0,0,0.2))"
+              />
+            );
+          }
+          // Active day: filled mark rising from the baseline.
+          const y = STRIP_H - 8 - STRIP_MARK_H;
+          return (
+            <rect
+              key={i}
+              x={round1(x)}
+              y={round1(y)}
+              width={round1(colW)}
+              height={STRIP_MARK_H}
+              rx={1}
+              fill={ACCENT}
+              opacity={0.85}
+            >
+              <title>{`${day.date}: ${formatNumber(day.value)}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 10,
+          opacity: 0.55,
+          marginTop: 4,
+        }}
+      >
+        <span>{first}</span>
+        <span>{last}</span>
       </div>
     </div>
   );
@@ -2395,7 +2856,10 @@ export function QueryResult({
       'histogram',
       'chart',
       'treemap',
+      'gallery',
       'map',
+      'density',
+      'streak',
       'list',
       'grid',
       'mosaic',
@@ -2604,6 +3068,33 @@ export function QueryResult({
             mapConfig={payload.map_config}
           />
         )}
+        {view === 'density' && detection.densityEligible && (
+          <MapView
+            rows={rows}
+            latIndex={detection.latIndex}
+            lngIndex={detection.lngIndex}
+            polylineIndex={null}
+            labelIndex={detection.labelIndex}
+            mapConfig={payload.map_config}
+            density
+          />
+        )}
+        {view === 'gallery' && detection.galleryPolylineIndex !== null && (
+          <GalleryView
+            rows={rows}
+            polylineIndex={detection.galleryPolylineIndex}
+            labelIndex={detection.galleryLabelIndex}
+          />
+        )}
+        {view === 'streak' &&
+          detection.calendarDateIndex !== null &&
+          detection.calendarValueIndex !== null && (
+            <StreakView
+              rows={rows}
+              dateIndex={detection.calendarDateIndex}
+              valueIndex={detection.calendarValueIndex}
+            />
+          )}
       </div>
     </article>
   );

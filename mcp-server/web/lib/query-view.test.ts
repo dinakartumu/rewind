@@ -413,6 +413,105 @@ describe('detectView', () => {
     expect(d.mosaicMetricIndex).toBeNull();
   });
 
+  // ── density map (point-map extra tab) ────────────────────────────────
+  it('offers density on a lat/lng point-map result (extra tab)', () => {
+    const d = detectView(fixtures['density-map']);
+    // Same shape as map — map stays the auto default; density is an extra tab.
+    expect(d.auto).toBe('map');
+    expect(d.available).toContain('map');
+    expect(d.available).toContain('density');
+    expect(d.densityEligible).toBe(true);
+    expect(d.latIndex).not.toBeNull();
+    expect(d.lngIndex).not.toBeNull();
+  });
+
+  it('offers density on the small lat/lng point fixture too', () => {
+    const d = detectView(fixtures['latlng-map']);
+    expect(d.auto).toBe('map');
+    expect(d.available).toContain('density');
+    expect(d.densityEligible).toBe(true);
+  });
+
+  it('does NOT offer density on a route-only (polyline) result', () => {
+    const d = detectView(fixtures['polyline-map']);
+    // polyline-map has 2 routes, no lat/lng → map stays auto, no density.
+    expect(d.available).toContain('map');
+    expect(d.available).not.toContain('density');
+    expect(d.densityEligible).toBe(false);
+  });
+
+  it('does NOT offer density on a non-map result', () => {
+    const d = detectView(fixtures['category-chart']);
+    expect(d.available).not.toContain('density');
+    expect(d.densityEligible).toBe(false);
+  });
+
+  // ── route gallery (≥4 polylines → new auto default) ──────────────────
+  it('auto-selects gallery for ≥4 polyline route rows', () => {
+    const d = detectView(fixtures['route-gallery']);
+    expect(d.auto).toBe('gallery');
+    expect(d.available).toContain('gallery');
+    // The single-route map is still offered as a tab.
+    expect(d.available).toContain('map');
+    expect(d.galleryPolylineIndex).toBe(1);
+    // A name column labels each tile.
+    expect(d.galleryLabelIndex).toBe(0);
+  });
+
+  it('does NOT gallery a single/few-route result (stays map)', () => {
+    // polyline-map has exactly 2 routes → below the ≥4 gallery threshold.
+    const d = detectView(fixtures['polyline-map']);
+    expect(d.auto).toBe('map');
+    expect(d.available).not.toContain('gallery');
+    expect(d.galleryPolylineIndex).toBeNull();
+  });
+
+  it('galleries exactly at the ≥4-route threshold', () => {
+    const enc =
+      'aowkFtqjaVv@sBd@qBHm@AeAKm@Um@a@e@e@Wm@Ei@Fe@Vc@d@Wl@Kt@?t@Nn@Zh@d@Zh@Nl@?l@';
+    const d = detectView({
+      columns: ['name', 'route'],
+      rows: [
+        ['A', enc],
+        ['B', enc],
+        ['C', enc],
+        ['D', enc],
+      ],
+    });
+    expect(d.auto).toBe('gallery');
+    expect(d.available).toContain('gallery');
+  });
+
+  it('does NOT offer gallery for a lat/lng point map (no polyline)', () => {
+    const d = detectView(fixtures['density-map']);
+    expect(d.available).not.toContain('gallery');
+    expect(d.galleryPolylineIndex).toBeNull();
+  });
+
+  // ── streak strip (daily-date extra tab) ──────────────────────────────
+  it('offers streak on a daily-date + count result (extra tab)', () => {
+    const d = detectView(fixtures['streak-strip']);
+    // Same shape as calendar — calendar stays auto; streak is an extra tab.
+    expect(d.auto).toBe('calendar');
+    expect(d.available).toContain('calendar');
+    expect(d.available).toContain('streak');
+    expect(d.streakEligible).toBe(true);
+    expect(d.calendarDateIndex).toBe(0);
+    expect(d.calendarValueIndex).toBe(1);
+  });
+
+  it('does NOT offer streak on a YYYY-MM period result', () => {
+    const d = detectView(fixtures['period-chart']);
+    expect(d.available).not.toContain('streak');
+    expect(d.streakEligible).toBe(false);
+  });
+
+  it('does NOT offer streak on a non-dated result', () => {
+    const d = detectView(fixtures['category-chart']);
+    expect(d.available).not.toContain('streak');
+    expect(d.streakEligible).toBe(false);
+  });
+
   // ── priority integration: existing cases unchanged ───────────────────
   it('leaves existing auto selections unchanged by the new views', () => {
     expect(detectView(fixtures['scalar-table']).auto).toBe('table');
