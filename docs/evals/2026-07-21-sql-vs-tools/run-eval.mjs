@@ -22,7 +22,7 @@ if (!KEY) {
 }
 
 const questionsDoc = JSON.parse(
-  readFileSync(join(__dirname, 'questions.json'), 'utf8'),
+  readFileSync(join(__dirname, 'questions.json'), 'utf8')
 );
 const QUESTIONS = questionsDoc.questions;
 
@@ -42,7 +42,10 @@ async function runSql(sql) {
   const t0 = performance.now();
   const res = await fetch(BASE + '/v1/query', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${KEY}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ sql }),
   });
   const ms = Math.round(performance.now() - t0);
@@ -75,7 +78,8 @@ function extractPath(obj, path) {
 
 // From a /v1/query response {columns, rows}, build array-of-objects.
 function sqlRows(body) {
-  if (!body || !Array.isArray(body.columns) || !Array.isArray(body.rows)) return [];
+  if (!body || !Array.isArray(body.columns) || !Array.isArray(body.rows))
+    return [];
   return body.rows.map((r) => {
     const o = {};
     body.columns.forEach((c, i) => (o[c] = r[i]));
@@ -111,7 +115,8 @@ function grade(gt, answer, opts = {}) {
     }
     case 'rows': {
       if (!answer) return false;
-      const rowsOk = gt.expected_rows == null || answer.rowCount === gt.expected_rows;
+      const rowsOk =
+        gt.expected_rows == null || answer.rowCount === gt.expected_rows;
       let spotOk = true;
       if (gt.spot_check) {
         for (const [k, v] of Object.entries(gt.spot_check)) {
@@ -184,7 +189,11 @@ async function runOldPath(q) {
   }
   const { ms, status, body } = await httpGet(op.endpoint);
   if (status !== 200 || body?.error) {
-    return { ms, error: `HTTP ${status} ${body?.error || ''}`.trim(), correct: false };
+    return {
+      ms,
+      error: `HTTP ${status} ${body?.error || ''}`.trim(),
+      correct: false,
+    };
   }
   const gt = q.ground_truth;
   let answer;
@@ -210,7 +219,12 @@ async function runOldPath(q) {
             : null;
       // key by whichever bucket field the endpoint uses (year or period)
       for (const el of arr) {
-        const k = el.year != null ? String(el.year) : el.period != null ? String(el.period) : null;
+        const k =
+          el.year != null
+            ? String(el.year)
+            : el.period != null
+              ? String(el.period)
+              : null;
         if (k != null) byKey[k] = valField ? el[valField] : undefined;
       }
     }
@@ -229,11 +243,17 @@ async function runOldPath(q) {
 async function runNewPath(q) {
   const { ms, status, body } = await runSql(q.sql);
   if (status !== 200 || body?.error) {
-    return { ms, error: `HTTP ${status} ${body?.error || ''}`.trim(), correct: false };
+    return {
+      ms,
+      error: `HTTP ${status} ${body?.error || ''}`.trim(),
+      correct: false,
+    };
   }
   const rows = sqlRows(body);
   const answer = newAnswerFromRows(q.ground_truth, rows);
-  const correct = grade(q.ground_truth, answer, { gradeLabelOnly: q.grade_label_only });
+  const correct = grade(q.ground_truth, answer, {
+    gradeLabelOnly: q.grade_label_only,
+  });
   return { ms, correct, extracted: answer, truncated: body.truncated };
 }
 
@@ -265,11 +285,14 @@ function bucket(rows) {
   const total = rows.length;
   const oldAttempted = rows.filter((r) => !r.old.unanswerable).length;
   const oldCorrect = rows.filter((r) => r.old.correct === true).length;
-  const newAttempted = rows.filter((r) => !r.new.error || r.new.correct !== undefined).length;
+  const newAttempted = rows.filter(
+    (r) => !r.new.error || r.new.correct !== undefined
+  ).length;
   const newCorrect = rows.filter((r) => r.new.correct === true).length;
   const oldLat = rows.filter((r) => r.old.ms > 0).map((r) => r.old.ms);
   const newLat = rows.map((r) => r.new.ms);
-  const avg = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0);
+  const avg = (a) =>
+    a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0;
   return {
     total,
     old_coverage: pct(oldAttempted, total),
@@ -284,7 +307,8 @@ function bucket(rows) {
     new_avg_ms: avg(newLat),
   };
 }
-for (const t of tiers) summary.byTier[t] = bucket(results.filter((r) => r.tier === t));
+for (const t of tiers)
+  summary.byTier[t] = bucket(results.filter((r) => r.tier === t));
 summary.overall = bucket(results);
 
 // ---- console output --------------------------------------------------------
@@ -298,14 +322,29 @@ for (const r of results) {
       : r.old.correct
         ? 'PASS'
         : 'FAIL';
-  const newStr = r.new.error ? 'ERR:' + r.new.error : r.new.correct ? 'PASS' : 'FAIL';
+  const newStr = r.new.error
+    ? 'ERR:' + r.new.error
+    : r.new.correct
+      ? 'PASS'
+      : 'FAIL';
   console.log(
-    `${r.id.padEnd(6)} T${r.tier} ${r.category.padEnd(13)} OLD:${oldStr.padEnd(14)} NEW:${newStr.padEnd(6)} ${r.question}`,
+    `${r.id.padEnd(6)} T${r.tier} ${r.category.padEnd(13)} OLD:${oldStr.padEnd(14)} NEW:${newStr.padEnd(6)} ${r.question}`
   );
 }
 
-console.log('\n=== SUMMARY (coverage = % attempted, accuracy = % correct of attempted) ===');
-const hdr = ['Tier', 'N', 'OLD cov', 'OLD acc', 'NEW cov', 'NEW acc', 'OLD ms', 'NEW ms'];
+console.log(
+  '\n=== SUMMARY (coverage = % attempted, accuracy = % correct of attempted) ==='
+);
+const hdr = [
+  'Tier',
+  'N',
+  'OLD cov',
+  'OLD acc',
+  'NEW cov',
+  'NEW acc',
+  'OLD ms',
+  'NEW ms',
+];
 console.log(hdr.map((h) => h.padEnd(9)).join(''));
 for (const t of tiers) {
   const s = summary.byTier[t];
@@ -321,38 +360,53 @@ for (const t of tiers) {
       s.new_avg_ms,
     ]
       .map((x) => String(x).padEnd(9))
-      .join(''),
+      .join('')
   );
 }
 const o = summary.overall;
 console.log(
-  ['ALL', o.total, o.old_coverage, o.old_accuracy, o.new_coverage, o.new_accuracy, o.old_avg_ms, o.new_avg_ms]
+  [
+    'ALL',
+    o.total,
+    o.old_coverage,
+    o.old_accuracy,
+    o.new_coverage,
+    o.new_accuracy,
+    o.old_avg_ms,
+    o.new_avg_ms,
+  ]
     .map((x) => String(x).padEnd(9))
-    .join(''),
+    .join('')
 );
 
 // ---- write results.json ----------------------------------------------------
 
 writeFileSync(
   join(__dirname, 'results.json'),
-  JSON.stringify({ base: BASE, generated_at: new Date().toISOString(), summary, results }, null, 2),
+  JSON.stringify(
+    { base: BASE, generated_at: new Date().toISOString(), summary, results },
+    null,
+    2
+  )
 );
 
 // ---- write REPORT.md numbers block (appended by generate step below) -------
 
 function mdTable(summary) {
   const lines = [];
-  lines.push('| Tier | N | OLD coverage | OLD accuracy | NEW coverage | NEW accuracy | OLD avg ms | NEW avg ms |');
+  lines.push(
+    '| Tier | N | OLD coverage | OLD accuracy | NEW coverage | NEW accuracy | OLD avg ms | NEW avg ms |'
+  );
   lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const t of tiers) {
     const s = summary.byTier[t];
     lines.push(
-      `| ${t} | ${s.total} | ${s.old_coverage} (${s.old_coverage_n}/${s.total}) | ${s.old_accuracy} (${s.old_correct}/${s.old_coverage_n}) | ${s.new_coverage} (${s.new_coverage_n}/${s.total}) | ${s.new_accuracy} (${s.new_correct}/${s.new_coverage_n}) | ${s.old_avg_ms} | ${s.new_avg_ms} |`,
+      `| ${t} | ${s.total} | ${s.old_coverage} (${s.old_coverage_n}/${s.total}) | ${s.old_accuracy} (${s.old_correct}/${s.old_coverage_n}) | ${s.new_coverage} (${s.new_coverage_n}/${s.total}) | ${s.new_accuracy} (${s.new_correct}/${s.new_coverage_n}) | ${s.old_avg_ms} | ${s.new_avg_ms} |`
     );
   }
   const o = summary.overall;
   lines.push(
-    `| **ALL** | ${o.total} | ${o.old_coverage} (${o.old_coverage_n}/${o.total}) | ${o.old_accuracy} (${o.old_correct}/${o.old_coverage_n}) | ${o.new_coverage} (${o.new_coverage_n}/${o.total}) | ${o.new_accuracy} (${o.new_correct}/${o.new_coverage_n}) | ${o.old_avg_ms} | ${o.new_avg_ms} |`,
+    `| **ALL** | ${o.total} | ${o.old_coverage} (${o.old_coverage_n}/${o.total}) | ${o.old_accuracy} (${o.old_correct}/${o.old_coverage_n}) | ${o.new_coverage} (${o.new_coverage_n}/${o.total}) | ${o.new_accuracy} (${o.new_correct}/${o.new_coverage_n}) | ${o.old_avg_ms} | ${o.new_avg_ms} |`
   );
   return lines.join('\n');
 }
