@@ -259,7 +259,7 @@ Watching the same movie on different dates always creates separate watch events.
 - **Plex webhooks**: `media.scrobble` events (real-time)
 - **Plex catch-up cron** (daily 5 AM): scan Plex library for watched items not in DB
 - **Letterboxd cron** (every 6 hours): fetch RSS feed, insert new entries not already in DB
-- **Trakt cron** (every 6 hours): incremental fetch of movie + episode history from the Trakt API, apply movie ratings, dedup on Trakt history ID
+- **Trakt cron** (hourly): incremental fetch of movie + episode history from the Trakt API, apply movie ratings, dedup on Trakt history ID
 - **Letterboxd initial import**: one-time import from `https://letterboxd.com/settings/data/` export. Merges diary.csv (watch dates + rewatch), ratings.csv (ratings for movies not in diary), and reviews.csv (review text). Adds `review` column to watch_history.
 - **Manual entry**: on-demand via admin endpoint
 - **TMDB enrichment**: on first encounter of a movie from any source, fetch TMDB details + credits + images. Store in `movies` table with genres/directors in join tables.

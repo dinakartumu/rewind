@@ -26,14 +26,15 @@ GET endpoints require a read key (`rw_live_...`). Write endpoints (admin, sync, 
 
 ## Sync Schedule
 
-| Domain     | Trigger        | Schedule                             | Strategy                                          |
-| ---------- | -------------- | ------------------------------------ | ------------------------------------------------- |
-| Last.fm    | Cron           | Every 15 min (scrobbles), 3 AM daily | Incremental from last scrobble timestamp          |
-| Strava     | Cron + Webhook | 3:15 AM daily + real-time webhook    | Incremental since last synced activity            |
-| Plex       | Webhook + Cron | Real-time webhook + 3:30 AM daily    | Webhook for watch events, cron for library scan   |
-| Letterboxd | Cron           | Every 6 hours                        | RSS feed parse, deduplicate against existing data |
-| Discogs    | Cron           | Sunday 3:45 AM                       | Full collection replace                           |
-| Trakt      | Cron           | Sunday 3:45 AM                       | Full collection sync with write-through           |
+| Domain     | Trigger        | Schedule                                        | Strategy                                                     |
+| ---------- | -------------- | ----------------------------------------------- | ------------------------------------------------------------ |
+| Last.fm    | Cron           | Every 15 min (scrobbles), 3 AM daily            | Incremental from last scrobble timestamp                     |
+| Strava     | Cron + Webhook | Hourly + real-time webhook                      | Incremental since last synced activity                       |
+| Plex       | Webhook + Cron | Real-time webhook + 3:30 AM daily               | Webhook for watch events, cron for library scan              |
+| Letterboxd | Cron           | Every 6 hours                                   | RSS feed parse, deduplicate against existing data            |
+| Discogs    | Cron           | Sunday 3:45 AM                                  | Full collection replace                                      |
+| Trakt      | Cron           | Watch history hourly, collection Sunday 3:45 AM | Incremental history; full collection sync with write-through |
+| Foursquare | Cron           | Hourly                                          | Incremental check-in walk since newest stored                |
 
 Sync runs are recorded in `sync_runs` with status, item count, duration, and errors. Consecutive failures (max 2) degrade the domain; a success resets the counter.
 

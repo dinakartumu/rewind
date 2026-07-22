@@ -209,7 +209,7 @@ Handler logic:
 
 ## Sync Strategy
 
-- **Incremental cron** (daily 4 AM): `GET /athlete/activities?after={last_activity_epoch}`
+- **Incremental cron** (hourly): `GET /athlete/activities?after={last_activity_epoch}`
 - **Webhook**: real-time create/update/delete events
 - **Gear sync**: daily, fetch `GET /gear/{id}` for each gear_id in activities
 - **Stats recomputation**: after each sync -- rebuild year summaries, lifetime stats, personal records, streaks, Eddington number

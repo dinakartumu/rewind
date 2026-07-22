@@ -43,11 +43,11 @@ preview_id = "0c656a4610914eccb67a8b93cf186aa3"
 [triggers]
 crons = [
   "*/15 * * * *",   # Every 15 min: Last.fm scrobble sync
+  "0 * * * *",      # Hourly: Strava activities + Trakt watch history + Foursquare check-ins
   "0 3 * * *",      # Daily 3:00 AM: Last.fm top lists + stats
-  "15 3 * * *",     # Daily 3:15 AM: Strava activities
   "30 3 * * *",     # Daily 3:30 AM: Plex library scan
   "45 3 * * SUN",   # Sunday 3:45 AM: Discogs + Trakt collections
-  "0 */6 * * *",    # Every 6 hours: Trakt watch history + Instapaper
+  "0 */6 * * *",    # Every 6 hours: Letterboxd RSS + Instapaper
   "0 4 * * *",      # Daily 4:00 AM: Attending (Calendar + Gmail incremental)
   "0 5 * * SUN",    # Sunday 5:00 AM: Instapaper full deletion reconciliation
 ]

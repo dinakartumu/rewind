@@ -149,6 +149,59 @@ export default {
         );
         break;
       }
+      case '0 * * * *': {
+        // Hourly high-frequency feeds. Strava activities, Trakt watch
+        // history, and Foursquare/Swarm check-ins change often enough that
+        // daily / 6-hourly freshness felt stale. Collection-style Trakt data
+        // (owned media) stays on the weekly Sunday job.
+        const runningRetry = await shouldRetry(db, 'running');
+        if (runningRetry.shouldRetry) {
+          console.log(
+            `[SYNC] Retrying failed running sync (${runningRetry.consecutiveFailures} consecutive failures)`
+          );
+        }
+        console.log('[SYNC] Strava activities (hourly)');
+        ctx.waitUntil(
+          syncRunning(env, db).catch((e) =>
+            console.log(`[ERROR] Strava cron sync failed: ${e}`)
+          )
+        );
+
+        if (env.TRAKT_CLIENT_ID) {
+          console.log('[SYNC] Trakt watch history sync (hourly)');
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await syncTraktHistory(env);
+                const skip = await shouldSkipWatchingImages(db);
+                if (skip) {
+                  console.log(
+                    '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
+                  );
+                } else {
+                  await processWatchingImages(db, env);
+                }
+              } catch (error) {
+                console.log(
+                  `[ERROR] Trakt history sync failed: ${error instanceof Error ? error.message : String(error)}`
+                );
+              }
+            })()
+          );
+        }
+
+        if (env.FOURSQUARE_ACCESS_TOKEN) {
+          console.log('[SYNC] Foursquare check-in sync (hourly)');
+          ctx.waitUntil(
+            syncPlaces(env).catch((error) =>
+              console.log(
+                `[ERROR] Foursquare sync failed: ${error instanceof Error ? error.message : String(error)}`
+              )
+            )
+          );
+        }
+        break;
+      }
       case '0 3 * * *': {
         const listeningRetry = await shouldRetry(db, 'listening');
         if (listeningRetry.shouldRetry) {
@@ -263,21 +316,6 @@ export default {
         );
         break;
       }
-      case '15 3 * * *': {
-        const runningRetry = await shouldRetry(db, 'running');
-        if (runningRetry.shouldRetry) {
-          console.log(
-            `[SYNC] Retrying failed running sync (${runningRetry.consecutiveFailures} consecutive failures)`
-          );
-        }
-        console.log('[SYNC] Strava activities');
-        ctx.waitUntil(
-          syncRunning(env, db).catch((e) =>
-            console.log(`[ERROR] Strava cron sync failed: ${e}`)
-          )
-        );
-        break;
-      }
       case '30 3 * * *': {
         const watchingRetry = await shouldRetry(db, 'watching');
         if (watchingRetry.shouldRetry) {
@@ -327,10 +365,7 @@ export default {
       }
       case '0 */6 * * *': {
         const watchingRetry = await shouldRetry(db, 'watching');
-        if (
-          watchingRetry.shouldRetry &&
-          (env.LETTERBOXD_USERNAME || env.TRAKT_CLIENT_ID)
-        ) {
+        if (watchingRetry.shouldRetry && env.LETTERBOXD_USERNAME) {
           console.log(
             `[SYNC] Retrying failed watching sync (${watchingRetry.consecutiveFailures} consecutive failures)`
           );
@@ -341,34 +376,10 @@ export default {
             (async () => {
               try {
                 await syncLetterboxd(db, env);
-                // When Trakt is configured, its block below owns watching
-                // image processing. Without Trakt, run it here so
-                // Letterboxd-only movies still get posters.
-                if (!env.TRAKT_CLIENT_ID) {
-                  const skip = await shouldSkipWatchingImages(db);
-                  if (skip) {
-                    console.log(
-                      '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
-                    );
-                  } else {
-                    await processWatchingImages(db, env);
-                  }
-                }
-              } catch (error) {
-                console.log(
-                  `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`
-                );
-              }
-            })()
-          );
-        }
-
-        if (env.TRAKT_CLIENT_ID) {
-          console.log('[SYNC] Trakt watch history sync');
-          ctx.waitUntil(
-            (async () => {
-              try {
-                await syncTraktHistory(env);
+                // Letterboxd-only movies still need posters. The hourly
+                // Trakt job also processes watching images, but Letterboxd
+                // runs here independently, so process here too (skipping
+                // when the Plex cron ran recently).
                 const skip = await shouldSkipWatchingImages(db);
                 if (skip) {
                   console.log(
@@ -379,21 +390,10 @@ export default {
                 }
               } catch (error) {
                 console.log(
-                  `[ERROR] Trakt history sync failed: ${error instanceof Error ? error.message : String(error)}`
+                  `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`
                 );
               }
             })()
-          );
-        }
-
-        if (env.FOURSQUARE_ACCESS_TOKEN) {
-          console.log('[SYNC] Foursquare check-in sync');
-          ctx.waitUntil(
-            syncPlaces(env).catch((error) =>
-              console.log(
-                `[ERROR] Foursquare sync failed: ${error instanceof Error ? error.message : String(error)}`
-              )
-            )
           );
         }
 

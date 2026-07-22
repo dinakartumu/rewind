@@ -37,7 +37,7 @@ The v2 user token is obtained once via the browser OAuth flow and stored as the 
 - New check-ins prepend at offset 0 and do not shift the end-anchored tail offsets, so a mid-walk arrival cannot desync the walk; a final-batch interleave dedups on `foursquare_id`.
 - sync_runs domain `places`, syncType `foursquare`.
 - afterSync: feed items (`checkin` events, sourceId `foursquare:checkin:{id}`) and search items (entityType `venue`).
-- Cron: every 6 hours, guarded on `env.FOURSQUARE_ACCESS_TOKEN`.
+- Cron: hourly, guarded on `env.FOURSQUARE_ACCESS_TOKEN`.
 
 ## Endpoints
 
