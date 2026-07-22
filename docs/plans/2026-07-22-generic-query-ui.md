@@ -41,21 +41,61 @@ Never throws; **table is always available and is the universal fallback.**
   [-180,180]), OR a polyline column (name matches
   `map_polyline`/`polyline`/`route`/`encoded_path` with ≥50% encoded-looking
   string values). Requires ≥1 row.
+- **calendar** (heatmap) — col0 is a **DAY-precision date** (`YYYY-MM-DD`, ≥60%
+  of samples, no time component) AND there is **exactly one** numeric column.
+  Requires ≥1 row. Deliberately distinct from the time-series chart, which
+  fires on coarser `YYYY` / `YYYY-MM` period granularity — a `YYYY-MM` result
+  stays a chart, never a calendar. Renders a GitHub-contributions grid (weeks as
+  columns, Mon–Sun rows, one stacked panel per calendar year, month labels + a
+  less→more legend); missing days render as empty cells and duplicate days sum.
+- **clock** (polar) — col0 is a **cyclic category** plus **one** numeric count
+  column: integer **hours** all in `[0,23]` (≥90%, with real spread — ≥6
+  distinct values and at least one in the 7–23 band so tiny small-integer
+  categories don't qualify), integer **weekday** indices all in `[0,6]` (≥90%,
+  ≥4 distinct), or **weekday names** (`Mon`/`Monday`/… ≥80%). Requires ≥1 row.
+  Guarded tightly so an ordinary category+count stays a bar chart; when
+  ambiguous it prefers the chart. Renders a radial histogram (24 hour spokes or
+  7 weekday wedges, length + opacity by count, ring labels, center total).
+- **stat** (cards) — **exactly one row** AND ≥1 numeric column. Renders each
+  column as a labeled big-number KPI tile (humanized column name, thousands
+  separators; durations are shown raw — no unit inference); non-numeric columns
+  become small caption tiles.
+- **grid / list** (both offered) — a CDN image-URL column
+  (`https://cdn.dinakartumu.com/...`, ≥50% of samples) AND a name/label text
+  column (`name`/`title`/`label`/`track`/…, or any text column), with ≥1 row. A
+  leftover numeric column (not the image or label) is the ranking metric. BOTH
+  the **card grid** and the **ranked list** tabs are shown whenever this shape
+  holds. Default: **list** when there is exactly one obvious metric to rank by,
+  else **grid**. The list is horizontal rows — rank number (1,2,3… by result
+  order), a small square cover, the name, a proportional metric bar + its value.
 - **chart** — exactly 2 columns, ≥1 row, resolving to one category/period
   column + one numeric column. If the category column reads as a period
   (`YYYY`, `YYYY-MM`, or ISO date, ≥60% of samples) → **line/area time-series**;
   otherwise → **bar chart**. Two numeric columns count as a chart only when the
   first looks period-ish (e.g. `year, plays`).
-- **grid** — a CDN image-URL column (`https://cdn.dinakartumu.com/...`, ≥50% of
-  samples) AND a name/label text column (`name`/`title`/`label`/`track`/…, or
-  any text column), with ≥1 row. A leftover numeric column becomes the card
-  metric.
 - **table** — everything else, and the fallback whenever a richer view fails.
 
-**Auto priority:** `map > grid > chart > table`. The `view` arg forces one
-mode (still validated by the input enum). The UI always shows a **table** tab
-plus a tab for each detected richer view; table is the safe default tab, and
-`auto` selects the richest applicable view on first render.
+**Auto priority (finalized):**
+`map > calendar > clock > stat > (grid | list) > chart > table`.
+The `view` arg forces one mode (validated by the input enum:
+`auto | table | chart | map | grid | calendar | clock | stat | list`). The UI
+always shows a **table** tab plus a tab for each detected richer view; table is
+the safe default tab, and `auto` selects the richest applicable view on first
+render.
+
+### Example SQL per auto-selected view
+
+- **calendar** — `SELECT date(started_at) AS day, COUNT(*) AS runs FROM
+strava_activities GROUP BY day` (daily dates + one count).
+- **clock** — `SELECT CAST(strftime('%H', scrobbled_at) AS INT) AS hour,
+COUNT(*) AS plays FROM lastfm_scrobbles GROUP BY hour` (hours 0–23 + count);
+  weekday names via a `CASE strftime('%w', …)` also land here.
+- **stat** — `SELECT COUNT(*) AS films, SUM(runtime)/60 AS hours,
+COUNT(DISTINCT director) AS directors FROM watching_movies` (single row, 3
+  numerics → "1,946 Films · 2,440 Hours · 312 Directors").
+- **list / grid** — `SELECT name AS artist, image_url AS cover, play_count AS
+plays FROM lastfm_artists ORDER BY plays DESC LIMIT 20` (image + label +
+  one metric → ranked list by default; grid tab also available).
 
 ## Map view — Leaflet with a configurable tile provider
 
@@ -148,10 +188,17 @@ The fallback needs no tiles, no external requests, no API key.
 (cloned from `top-albums.tsx`), the `registerUiResource` + CSP registration
 path, the `_meta.ui.resourceUri` attach convention, and `scripts/inline-bundles.mjs`.
 
+**Added later (first visualization batch, issue #4):** four more auto-detected
+views in the same pure-detection + inline-SVG style, **zero new runtime deps** —
+**calendar** heatmap, **clock** polar radial histogram, **stat** KPI cards, and
+**list** ranked-with-art (sharing the grid signal). Detectors are pure functions
+in `query-view.ts`; the `view` input enum + result schema grew to
+`… | calendar | clock | stat | list`.
+
 **Added:** `web/lib/query-view.ts` (detection), `web/lib/geo-projection.ts`
 (SVG fallback projector, ported from the website), `leaflet` (bundled
 dependency powering the OSM slippy map), `web/components/QueryResult.tsx`
-(4 views
+(8 views
 
 - switcher), `web/query-result.{tsx,html,fixtures.ts}`, and the `view` input
   arg + result `_meta` wiring in `query.ts`.

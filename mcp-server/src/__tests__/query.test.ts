@@ -214,7 +214,16 @@ describe('query_rewind generic UI wiring', () => {
 
   it('accepts an explicit view arg and echoes it back', async () => {
     const { client } = await createTestClient();
-    for (const view of ['table', 'chart', 'map', 'grid'] as const) {
+    for (const view of [
+      'table',
+      'chart',
+      'map',
+      'grid',
+      'calendar',
+      'clock',
+      'stat',
+      'list',
+    ] as const) {
       const result = await client.callTool({
         name: 'query_rewind',
         arguments: { sql: 'SELECT 1', view },

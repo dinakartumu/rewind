@@ -77,6 +77,75 @@ const imageGrid: QueryResultShape = {
   ],
 };
 
+/**
+ * Daily date + count spanning ~a year → calendar heatmap. Sparse: only the
+ * days actually run are present; the heatmap fills the rest as empty cells.
+ */
+const calendarHeatmap: QueryResultShape = (() => {
+  const rows: (string | number)[][] = [];
+  const start = new Date('2025-01-06T00:00:00Z');
+  // ~110 scattered active days across the year, deterministic pseudo-random.
+  let seed = 7;
+  for (let i = 0; i < 360; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    if (seed % 3 === 0) continue; // ~1/3 of days are rest days
+    const d = new Date(start.getTime() + i * 86400000);
+    const iso = d.toISOString().slice(0, 10);
+    const count = 1 + (seed % 5); // 1..5 km-ish
+    rows.push([iso, count]);
+  }
+  return { columns: ['day', 'runs'], rows };
+})();
+
+/** Single row + several numeric columns → big-number stat cards. */
+const statCards: QueryResultShape = {
+  columns: ['films', 'hours', 'directors'],
+  rows: [[1946, 2440, 312]],
+};
+
+/** rank/name/cover/plays → ranked list with art (and grid). */
+const rankedList: QueryResultShape = {
+  columns: ['artist', 'cover', 'plays'],
+  rows: [
+    ['Olivia Rodrigo', `${CDN}/listening/artists/1/original.jpg?v=1`, 4120],
+    ['Taylor Swift', `${CDN}/listening/artists/2/original.jpg?v=1`, 3880],
+    ['Sabrina Carpenter', `${CDN}/listening/artists/3/original.jpg?v=1`, 3010],
+    ['Clairo', `${CDN}/listening/artists/4/original.jpg?v=1`, 2540],
+    ['Phoebe Bridgers', `${CDN}/listening/artists/5/original.jpg?v=1`, 2110],
+  ],
+};
+
+/** Hour-of-day (0-23) + count → polar clock (24 spokes). */
+const hourClock: QueryResultShape = {
+  columns: ['hour', 'plays'],
+  rows: [
+    [0, 120],
+    [1, 60],
+    [2, 30],
+    [3, 12],
+    [4, 8],
+    [5, 15],
+    [6, 40],
+    [7, 90],
+    [8, 160],
+    [9, 210],
+    [10, 240],
+    [11, 220],
+    [12, 260],
+    [13, 250],
+    [14, 230],
+    [15, 240],
+    [16, 280],
+    [17, 320],
+    [18, 300],
+    [19, 340],
+    [20, 380],
+    [21, 360],
+    [22, 260],
+    [23, 180],
+  ],
+};
+
 /** Same image-grid data but forced to the table view via `view`. */
 const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 
@@ -87,5 +156,9 @@ export const fixtures: Record<string, QueryResultShape> = {
   'latlng-map': latLngMap,
   'polyline-map': polylineMap,
   'image-grid': imageGrid,
+  'calendar-heatmap': calendarHeatmap,
+  'stat-cards': statCards,
+  'ranked-list': rankedList,
+  'hour-clock': hourClock,
   'forced-table': forcedTable,
 };

@@ -16,9 +16,22 @@ export const queryOutputSchema = z
     /**
      * Echo of the requested render view for the generic query-result UI
      * bundle: 'auto' (auto-detect) or a forced 'table' | 'chart' | 'map' |
-     * 'grid'. Present on every result; ignored by non-UI hosts.
+     * 'grid' | 'calendar' | 'clock' | 'stat' | 'list'. Present on every
+     * result; ignored by non-UI hosts.
      */
-    view: z.enum(['auto', 'table', 'chart', 'map', 'grid']).optional(),
+    view: z
+      .enum([
+        'auto',
+        'table',
+        'chart',
+        'map',
+        'grid',
+        'calendar',
+        'clock',
+        'stat',
+        'list',
+      ])
+      .optional(),
     /**
      * Present only when `embed_art: true`. Maps each matched CDN image URL —
      * exactly as it appears in a result cell — to a small base64 WebP data URI

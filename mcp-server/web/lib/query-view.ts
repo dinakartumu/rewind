@@ -35,7 +35,15 @@ export type QueryResultShape = {
   map_config?: MapConfig;
 };
 
-export type ViewMode = 'table' | 'chart' | 'map' | 'grid';
+export type ViewMode =
+  | 'table'
+  | 'chart'
+  | 'map'
+  | 'grid'
+  | 'calendar'
+  | 'clock'
+  | 'stat'
+  | 'list';
 
 /** Public CDN origin — a cell under this host is Rewind artwork. */
 export const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
@@ -83,6 +91,53 @@ export function looksLikePeriod(v: Cell): boolean {
 /** A cell that reads as a full ISO 8601 timestamp (has a time component). */
 export function looksLikeTimestamp(v: Cell): boolean {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(v);
+}
+
+/**
+ * A DAY-precision calendar date: exactly YYYY-MM-DD, with NO time component.
+ * This is the calendar-heatmap signal — distinct from a coarser YYYY / YYYY-MM
+ * period (which stays on the time-series chart) and from a full timestamp
+ * (which carries an hour/minute and is not a bare day).
+ */
+export function looksLikeDayDate(v: Cell): boolean {
+  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
+/** Full weekday names (long or short), case-insensitive. */
+const WEEKDAY_NAMES = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+const WEEKDAY_ABBR = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/** A cell naming a day of week: "Mon"/"Monday"/… (case-insensitive). */
+export function looksLikeWeekdayName(v: Cell): boolean {
+  if (typeof v !== 'string') return false;
+  const s = v.trim().toLowerCase();
+  return WEEKDAY_NAMES.includes(s) || WEEKDAY_ABBR.includes(s);
+}
+
+/** Map a weekday name to its Monday=0…Sunday=6 index, or null. */
+export function weekdayNameToIndex(v: Cell): number | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim().toLowerCase();
+  const long = WEEKDAY_NAMES.indexOf(s);
+  if (long >= 0) return long;
+  const abbr = WEEKDAY_ABBR.indexOf(s);
+  if (abbr >= 0) return abbr;
+  return null;
+}
+
+/** An integer-valued cell inside [lo, hi] (inclusive). */
+function isIntegerInRange(v: Cell, lo: number, hi: number): boolean {
+  if (!isNumericCell(v)) return false;
+  const n = toNumber(v);
+  return Number.isInteger(n) && n >= lo && n <= hi;
 }
 
 /** How many rows to sample when classifying a column. */
@@ -190,6 +245,18 @@ export type Detection = {
   chartLabelIndex: number | null;
   chartValueIndex: number | null;
   chartIsTimeSeries: boolean;
+  /** Calendar heatmap: day-date column + value column. */
+  calendarDateIndex: number | null;
+  calendarValueIndex: number | null;
+  /**
+   * Polar clock: cyclic-category column + count column, plus its kind so the
+   * view knows whether to draw 24 hour spokes or 7 weekday wedges.
+   */
+  clockLabelIndex: number | null;
+  clockValueIndex: number | null;
+  clockKind: 'hour' | 'weekday' | null;
+  /** Ranked-list / grid metric: the numeric column ranked in the list view. */
+  metricIndex: number | null;
 };
 
 /** Pick a label column: an image-adjacent name/title/text column. */
@@ -216,6 +283,7 @@ export function detectView(result: QueryResultShape): Detection {
   const labelIndex = pickLabelIndex(cols);
 
   const available: ViewMode[] = [];
+  const numericColInfos = cols.filter((c) => c.kind === 'numeric');
 
   // MAP: lat AND lng, or a polyline column — with at least one row.
   const hasMap =
@@ -223,9 +291,99 @@ export function detectView(result: QueryResultShape): Detection {
     ((latIndex !== null && lngIndex !== null) || polylineIndex !== null);
   if (hasMap) available.push('map');
 
-  // GRID: an image column AND a label column AND at least one row.
-  const hasGrid = rows.length > 0 && imageIndex !== null && labelIndex !== null;
-  if (hasGrid) available.push('grid');
+  // CALENDAR: col0 is a DAY-precision date (YYYY-MM-DD, ≥60% of samples) AND
+  // exactly one numeric column. Distinct from the time-series chart, which
+  // fires on coarser YYYY / YYYY-MM period granularity. Requires ≥1 row.
+  let calendarDateIndex: number | null = null;
+  let calendarValueIndex: number | null = null;
+  if (cols.length >= 2 && rows.length > 0 && numericColInfos.length === 1) {
+    const first = cols[0];
+    if (first.kind !== 'numeric') {
+      const firstCells = sampleColumn(rows, first.index);
+      if (fractionMatching(firstCells, looksLikeDayDate) >= 0.6) {
+        calendarDateIndex = first.index;
+        calendarValueIndex = numericColInfos[0].index;
+      }
+    }
+  }
+  const hasCalendar = calendarDateIndex !== null && calendarValueIndex !== null;
+  if (hasCalendar) available.push('calendar');
+
+  // CLOCK: col0 is a cyclic category — integer hours [0,23], integer weekday
+  // [0,6], or weekday names — plus exactly one numeric count column. Guarded
+  // tightly so ordinary category bars stay on the chart. Requires ≥1 row.
+  let clockLabelIndex: number | null = null;
+  let clockValueIndex: number | null = null;
+  let clockKind: 'hour' | 'weekday' | null = null;
+  if (
+    !hasCalendar &&
+    cols.length >= 2 &&
+    rows.length > 0 &&
+    numericColInfos.length >= 1
+  ) {
+    const first = cols[0];
+    const firstCells = sampleColumn(rows, first.index);
+    // The count column is a numeric column that ISN'T col0.
+    const countCol = numericColInfos.find((c) => c.index !== first.index);
+    // Distinct in-range integer values in col0 — a cyclic category needs real
+    // spread, so a lone `1` or a 2-row toy never trips the clock.
+    const distinctInts = (lo: number, hi: number) => {
+      const seen = new Set<number>();
+      for (const c of firstCells) {
+        if (isIntegerInRange(c, lo, hi)) seen.add(toNumber(c));
+      }
+      return seen.size;
+    };
+    if (countCol) {
+      const nameCyclic = fractionMatching(firstCells, looksLikeWeekdayName);
+      if (nameCyclic >= 0.8) {
+        clockKind = 'weekday';
+        clockLabelIndex = first.index;
+        clockValueIndex = countCol.index;
+      } else if (
+        first.kind === 'numeric' &&
+        fractionMatching(firstCells, (c) => isIntegerInRange(c, 0, 6)) >= 0.9 &&
+        distinctInts(0, 6) >= 4
+      ) {
+        // Integer weekday index: all values in [0,6] with real day spread.
+        clockKind = 'weekday';
+        clockLabelIndex = first.index;
+        clockValueIndex = countCol.index;
+      } else if (
+        first.kind === 'numeric' &&
+        fractionMatching(firstCells, (c) => isIntegerInRange(c, 0, 23)) >=
+          0.9 &&
+        // At least one value in the 7..23 band so it reads as hours, not a tiny
+        // category of small integers; and real spread across the day.
+        fractionMatching(firstCells, (c) => isIntegerInRange(c, 7, 23)) > 0 &&
+        distinctInts(0, 23) >= 6
+      ) {
+        clockKind = 'hour';
+        clockLabelIndex = first.index;
+        clockValueIndex = countCol.index;
+      }
+    }
+  }
+  const hasClock = clockKind !== null;
+  if (hasClock) available.push('clock');
+
+  // STAT: exactly one row AND ≥1 numeric column → big-number KPI tiles.
+  const hasStat = rows.length === 1 && numericColInfos.length >= 1;
+  if (hasStat) available.push('stat');
+
+  // GRID / LIST: an image column AND a label column AND ≥1 row. Both tabs are
+  // offered whenever this shape holds. A leftover numeric column (not the image
+  // or label) is the ranking metric for the list (and the grid caption).
+  const metricIndex =
+    numericColInfos.find(
+      (c) => c.index !== imageIndex && c.index !== labelIndex
+    )?.index ?? null;
+  const hasArtList =
+    rows.length > 0 && imageIndex !== null && labelIndex !== null;
+  if (hasArtList) {
+    available.push('grid');
+    available.push('list');
+  }
 
   // CHART: exactly one text/period column + exactly one numeric column
   // (i.e. a 2-column category→value shape). We locate them by role.
@@ -255,11 +413,16 @@ export function detectView(result: QueryResultShape): Detection {
     }
   }
 
-  // Default view priority: map > grid > chart > table. Table is always the
-  // safe default tab in the UI, but `auto` picks the richest applicable view.
+  // Default view priority: map > calendar > clock > stat > (grid|list) > chart
+  // > table. Table is always the safe default tab in the UI, but `auto` picks
+  // the richest applicable view. When both grid+list apply, prefer `list` only
+  // when there's exactly one obvious metric to rank by; else prefer `grid`.
   let auto: ViewMode = 'table';
   if (hasMap) auto = 'map';
-  else if (hasGrid) auto = 'grid';
+  else if (hasCalendar) auto = 'calendar';
+  else if (hasClock) auto = 'clock';
+  else if (hasStat) auto = 'stat';
+  else if (hasArtList) auto = metricIndex !== null ? 'list' : 'grid';
   else if (chartValueIndex !== null) auto = 'chart';
 
   return {
@@ -274,5 +437,11 @@ export function detectView(result: QueryResultShape): Detection {
     chartLabelIndex,
     chartValueIndex,
     chartIsTimeSeries,
+    calendarDateIndex,
+    calendarValueIndex,
+    clockLabelIndex,
+    clockValueIndex,
+    clockKind,
+    metricIndex,
   };
 }
