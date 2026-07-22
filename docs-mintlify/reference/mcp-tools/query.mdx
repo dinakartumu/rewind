@@ -16,6 +16,14 @@ This tool takes no parameters.
 
 Run a read-only SQL SELECT against the Rewind SQLite database.
 
+<ParamField path="embed_art" type="boolean">
+Opt-in. When true, matched CDN image URLs in the result are returned as small base64 WebP data URIs (64px) in structuredContent.art, keyed by the original URL, so sandboxed artifact HTML that cannot fetch the CDN can inline the artwork. Capped at 16 distinct URLs and a ~256KB total; adds payload, so leave false for normal data queries. Defaults to `false`.
+</ParamField>
+
 <ParamField path="sql" type="string" required>
 A single read-only SELECT (or WITH … SELECT) statement. Do not include a trailing semicolon. A LIMIT is applied automatically. Call get_schema first for table and column names.
+</ParamField>
+
+<ParamField path="view" type="string">
+Preferred rendered view in MCP Apps hosts. 'auto' (default) auto-detects from the result shape: a calendar heatmap for a daily-date (YYYY-MM-DD) column + one numeric column, a polar clock for an hour-of-day (0-23) or weekday column + a count, stat cards for a single-row result with numeric columns, a ranked list (or card grid, or a metric-sized cover mosaic) for a CDN image URL + label + metric, a stacked bar OR sankey flow for a category/source + series/target + numeric (3 columns — stacked when the first column is ordinal/temporal, sankey when both are free-form categoricals), a scatter plot for exactly two numeric columns, a histogram for a single numeric column of raw values, a chart (or a treemap when there are 8+ distinct categories) for one category/period column + one numeric column, a tile-less lat/lng or polyline map (with a density-map tab of binned graduated markers when there are lat/lng points, and a route-gallery of small-multiple route shapes — the default — for 4+ polyline routes), a streak strip of consecutive-day streaks alongside the calendar heatmap for a daily-date column, a single-entity detail card for a single row that has a CDN image URL column plus several other fields, else a table. The 'wrapped' year-in-review view is NEVER auto-selected — request it explicitly. Force one of 'table' | 'chart' | 'map' | 'grid' | 'calendar' | 'clock' | 'stat' | 'list' | 'histogram' | 'scatter' | 'stacked' | 'treemap' | 'sankey' | 'mosaic' | 'density' | 'gallery' | 'streak' | 'detail' | 'wrapped' to override. 'wrapped' expects a curated UNION-ALL result with columns section,label,value,image (image optional) — labeled highlight rows grouped by section (e.g. "Top Artists", "Top Films", "Miles Run", "Places"); add a leading `SELECT 'Year' AS section, '2024 in review' AS label, NULL, NULL` to title the card. Echoed back in structuredContent.view. Ignored by non-UI hosts. One of: `auto`, `table`, `chart`, `map`, `grid`, `calendar`, `clock`, `stat`, `list`, `histogram`, `scatter`, `stacked`, `treemap`, `sankey`, `mosaic`, `density`, `gallery`, `streak`, `detail`, `wrapped`. Defaults to `auto`.
 </ParamField>
