@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -2811,6 +2812,419 @@ function StreakView({
   );
 }
 
+// ── ENTITY DETAIL ────────────────────────────────────────────────────
+// A single-row result carrying a CDN cover image + several other fields → a
+// rich single-entity card: the cover large on the left, the primary name/title
+// as a heading, then the remaining columns as a humanized field list. Values
+// are formatted (numbers with separators, timestamps readable), hex colors get
+// a swatch, and any OTHER CDN-image columns render as small thumbs.
+const DETAIL_COVER_PX = 160;
+
+function DetailView({
+  columns,
+  row,
+  imageIndex,
+  nameIndex,
+  numericCols,
+  art,
+  onOpen,
+}: {
+  columns: string[];
+  row: unknown[];
+  imageIndex: number;
+  nameIndex: number;
+  numericCols: Set<number>;
+  art?: Record<string, string>;
+  onOpen?: (url: string) => void;
+}) {
+  const rawCover = row[imageIndex];
+  const coverUrl = typeof rawCover === 'string' ? rawCover : '';
+  const coverSrc = (coverUrl && art?.[coverUrl]) || coverUrl;
+  const title = displayCell(row[nameIndex]);
+
+  // Field list: every column that is NOT the cover image or the primary name.
+  const fieldIdx = columns
+    .map((_, i) => i)
+    .filter((i) => i !== imageIndex && i !== nameIndex);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 18,
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+      }}
+    >
+      <div
+        role={onOpen && coverUrl ? 'button' : undefined}
+        onClick={onOpen && coverUrl ? () => onOpen(coverUrl) : undefined}
+        style={{
+          width: DETAIL_COVER_PX,
+          height: DETAIL_COVER_PX,
+          borderRadius: 12,
+          overflow: 'hidden',
+          flexShrink: 0,
+          cursor: onOpen && coverUrl ? 'pointer' : 'default',
+          background: 'var(--color-background-secondary, rgba(0,0,0,0.04))',
+        }}
+      >
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt={title}
+            loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <h2
+          style={{
+            margin: '2px 0 14px',
+            fontSize: 22,
+            fontWeight: 700,
+            lineHeight: 1.15,
+            wordBreak: 'break-word',
+          }}
+        >
+          {title}
+        </h2>
+        <dl
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'max-content 1fr',
+            gap: '8px 16px',
+            margin: 0,
+          }}
+        >
+          {fieldIdx.map((i) => {
+            const raw = row[i];
+            const numeric = numericCols.has(i) && isNumericCell(raw);
+            let valueNode: ReactNode;
+            if (isHexColor(raw)) {
+              valueNode = (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 3,
+                      background: raw as string,
+                      border: '1px solid rgba(127,127,127,0.35)',
+                      display: 'inline-block',
+                    }}
+                  />
+                  {raw as string}
+                </span>
+              );
+            } else if (isCdnImageUrl(raw)) {
+              const thumbSrc = art?.[raw] ?? raw;
+              valueNode = (
+                <img
+                  src={thumbSrc}
+                  alt=""
+                  loading="lazy"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 4,
+                    objectFit: 'cover',
+                    verticalAlign: 'middle',
+                  }}
+                />
+              );
+            } else if (numeric) {
+              valueNode = formatNumber(toNumber(raw));
+            } else {
+              valueNode = displayCell(raw);
+            }
+            return (
+              <div key={i} style={{ display: 'contents' }}>
+                <dt
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: 'uppercase',
+                    opacity: 0.55,
+                    alignSelf: 'center',
+                  }}
+                >
+                  {humanizeColumn(columns[i] ?? '')}
+                </dt>
+                <dd
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontVariantNumeric: numeric ? 'tabular-nums' : 'normal',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {valueNode}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+// ── YEAR-IN-REVIEW WRAPPED ───────────────────────────────────────────
+// A CURATED composite the model requests via `view: 'wrapped'` — never
+// auto-detected. It reads a documented UNION-shaped result with columns
+// `section, label, value, image?`: highlight rows grouped by `section`. The
+// view groups rows by section (order-preserving) and renders each as a mini
+// panel — a ranked list with covers when the section has images, else a labeled
+// text/stat list. A `year`/title-ish section (or a row whose label looks like a
+// title) supplies the header. Resilient: unknown sections render as a generic
+// labeled panel; missing images fall back to text.
+type WrappedRow = { label: string; value: unknown; image: string | null };
+type WrappedSection = { name: string; rows: WrappedRow[]; hasImage: boolean };
+
+/** Column resolution for the wrapped contract; tolerant of column ordering. */
+function resolveWrappedColumns(columns: string[]): {
+  sectionIdx: number;
+  labelIdx: number;
+  valueIdx: number;
+  imageIdx: number | null;
+} {
+  const find = (re: RegExp, fallback: number) => {
+    const i = columns.findIndex((c) => re.test(c));
+    return i >= 0 ? i : fallback;
+  };
+  const sectionIdx = find(/^section$|group|category/i, 0);
+  const labelIdx = find(/^label$|name|title/i, 1);
+  const valueIdx = find(/^value$|count|total|metric/i, 2);
+  const imageIdx = columns.findIndex((c) => /image|cover|art|poster/i.test(c));
+  return {
+    sectionIdx,
+    labelIdx,
+    valueIdx,
+    imageIdx: imageIdx >= 0 ? imageIdx : null,
+  };
+}
+
+/** A section name that names the wrapped header (the "2024 in review" line). */
+const WRAPPED_HEADER_RE = /^(year|title|header|review|wrapped)$/i;
+
+function WrappedView({
+  columns,
+  rows,
+  art,
+  onOpen,
+}: {
+  columns: string[];
+  rows: unknown[][];
+  art?: Record<string, string>;
+  onOpen?: (url: string) => void;
+}) {
+  const { header, sections } = useMemo(() => {
+    const { sectionIdx, labelIdx, valueIdx, imageIdx } =
+      resolveWrappedColumns(columns);
+    const order: string[] = [];
+    const byName = new Map<string, WrappedSection>();
+    let hdr: string | null = null;
+    for (const r of rows) {
+      const section = displayCell(r[sectionIdx]).trim() || 'Highlights';
+      const label = displayCell(r[labelIdx]);
+      const value = r[valueIdx];
+      const rawImg = imageIdx !== null ? r[imageIdx] : null;
+      const image = typeof rawImg === 'string' && rawImg ? rawImg : null;
+      // A header-ish section (year/title) sets the card header rather than a
+      // panel — its label is the "2024 in review" title.
+      if (WRAPPED_HEADER_RE.test(section)) {
+        if (!hdr && label) hdr = label;
+        continue;
+      }
+      let sec = byName.get(section);
+      if (!sec) {
+        sec = { name: section, rows: [], hasImage: false };
+        byName.set(section, sec);
+        order.push(section);
+      }
+      sec.rows.push({ label, value, image });
+      if (image) sec.hasImage = true;
+    }
+    return {
+      header: hdr,
+      sections: order.map((n) => byName.get(n)!),
+    };
+  }, [columns, rows]);
+
+  if (!sections.length) {
+    return <div style={emptyStyle}>No wrapped sections to show</div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 24,
+          fontWeight: 800,
+          letterSpacing: -0.4,
+          lineHeight: 1.1,
+        }}
+      >
+        {header ?? 'Year in review'}
+      </h2>
+      {sections.map((sec, si) => (
+        <section
+          key={si}
+          style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              opacity: 0.6,
+            }}
+          >
+            {sec.name}
+          </h3>
+          {/* A single value-less-or-single row reads as a stat; else a ranked
+              list (with covers when the section carries images). */}
+          {sec.rows.length === 1 && !sec.hasImage ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 26,
+                  fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
+                  lineHeight: 1,
+                }}
+              >
+                {sec.rows[0].label}
+              </span>
+            </div>
+          ) : (
+            <ol
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              {sec.rows.map((r, ri) => {
+                const src = (r.image && (art?.[r.image] ?? r.image)) || '';
+                const valueStr = isNumericCell(r.value)
+                  ? formatNumber(toNumber(r.value))
+                  : r.value !== null && r.value !== undefined
+                    ? displayCell(r.value)
+                    : '';
+                return (
+                  <li
+                    key={ri}
+                    role={onOpen && r.image ? 'button' : undefined}
+                    onClick={
+                      onOpen && r.image ? () => onOpen(r.image!) : undefined
+                    }
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      cursor: onOpen && r.image ? 'pointer' : 'default',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 20,
+                        textAlign: 'right',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        opacity: 0.4,
+                        flexShrink: 0,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {ri + 1}
+                    </span>
+                    {sec.hasImage ? (
+                      <span
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 6,
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          background:
+                            'var(--color-background-secondary, rgba(0,0,0,0.04))',
+                        }}
+                      >
+                        {src ? (
+                          <img
+                            src={src}
+                            alt={r.label}
+                            loading="lazy"
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        ) : null}
+                      </span>
+                    ) : null}
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {r.label}
+                    </span>
+                    {valueStr ? (
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          fontVariantNumeric: 'tabular-nums',
+                          opacity: 0.65,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {valueStr}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+}
+
 // ── top-level component ──────────────────────────────────────────────
 export function QueryResult({
   payload,
@@ -2847,6 +3261,8 @@ export function QueryResult({
   const tabs = useMemo<ViewMode[]>(() => {
     const order: ViewMode[] = [
       'table',
+      'detail',
+      'wrapped',
       'stat',
       'calendar',
       'clock',
@@ -2864,10 +3280,17 @@ export function QueryResult({
       'grid',
       'mosaic',
     ];
+    // `wrapped` is NEVER auto-detected (it's not in detection.available); it's
+    // a curated composite that only appears when explicitly forced via `view`.
+    const forcedView =
+      payload.view && payload.view !== 'auto' ? payload.view : null;
     return order.filter(
-      (v) => v === 'table' || detection.available.includes(v)
+      (v) =>
+        v === 'table' ||
+        detection.available.includes(v) ||
+        (v === 'wrapped' && forcedView === 'wrapped')
     );
-  }, [detection.available]);
+  }, [detection.available, payload.view]);
 
   // Honour explicit server `view`, else fall back to detection's auto view
   // (but only if it's actually available). Table otherwise.
@@ -3095,6 +3518,27 @@ export function QueryResult({
               valueIndex={detection.calendarValueIndex}
             />
           )}
+        {view === 'detail' &&
+          detection.detailImageIndex !== null &&
+          detection.detailNameIndex !== null && (
+            <DetailView
+              columns={columns}
+              row={rows[0]}
+              imageIndex={detection.detailImageIndex}
+              nameIndex={detection.detailNameIndex}
+              numericCols={numericCols}
+              art={payload.art}
+              onOpen={onOpen}
+            />
+          )}
+        {view === 'wrapped' && (
+          <WrappedView
+            columns={columns}
+            rows={rows}
+            art={payload.art}
+            onOpen={onOpen}
+          />
+        )}
       </div>
     </article>
   );

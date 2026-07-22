@@ -18,7 +18,8 @@ export const queryOutputSchema = z
      * bundle: 'auto' (auto-detect) or a forced 'table' | 'chart' | 'map' |
      * 'grid' | 'calendar' | 'clock' | 'stat' | 'list' | 'histogram' |
      * 'scatter' | 'stacked' | 'treemap' | 'sankey' | 'mosaic' | 'density' |
-     * 'gallery' | 'streak'. Present on every result; ignored by non-UI hosts.
+     * 'gallery' | 'streak' | 'detail' | 'wrapped'. Present on every result;
+     * ignored by non-UI hosts.
      */
     view: z
       .enum([
@@ -40,6 +41,8 @@ export const queryOutputSchema = z
         'density',
         'gallery',
         'streak',
+        'detail',
+        'wrapped',
       ])
       .optional(),
     /**

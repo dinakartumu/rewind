@@ -353,6 +353,50 @@ const streakStrip: QueryResultShape = (() => {
   return { columns: ['day', 'km'], rows };
 })();
 
+/**
+ * A SINGLE row carrying a CDN cover URL plus several mixed fields → entity
+ * detail. One album: name + cover + artist + year + playcount + an accent hex.
+ * Richer than the all-numeric `stat` case, so `auto` is `detail`.
+ */
+const entityDetail: QueryResultShape = {
+  columns: ['album', 'cover', 'artist', 'released_year', 'playcount', 'accent'],
+  rows: [
+    [
+      'GUTS',
+      `${CDN}/listening/albums/1/original.jpg?v=1`,
+      'Olivia Rodrigo',
+      2023,
+      4120,
+      '#c8763a',
+    ],
+  ],
+};
+
+/**
+ * A curated year-in-review "wrapped" composite. NOT auto-detected — the model
+ * REQUESTS it via `view: 'wrapped'`. The documented input contract is a
+ * UNION-ALL across domains producing labeled highlight rows grouped by
+ * `section`: columns `section, label, value, image?` (image optional). The
+ * wrapped view groups rows by `section` and renders each as a mini panel
+ * (ranked list with covers when images are present, else a labeled text/stat
+ * panel). A `year`/title row is used to derive the header.
+ */
+const yearWrapped: QueryResultShape = {
+  view: 'wrapped',
+  columns: ['section', 'label', 'value', 'image'],
+  rows: [
+    ['Year', '2024 in review', null, null],
+    ['Top Artists', 'Olivia Rodrigo', 4120, `${CDN}/listening/artists/1/o.jpg`],
+    ['Top Artists', 'Taylor Swift', 3880, `${CDN}/listening/artists/2/o.jpg`],
+    ['Top Artists', 'Clairo', 2540, `${CDN}/listening/artists/3/o.jpg`],
+    ['Top Films', 'Dune: Part Two', 5, `${CDN}/watching/movies/1/o.jpg`],
+    ['Top Films', 'Poor Things', 5, `${CDN}/watching/movies/2/o.jpg`],
+    ['Miles Run', '842 miles', 842, null],
+    ['Places', 'San Francisco', 128, null],
+    ['Places', 'Oakland', 41, null],
+  ],
+};
+
 /** Same image-grid data but forced to the table view via `view`. */
 const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 
@@ -376,5 +420,7 @@ export const fixtures: Record<string, QueryResultShape> = {
   'density-map': densityMap,
   'route-gallery': routeGallery,
   'streak-strip': streakStrip,
+  'entity-detail': entityDetail,
+  'year-wrapped': yearWrapped,
   'forced-table': forcedTable,
 };

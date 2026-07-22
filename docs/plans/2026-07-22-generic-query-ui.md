@@ -147,6 +147,26 @@ Never throws; **table is always available and is the universal fallback.**
   **current (trailing) streak**, and **active-day count** are annotated.
   Complements the calendar grid with a streak-focused read. **Never the `auto`
   default** — `calendar` keeps that; streak is purely an extra tab.
+- **detail** (entity detail) — a **single row** (row_count === 1) that carries
+  a **CDN image-URL column** PLUS a name/label column AND **≥2 columns beyond the
+  image** → a rich single-entity card: a large cover, the primary name/title (a
+  `name`/`title`/`album`/… column, else the first text col), then the remaining
+  columns as a **humanized labeled field list** (formatted numbers, readable
+  dates, hex→swatch, other CDN-image cols as small thumbs). This is the
+  single-row-WITH-image case — distinct from `stat` (single-row ALL-numeric KPI
+  tiles). It becomes the `auto` view for that shape, sitting **above stat and
+  grid/list**, so a 1-row all-numeric result stays `stat` and a multi-row image
+  result stays grid/list. A bare 1-row image+label (2 cols) stays grid/list.
+- **wrapped** (year-in-review) — a **curated composite the model REQUESTS via
+  `view:'wrapped'`; NEVER auto-detected** (it is not in `detection.available`).
+  It reads a documented UNION-ALL contract: highlight rows with columns
+  `section, label, value, image` (image optional), grouped by `section`. Rows
+  are grouped by section (order-preserving) and each section renders as a mini
+  panel — a **ranked list with covers** when the section has images, else a
+  **labeled stat**. A leading `SELECT 'Year' AS section, '<year> in review' AS
+label, NULL, NULL` row titles the card. Resilient: unknown sections render
+  generically; missing images fall back to text. Only appears as a tab when
+  `view:'wrapped'` is forced.
 - **table** — everything else, and the fallback whenever a richer view fails.
 
 **Stacked-vs-sankey default rule.** `stacked` and `sankey` share the 3-col
@@ -163,7 +183,10 @@ free-form text) satisfies sankey and, because col0 (`genre`) isn't period-ish,
 defaults to **sankey** (with a `stacked` tab still available).
 
 **Auto priority (finalized):**
-`gallery > map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+`gallery > map > calendar > clock > detail > stat > (grid | list) > (stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+`detail` (1-row with an image + several fields) sits above `stat` and
+`grid/list`. `wrapped` is NEVER in the auto priority — it activates only when
+`view:'wrapped'` is explicitly forced.
 `gallery` (≥4 polyline routes) is a NEW auto default sitting just above `map` (a
 wall of route shapes beats a single overlaid map). `density` (point-map tab) and
 `streak` (daily-date tab) are **additional tabs** layered onto shapes that
@@ -236,6 +259,22 @@ strava_activities GROUP BY day` (daily dates + a count → the `calendar` heatma
   by default, with a **streak** tab annotating consecutive-day runs — longest /
   current streak). Same shape as calendar; streak is the extra tab, never the
   auto default.
+- **detail** — `SELECT al.name AS album, '<cdn_url>' AS cover, ar.name AS artist,
+al.released_year, al.playcount, i.accent_color AS accent FROM lastfm_albums al
+JOIN lastfm_artists ar ON ar.id = al.artist_id … WHERE al.id = 1` (ONE row with
+  a cover URL + several fields → a rich single-entity card). A single-row
+  all-numeric result (no image) stays `stat`.
+- **wrapped** — `view:'wrapped'` with a cross-domain UNION-ALL:
+  `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS
+image UNION ALL SELECT 'Top Artists', ar.name, ar.playcount, '<cdn_url>' FROM
+lastfm_artists ar WHERE ar.is_filtered = 0 ORDER BY ar.playcount DESC LIMIT 3
+UNION ALL SELECT 'Top Films', m.title, wh.user_rating, '<poster_url>' FROM
+watch_history wh JOIN movies m ON m.id = wh.movie_id … UNION ALL SELECT
+'Miles Run', CAST(ROUND(SUM(distance)/1609.34) AS TEXT) || ' miles',
+SUM(distance), NULL FROM strava_activities WHERE started_at LIKE '2024%'`
+  (labeled highlight rows grouped by `section` → the year-in-review card). Every
+  SELECT projects the SAME four columns in order; aliases only on the first.
+  Never auto-selected — always requested via `view:'wrapped'`.
 
 ## Map view — Leaflet with a configurable tile provider
 
@@ -374,10 +413,37 @@ default). The `view` input enum + result schema grew to
 `gallery > map > calendar > clock > stat > (grid | list) > (stacked | sankey) >
 scatter > histogram > (chart | treemap) > table`.
 
+**Added later (final section-B batch, issue #4):** two more views, again
+pure-detection/curated + inline-SVG-free DOM, **zero new runtime deps** —
+**detail** (a rich single-ENTITY card: a SINGLE-ROW result carrying a CDN image
+URL column PLUS several other fields → a large cover, the primary name/title,
+and the remaining columns as a humanized labeled field list, with hex→swatch and
+other CDN-image cols as small thumbs; it becomes the `auto` view for the
+single-row-with-image shape, sitting above `stat` and `grid/list` so a 1-row
+all-numeric result stays `stat` and a multi-row image result stays grid/list),
+and **wrapped** (a CURATED year-in-review composite that is **never
+auto-detected** — the model requests it via `view:'wrapped'`). The wrapped view
+reads a documented UNION-ALL contract: highlight rows with columns
+`section, label, value, image` (image optional), grouped by `section`. It groups
+rows by section (order-preserving) and renders each as a mini panel — a ranked
+list with covers when the section carries images, else a labeled stat; a
+leading `SELECT 'Year' AS section, '<year> in review' AS label, NULL, NULL`
+titles the card. Resilient: unknown sections render generically and missing
+images fall back to text. `detail`'s detection is pure in `query-view.ts`
+(`detailImageIndex`/`detailNameIndex`); `wrapped` has no detector (never in
+`detection.available`) and only appears as a tab when forced. The `view` input
+enum + result schema grew to `… | detail | wrapped`. Final auto priority:
+`gallery > map > calendar > clock > detail > stat > (grid | list) >
+(stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+
+The **wrapped query contract** is also documented in the `query_rewind` tool
+description and in a `get_schema` global note (parent `src/lib/schema-doc.ts`),
+with an example cross-domain UNION so the model knows how to build it.
+
 **Added:** `web/lib/query-view.ts` (detection), `web/lib/geo-projection.ts`
 (SVG fallback projector, ported from the website), `leaflet` (bundled
 dependency powering the OSM slippy map), `web/components/QueryResult.tsx`
-(18 views
+(20 views
 
 - switcher), `web/query-result.{tsx,html,fixtures.ts}`, and the `view` input
   arg + result `_meta` wiring in `query.ts`.

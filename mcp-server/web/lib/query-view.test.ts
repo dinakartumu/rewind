@@ -512,6 +512,52 @@ describe('detectView', () => {
     expect(d.streakEligible).toBe(false);
   });
 
+  // ── entity detail (single row + image + several fields) ──────────────
+  it('auto-selects detail for a single row with an image + several fields', () => {
+    const d = detectView(fixtures['entity-detail']);
+    expect(d.auto).toBe('detail');
+    expect(d.available).toContain('detail');
+    expect(d.detailImageIndex).not.toBeNull();
+    expect(d.detailNameIndex).not.toBeNull();
+    // The cover column is the image; the primary name is the `album` column.
+    expect(d.detailImageIndex).toBe(1);
+    expect(d.detailNameIndex).toBe(0);
+  });
+
+  it('does NOT detail a single-row ALL-numeric result (stays stat)', () => {
+    // stat-cards is 1 row, all numeric, NO image → detail must not fire.
+    const d = detectView(fixtures['stat-cards']);
+    expect(d.auto).toBe('stat');
+    expect(d.available).not.toContain('detail');
+    expect(d.detailImageIndex).toBeNull();
+  });
+
+  it('does NOT detail a MULTI-row image result (stays grid/list)', () => {
+    const d = detectView(fixtures['ranked-list']);
+    expect(d.auto).toBe('list');
+    expect(d.available).not.toContain('detail');
+    expect(d.detailImageIndex).toBeNull();
+  });
+
+  it('does NOT detail a bare single-row image+label (too few fields → grid)', () => {
+    // 1 row, image + label ONLY (2 cols) — not richer than the KPI/grid case.
+    const d = detectView({
+      columns: ['album', 'cover'],
+      rows: [['GUTS', 'https://cdn.dinakartumu.com/a/1.jpg']],
+    });
+    expect(d.available).not.toContain('detail');
+    expect(d.detailImageIndex).toBeNull();
+  });
+
+  // ── year-in-review wrapped (explicit only, never auto) ───────────────
+  it('never AUTO-selects wrapped even for its section-shaped result', () => {
+    // Strip the forced view: detection alone must not pick wrapped.
+    const { view: _v, ...rest } = fixtures['year-wrapped'];
+    const d = detectView(rest as (typeof fixtures)['year-wrapped']);
+    expect(d.auto).not.toBe('wrapped');
+    expect(d.available).not.toContain('wrapped');
+  });
+
   // ── priority integration: existing cases unchanged ───────────────────
   it('leaves existing auto selections unchanged by the new views', () => {
     expect(detectView(fixtures['scalar-table']).auto).toBe('table');

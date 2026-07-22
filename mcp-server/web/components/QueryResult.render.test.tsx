@@ -443,6 +443,81 @@ describe('StreakView render', () => {
   });
 });
 
+// ── ENTITY DETAIL ────────────────────────────────────────────────────
+describe('DetailView render', () => {
+  it('renders the cover image, the primary name, and a humanized field list', async () => {
+    const fx = fixtures['entity-detail']; // 1 row, auto → detail
+    expect(detectView(fx).auto).toBe('detail');
+    const container = await mount(fx);
+    const c = card(container);
+    // The large cover <img> points at the CDN origin.
+    const imgs = c.querySelectorAll('img');
+    expect(imgs.length).toBeGreaterThanOrEqual(1);
+    expect(
+      [...imgs].some((im) => im.getAttribute('src')?.includes(`${CDN}/`))
+    ).toBe(true);
+    // Primary name renders as a heading.
+    expect(within(c).getByText('GUTS')).toBeTruthy();
+    // Remaining columns render as a labeled field list (humanized labels).
+    expect(c.textContent).toContain('Artist');
+    expect(c.textContent).toContain('Olivia Rodrigo');
+    expect(c.textContent).toContain('Released Year');
+    // Playcount formatted with a thousands separator.
+    expect(c.textContent).toContain('4,120');
+    // The hex accent renders as a swatch + value.
+    expect(c.textContent).toContain('#c8763a');
+    // The cover image column is NOT repeated as a field label.
+    const dtLabels = [...c.querySelectorAll('dt')].map((d) => d.textContent);
+    expect(dtLabels).not.toContain('Cover');
+  });
+});
+
+// ── YEAR-IN-REVIEW WRAPPED ───────────────────────────────────────────
+describe('WrappedView render', () => {
+  it('renders the header plus a panel per section with ranked items', async () => {
+    // year-wrapped carries view:'wrapped' — forced, never auto.
+    const fx = fixtures['year-wrapped'];
+    const container = await mount(fx);
+    const c = card(container);
+    // Header derived from the `Year` section's label.
+    expect(within(c).getByText('2024 in review')).toBeTruthy();
+    // Section headings render for each non-header section.
+    for (const section of ['Top Artists', 'Top Films', 'Miles Run', 'Places']) {
+      expect(c.textContent).toContain(section);
+    }
+    // Ranked items inside a section.
+    expect(c.textContent).toContain('Olivia Rodrigo');
+    expect(c.textContent).toContain('Dune: Part Two');
+    expect(c.textContent).toContain('San Francisco');
+    // Image-bearing sections render covers (CDN <img>s).
+    const imgs = [...c.querySelectorAll('img')];
+    expect(imgs.some((im) => im.getAttribute('src')?.includes(`${CDN}/`))).toBe(
+      true
+    );
+    // A single-row image-less section (Miles Run) renders its value text.
+    expect(c.textContent).toContain('842 miles');
+    // The `Year` header row is NOT rendered as its own section heading.
+    const headings = [...c.querySelectorAll('h3')].map((h) => h.textContent);
+    expect(headings).not.toContain('Year');
+  });
+
+  it('renders whenever view:wrapped is forced, regardless of shape', async () => {
+    // A generic 2-col result forced to wrapped still renders a card, not a crash.
+    const generic: QueryResultShape = {
+      view: 'wrapped',
+      columns: ['section', 'label'],
+      rows: [
+        ['Top Reads', 'The Atlantic'],
+        ['Top Reads', 'Stratechery'],
+      ],
+    };
+    const container = await mount(generic);
+    const c = card(container);
+    expect(c.textContent).toContain('Top Reads');
+    expect(c.textContent).toContain('The Atlantic');
+  });
+});
+
 // ── RESOLVER → RENDER INTEGRATION ────────────────────────────────────
 // Feed each fixture WITHOUT forcing `view` and assert the AUTO-detected view
 // renders its expected root marker. This proves detection + rendering are
@@ -475,6 +550,11 @@ describe('resolver → render integration', () => {
         break;
       case 'mosaic':
         expect(c.querySelector('img')).toBeTruthy();
+        break;
+      case 'detail':
+        // Rich entity card: a cover <img> plus a humanized field list (<dt>).
+        expect(c.querySelector('img')).toBeTruthy();
+        expect(c.querySelectorAll('dt').length).toBeGreaterThan(0);
         break;
       case 'stat':
         // KPI tiles are divs (no table/img/svg); assert a humanized label tile.

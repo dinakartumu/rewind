@@ -52,7 +52,9 @@ export type ViewMode =
   | 'mosaic'
   | 'density'
   | 'gallery'
-  | 'streak';
+  | 'streak'
+  | 'detail'
+  | 'wrapped';
 
 /** Public CDN origin — a cell under this host is Rewind artwork. */
 export const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
@@ -325,6 +327,19 @@ export type Detection = {
    * eligibility. Never becomes `auto` — `calendar` keeps that.
    */
   streakEligible: boolean;
+  /**
+   * Entity detail: a SINGLE-ROW result (row_count === 1) that carries a CDN
+   * image URL column PLUS several other fields (richer than the all-numeric
+   * `stat` KPI case). Renders a rich single-entity card — the cover/poster
+   * large, the primary name/title, then the remaining columns as a labeled
+   * field list. `detailImageIndex` is the large cover column; `detailNameIndex`
+   * is the primary title column (first name/title-ish text col, else first
+   * text col). Becomes the `auto` view for the single-row-with-image shape (a
+   * 1-row all-numeric result stays `stat`; a multi-row image result stays
+   * grid/list). Null when the shape isn't a single entity with an image.
+   */
+  detailImageIndex: number | null;
+  detailNameIndex: number | null;
 };
 
 /** One histogram bucket: half-open [lo, hi) with the count of values inside. */
@@ -558,7 +573,28 @@ export function detectView(result: QueryResultShape): Detection {
   const hasClock = clockKind !== null;
   if (hasClock) available.push('clock');
 
-  // STAT: exactly one row AND ≥1 numeric column → big-number KPI tiles.
+  // ENTITY DETAIL: exactly one row that carries a CDN image column PLUS several
+  // other fields → a rich single-entity card (large cover + primary name + a
+  // labeled field list of the rest). This is the single-row-WITH-image case,
+  // distinct from `stat` (single-row ALL-numeric KPI tiles). Requires an image
+  // column, a primary name/title column, and ≥2 columns beyond the image
+  // (i.e. ≥3 columns total) so a bare image+label 1-row grid stays grid/list.
+  let detailImageIndex: number | null = null;
+  let detailNameIndex: number | null = null;
+  if (rows.length === 1 && imageIndex !== null && labelIndex !== null) {
+    // Fields beyond the cover image: everything that isn't the image column.
+    const nonImageCols = cols.filter((c) => c.index !== imageIndex).length;
+    if (nonImageCols >= 2) {
+      detailImageIndex = imageIndex;
+      detailNameIndex = labelIndex;
+    }
+  }
+  const hasDetail = detailImageIndex !== null;
+  if (hasDetail) available.push('detail');
+
+  // STAT: exactly one row AND ≥1 numeric column → big-number KPI tiles. A
+  // single-row-with-image result prefers `detail` (above) but `stat` stays
+  // available as a tab whenever there's a numeric column.
   const hasStat = rows.length === 1 && numericColInfos.length >= 1;
   if (hasStat) available.push('stat');
 
@@ -795,8 +831,12 @@ export function detectView(result: QueryResultShape): Detection {
   if (hasTreemap) available.push('treemap');
 
   // Default view priority:
-  //   gallery > map > calendar > clock > stat > (grid|list) >
+  //   gallery > map > calendar > clock > detail > stat > (grid|list) >
   //   (stacked|sankey) > scatter > histogram > (chart|treemap) > table.
+  // detail (1 row WITH an image + several fields) sits above stat and grid/list
+  // so a single entity renders as a rich card; a 1-row all-numeric result stays
+  // stat and a multi-row image result stays grid/list. wrapped is NEVER auto —
+  // it activates only when `view: 'wrapped'` is explicitly forced.
   // gallery (≥4 polyline routes) is a NEW auto default sitting just above map:
   // a wall of route shapes beats a single overlaid map. density (point-map
   // tab) and streak (daily-date tab) are ADDITIONAL tabs on existing shapes and
@@ -821,6 +861,10 @@ export function detectView(result: QueryResultShape): Detection {
   else if (hasMap) auto = 'map';
   else if (hasCalendar) auto = 'calendar';
   else if (hasClock) auto = 'clock';
+  // DETAIL sits above stat AND grid/list: a single row WITH an image resolves
+  // to the rich entity card, while a single-row all-numeric result (no image)
+  // falls through to `stat` and a multi-row image result to grid/list.
+  else if (hasDetail) auto = 'detail';
   else if (hasStat) auto = 'stat';
   else if (hasArtList) auto = metricIndex !== null ? 'list' : 'grid';
   else if (hasStacked || hasSankey)
@@ -865,5 +909,7 @@ export function detectView(result: QueryResultShape): Detection {
     galleryPolylineIndex,
     galleryLabelIndex,
     streakEligible,
+    detailImageIndex,
+    detailNameIndex,
   };
 }
