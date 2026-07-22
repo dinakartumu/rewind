@@ -33,7 +33,7 @@ import { fixtures as artistFixtures } from '../../web/artist.fixtures';
 import { fixtures as attendedPlayerFixtures } from '../../web/attended-player.fixtures';
 import { fixtures as topTracksFixtures } from '../../web/top-tracks.fixtures';
 import { fixtures as queryResultFixtures } from '../../web/query-result.fixtures';
-import type { QueryResultShape } from '../../web/lib/query-view';
+import { detectView, type QueryResultShape } from '../../web/lib/query-view';
 
 import type { EventDetail } from '../../web/components/GameCard';
 import type { ArticlePayload } from '../../web/components/ArticleDetail';
@@ -89,6 +89,39 @@ export type ComponentEntry = {
   /** Loads the production-built HTML bundle, or null if not yet built. */
   getBuiltHtml: () => Promise<string | null>;
 };
+
+/**
+ * The generic `query_rewind` renderer produces ~20 distinct visual views from
+ * one component, chosen by shape detection. In production they're a single UI
+ * bundle (`query-result.html`); in the workbench we surface EACH view as its
+ * own browsable page so designers can deep-link to a specific view — e.g.
+ * `?c=query-calendar-heatmap&v=default`. Every entry reuses the same component
+ * and built bundle; only the fixture differs. `producedBy` is annotated with
+ * the auto-detected view so the sidebar reads which shape each page exercises.
+ */
+const queryResultEntries: ComponentEntry[] = Object.entries(
+  queryResultFixtures
+).map(([key, fixture]) => {
+  const view =
+    fixture.view && fixture.view !== 'auto'
+      ? fixture.view
+      : detectView(fixture).auto;
+  const spaced = key.replace(/[-_]/g, ' ');
+  const displayName = `Query · ${spaced.charAt(0).toUpperCase()}${spaced.slice(1)}`;
+  return {
+    id: `query-${key}`,
+    displayName,
+    producedBy: `query_rewind · ${view}`,
+    defaultViewport: 'desktop',
+    // A single `default` fixture so the sidebar's `setVariant('default')` and
+    // the example `?v=default` URL both resolve to this view's data.
+    fixtures: { default: fixture },
+    getBuiltHtml: makeBuiltLoader('query-result.html'),
+    render: (f: unknown) => (
+      <QueryResult payload={f as QueryResultShape} onOpen={defaultOpen} />
+    ),
+  };
+});
 
 export const COMPONENTS: ComponentEntry[] = [
   {
@@ -200,15 +233,5 @@ export const COMPONENTS: ComponentEntry[] = [
       <TopTracks payload={f as TopTracksPayload} onOpen={defaultOpen} />
     ),
   },
-  {
-    id: 'query-result',
-    displayName: 'Query result',
-    producedBy: 'query_rewind',
-    defaultViewport: 'desktop',
-    fixtures: queryResultFixtures,
-    getBuiltHtml: makeBuiltLoader('query-result.html'),
-    render: (f) => (
-      <QueryResult payload={f as QueryResultShape} onOpen={defaultOpen} />
-    ),
-  },
+  ...queryResultEntries,
 ];
