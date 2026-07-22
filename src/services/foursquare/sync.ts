@@ -6,6 +6,7 @@ import { FoursquareClient, type FoursquareCheckin } from './client.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import type { Env } from '../../types/env.js';
+import { reconcileCheckinIcons } from './category-icons.js';
 
 const PAGE_SIZE = 250;
 const DEFAULT_MAX_PAGES = 8;
@@ -212,6 +213,20 @@ export async function syncPlaces(
     const client = new FoursquareClient(accessToken);
 
     const result = await syncCheckins(db, client, userId, options);
+
+    // Mirror category glyphs to our CDN and rewrite any rows still pointing at
+    // the raw 4sqi host (new inserts + any left behind by earlier syncs).
+    // Isolated so an icon-mirror hiccup never fails the check-in sync.
+    try {
+      const { mirrored } = await reconcileCheckinIcons(env, db, userId);
+      if (mirrored > 0) {
+        console.log(`[SYNC] Foursquare mirrored ${mirrored} category icon(s)`);
+      }
+    } catch (iconErr) {
+      console.log(
+        `[ERROR] Foursquare icon mirror failed: ${iconErr instanceof Error ? iconErr.message : String(iconErr)}`
+      );
+    }
 
     await db
       .update(syncRuns)
