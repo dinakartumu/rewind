@@ -1,9 +1,13 @@
 name: Release Please
 
+# Manual-only: opening a release PR requires the repo setting
+# "Allow GitHub Actions to create and approve pull requests" (Settings ->
+# Actions -> General -> Workflow permissions). Until that's enabled this
+# would fail on every push, so it's gated behind workflow_dispatch. Re-add
+# the `push: branches: [main]` trigger once the setting is on to resume
+# automatic release PRs.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
