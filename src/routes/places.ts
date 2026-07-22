@@ -4,6 +4,7 @@ import { createDb } from '../db/client.js';
 import { checkins } from '../db/schema/places.js';
 import { setCache } from '../lib/cache.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
+import { bucketByPeriod } from '../lib/period-breakdown.js';
 import { createOpenAPIApp } from '../lib/openapi.js';
 import {
   errorResponses,
@@ -218,6 +219,52 @@ const trendsRoute = createRoute({
   },
 });
 
+// 4. GET /categories — per-month category breakdown for the stacked chart
+const categoriesRoute = createRoute({
+  method: 'get',
+  path: '/categories',
+  operationId: 'getPlacesCategories',
+  tags: ['Places'],
+  summary: 'Category breakdown by month',
+  description:
+    'Per-month venue-category buckets for the stacked monthly chart. Each check-in counts under its venue category. Returns { period (YYYY-MM), categories: {name: count} with the top `limit` kept and the rest folded into "Other", total }. Supports date filtering.',
+  request: {
+    query: z
+      .object({
+        limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+      })
+      .merge(DateFilterQuery),
+  },
+  responses: {
+    200: {
+      description: 'Category buckets by month',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(
+              z.object({
+                period: z.string(),
+                categories: z.record(z.string(), z.number()),
+                total: z.number(),
+              })
+            ),
+          }),
+          example: {
+            data: [
+              {
+                period: '2026-01',
+                categories: { 'Coffee Shop': 6, Restaurant: 4, Other: 3 },
+                total: 13,
+              },
+            ],
+          },
+        },
+      },
+    },
+    ...errorResponses(400, 401),
+  },
+});
+
 // ─── Handlers ────────────────────────────────────────────────────────
 
 function formatCheckin(row: typeof checkins.$inferSelect) {
@@ -395,6 +442,41 @@ places.openapi(trendsRoute, async (c) => {
     period: 'monthly',
     data: trendData.map((t) => ({ period: t.period, count: t.total })),
   });
+});
+
+// 4. GET /categories — per-month category breakdown for the stacked chart
+places.openapi(categoriesRoute, async (c) => {
+  setCache(c, 'medium');
+  const db = createDb(c.env.DB);
+
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? 10)), 50);
+  const conditions = [
+    eq(checkins.userId, 1),
+    sql`${checkins.venueCategory} IS NOT NULL`,
+  ];
+  const dateCondition = buildDateCondition(checkins.checkedInAt, c.req.query());
+  if (dateCondition) conditions.push(dateCondition);
+
+  const rows = await db
+    .select({
+      period: sql<string>`substr(${checkins.checkedInAt}, 1, 7)`,
+      name: checkins.venueCategory,
+      count: sql<number>`count(*)`,
+    })
+    .from(checkins)
+    .where(and(...conditions))
+    .groupBy(
+      sql`substr(${checkins.checkedInAt}, 1, 7)`,
+      checkins.venueCategory
+    );
+
+  const data = bucketByPeriod(rows, limit).map((b) => ({
+    period: b.period,
+    categories: b.items,
+    total: b.total,
+  }));
+
+  return c.json({ data });
 });
 
 export default places;

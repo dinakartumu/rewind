@@ -4,6 +4,7 @@ import { createDb } from '../db/client.js';
 import { setCache } from '../lib/cache.js';
 import { requireAuth } from '../lib/auth.js';
 import { DateFilterQuery, buildDateCondition } from '../lib/date-filters.js';
+import { bucketByPeriod } from '../lib/period-breakdown.js';
 import { notFound, badRequest } from '../lib/errors.js';
 import {
   movies,
@@ -523,6 +524,51 @@ const genreStatsRoute = createRoute({
               { name: 'Drama', count: 280, percentage: 36.2 },
               { name: 'Comedy', count: 195, percentage: 25.2 },
               { name: 'Action', count: 142, percentage: 18.4 },
+            ],
+          },
+        },
+      },
+    },
+    ...errorResponses(401),
+  },
+});
+
+const genresByMonthRoute = createRoute({
+  method: 'get',
+  path: '/genres',
+  operationId: 'getWatchingGenres',
+  tags: ['Watching'],
+  summary: 'Genre breakdown by month',
+  description:
+    'Per-month movie-genre buckets for the stacked monthly chart. Each watch is assigned its film’s primary genre (lowest genre id), so counts sum to watch counts. Returns { period (YYYY-MM), genres: {name: count} with the top `limit` kept and the rest folded into "Other", total }. Supports date filtering.',
+  request: {
+    query: z
+      .object({
+        limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+      })
+      .merge(DateFilterQuery),
+  },
+  responses: {
+    200: {
+      description: 'Genre buckets by month',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(
+              z.object({
+                period: z.string(),
+                genres: z.record(z.string(), z.number()),
+                total: z.number(),
+              })
+            ),
+          }),
+          example: {
+            data: [
+              {
+                period: '2026-01',
+                genres: { Drama: 6, Comedy: 3, Other: 2 },
+                total: 11,
+              },
             ],
           },
         },
@@ -1677,6 +1723,53 @@ watching.openapi(genreStatsRoute, async (c) => {
         totalMovies > 0 ? Math.round((g.total / totalMovies) * 1000) / 10 : 0,
     })),
   }) as any;
+});
+
+// ─── Genres by month (stacked chart) ─────────────────────────────────
+
+watching.openapi(genresByMonthRoute, async (c) => {
+  setCache(c, 'medium');
+  const db = createDb(c.env.DB);
+
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? 10)), 50);
+  const dateCondition = buildDateCondition(
+    watchHistory.watchedAt,
+    c.req.query()
+  );
+
+  // Each watch is assigned its film's primary genre (lowest genre id) so a
+  // multi-genre film counts once and monthly genre counts sum to watch counts.
+  const primaryGenre = db
+    .select({
+      movieId: movieGenres.movieId,
+      genreId: sql<number>`min(${movieGenres.genreId})`.as('genre_id'),
+    })
+    .from(movieGenres)
+    .groupBy(movieGenres.movieId)
+    .as('primary_genre');
+
+  const conditions = [eq(watchHistory.userId, 1)];
+  if (dateCondition) conditions.push(dateCondition);
+
+  const rows = await db
+    .select({
+      period: sql<string>`strftime('%Y-%m', ${watchHistory.watchedAt})`,
+      name: genres.name,
+      count: sql<number>`count(*)`,
+    })
+    .from(watchHistory)
+    .innerJoin(primaryGenre, eq(primaryGenre.movieId, watchHistory.movieId))
+    .innerJoin(genres, eq(genres.id, primaryGenre.genreId))
+    .where(and(...conditions))
+    .groupBy(sql`strftime('%Y-%m', ${watchHistory.watchedAt})`, genres.name);
+
+  const data = bucketByPeriod(rows, limit).map((b) => ({
+    period: b.period,
+    genres: b.items,
+    total: b.total,
+  }));
+
+  return c.json({ data }) as any;
 });
 
 // ─── Stats: Decades ──────────────────────────────────────────────────

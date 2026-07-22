@@ -10335,6 +10335,128 @@
         }
       }
     },
+    "/v1/watching/genres": {
+      "get": {
+        "operationId": "getWatchingGenres",
+        "tags": [
+          "Watching"
+        ],
+        "summary": "Genre breakdown by month",
+        "description": "Per-month movie-genre buckets for the stacked monthly chart. Each watch is assigned its film’s primary genre (lowest genre id), so counts sum to watch counts. Returns { period (YYYY-MM), genres: {name: count} with the top `limit` kept and the rest folded into \"Other\", total }. Supports date filtering.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Genre buckets by month",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "period": {
+                            "type": "string"
+                          },
+                          "genres": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "number"
+                            }
+                          },
+                          "total": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "period",
+                          "genres",
+                          "total"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "period": "2026-01",
+                      "genres": {
+                        "Drama": 6,
+                        "Comedy": 3,
+                        "Other": 2
+                      },
+                      "total": 11
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/watching/stats/decades": {
       "get": {
         "operationId": "getWatchingStatsDecades",
@@ -19899,6 +20021,138 @@
                     {
                       "period": "2026-03",
                       "count": 17
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/categories": {
+      "get": {
+        "operationId": "getPlacesCategories",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Category breakdown by month",
+        "description": "Per-month venue-category buckets for the stacked monthly chart. Each check-in counts under its venue category. Returns { period (YYYY-MM), categories: {name: count} with the top `limit` kept and the rest folded into \"Other\", total }. Supports date filtering.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category buckets by month",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "period": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "number"
+                            }
+                          },
+                          "total": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "period",
+                          "categories",
+                          "total"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "period": "2026-01",
+                      "categories": {
+                        "Coffee Shop": 6,
+                        "Restaurant": 4,
+                        "Other": 3
+                      },
+                      "total": 13
                     }
                   ]
                 }
