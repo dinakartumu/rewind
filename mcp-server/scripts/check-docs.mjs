@@ -43,6 +43,7 @@ const UNDOCUMENTED_ALLOWLIST = new Set([
   'ui://rewind/attended-season.html', // MCP Apps UI asset for get_attended_season (documented)
   'ui://rewind/attended-event.html', // MCP Apps UI asset for get_attended_event (documented)
   'ui://rewind/attended-player.html', // MCP Apps UI asset for get_attended_player_stats (documented)
+  'ui://rewind/query-result.html', // MCP Apps UI asset for query_rewind (generic result renderer)
   'ui://rewind/hello.html', // MCP Apps debug UI
 ]);
 
