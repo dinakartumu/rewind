@@ -3,6 +3,9 @@ main = "src/worker.ts"
 compatibility_date = "2026-03-12"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+# Pinned so CI's scoped API token deploys without a /memberships account
+# lookup (that endpoint 401s for account-scoped tokens). Not a secret.
+account_id = "e7feb32a6387962b71058b1d51853258"
 
 # Custom domain
 routes = [
