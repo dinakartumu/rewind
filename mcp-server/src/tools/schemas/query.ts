@@ -30,6 +30,9 @@ export const queryOutputSchema = z
         'clock',
         'stat',
         'list',
+        'histogram',
+        'scatter',
+        'stacked',
       ])
       .optional(),
     /**

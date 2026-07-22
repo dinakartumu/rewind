@@ -146,6 +146,64 @@ const hourClock: QueryResultShape = {
   ],
 };
 
+/**
+ * A single NUMERIC column of RAW values → histogram. ~40 movie ratings on a
+ * 0.5–5 scale; the detector bins the distribution rather than plotting one bar
+ * per row.
+ */
+const histogramDist: QueryResultShape = (() => {
+  const rows: number[][] = [];
+  let seed = 11;
+  for (let i = 0; i < 40; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    // ratings clustered around 3.5–4.5, in 0.5 steps over [1, 5].
+    const step = 2 + (seed % 7); // 2..8
+    const rating = Math.min(10, Math.max(2, step)) / 2; // 1.0 .. 5.0
+    rows.push([rating]);
+  }
+  return { columns: ['rating'], rows };
+})();
+
+/**
+ * Exactly TWO numeric columns (+ a text label) → scatter plot. Run pace vs
+ * distance, with the activity name as the point label.
+ */
+const scatterPlot: QueryResultShape = {
+  columns: ['distance_km', 'pace_min_km', 'name'],
+  rows: [
+    [5.1, 5.4, 'Morning shakeout'],
+    [10.3, 5.9, 'Long tempo'],
+    [3.2, 5.1, 'Recovery jog'],
+    [21.1, 6.4, 'Half marathon'],
+    [8.0, 5.6, 'Progression run'],
+    [4.5, 4.9, 'Track intervals'],
+    [16.2, 6.1, 'Weekend long'],
+    [6.4, 5.5, 'Easy miles'],
+    [12.9, 6.0, 'Marathon pace'],
+    [2.0, 4.7, 'Sprint session'],
+  ],
+};
+
+/**
+ * category (text) + series (text) + numeric value → stacked bar. Genre mix per
+ * year: years on the x-axis, genre segments stacked within each year.
+ */
+const stackedBars: QueryResultShape = {
+  columns: ['year', 'genre', 'count'],
+  rows: [
+    ['2023', 'Drama', 24],
+    ['2023', 'Comedy', 12],
+    ['2023', 'Horror', 8],
+    ['2024', 'Drama', 31],
+    ['2024', 'Comedy', 9],
+    ['2024', 'Horror', 14],
+    ['2024', 'Sci-Fi', 6],
+    ['2025', 'Drama', 18],
+    ['2025', 'Comedy', 15],
+    ['2025', 'Horror', 5],
+  ],
+};
+
 /** Same image-grid data but forced to the table view via `view`. */
 const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 
@@ -160,5 +218,8 @@ export const fixtures: Record<string, QueryResultShape> = {
   'stat-cards': statCards,
   'ranked-list': rankedList,
   'hour-clock': hourClock,
+  'histogram-dist': histogramDist,
+  'scatter-plot': scatterPlot,
+  'stacked-bars': stackedBars,
   'forced-table': forcedTable,
 };

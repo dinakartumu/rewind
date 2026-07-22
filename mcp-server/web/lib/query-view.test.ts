@@ -192,6 +192,108 @@ describe('detectView', () => {
     });
     expect(d.auto).toBe('table');
   });
+
+  // ── histogram (single numeric column of raw values) ──────────────────
+  it('detects a histogram for a single numeric column of raw values', () => {
+    const d = detectView(fixtures['histogram-dist']);
+    expect(d.auto).toBe('histogram');
+    expect(d.available).toContain('histogram');
+    expect(d.histogramValueIndex).toBe(0);
+    expect(d.histogramBins?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('does NOT treat a category + count as a histogram (stays a chart)', () => {
+    const d = detectView(fixtures['category-chart']);
+    expect(d.auto).toBe('chart');
+    expect(d.available).not.toContain('histogram');
+    expect(d.histogramValueIndex).toBeNull();
+  });
+
+  it('does NOT histogram a single numeric column with too few rows', () => {
+    const d = detectView({
+      columns: ['rating'],
+      rows: [[3], [4], [5], [4], [3]],
+    });
+    expect(d.available).not.toContain('histogram');
+    expect(d.histogramValueIndex).toBeNull();
+  });
+
+  // ── scatter (two numeric columns) ────────────────────────────────────
+  it('detects a scatter for exactly two numeric columns', () => {
+    const d = detectView(fixtures['scatter-plot']);
+    expect(d.auto).toBe('scatter');
+    expect(d.available).toContain('scatter');
+    expect(d.scatterXIndex).toBe(0);
+    expect(d.scatterYIndex).toBe(1);
+    // A trailing text column provides point labels.
+    expect(d.scatterLabelIndex).toBe(2);
+  });
+
+  it('does NOT treat a period + value (year, plays) as a scatter (chart)', () => {
+    const d = detectView({
+      columns: ['year', 'plays'],
+      rows: [
+        ['2019', 1200],
+        ['2020', 1400],
+        ['2021', 1800],
+        ['2022', 1600],
+        ['2023', 2200],
+      ],
+    });
+    expect(d.auto).toBe('chart');
+    expect(d.available).not.toContain('scatter');
+    expect(d.scatterXIndex).toBeNull();
+  });
+
+  it('does NOT scatter two numeric columns with too few rows', () => {
+    const d = detectView({
+      columns: ['x', 'y'],
+      rows: [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+      ],
+    });
+    expect(d.available).not.toContain('scatter');
+    expect(d.scatterXIndex).toBeNull();
+  });
+
+  // ── stacked bar (category + series + numeric) ────────────────────────
+  it('detects a stacked bar for category + series + numeric', () => {
+    const d = detectView(fixtures['stacked-bars']);
+    expect(d.auto).toBe('stacked');
+    expect(d.available).toContain('stacked');
+    expect(d.stackedCategoryIndex).toBe(0);
+    expect(d.stackedSeriesIndex).toBe(1);
+    expect(d.stackedValueIndex).toBe(2);
+  });
+
+  it('does NOT stack a plain category + metric (stays a chart)', () => {
+    const d = detectView(fixtures['category-chart']);
+    expect(d.auto).toBe('chart');
+    expect(d.available).not.toContain('stacked');
+    expect(d.stackedCategoryIndex).toBeNull();
+  });
+
+  it('does NOT stack when there is only one distinct category', () => {
+    const d = detectView({
+      columns: ['year', 'genre', 'count'],
+      rows: [
+        ['2024', 'Drama', 10],
+        ['2024', 'Comedy', 8],
+        ['2024', 'Horror', 4],
+      ],
+    });
+    expect(d.available).not.toContain('stacked');
+    expect(d.stackedCategoryIndex).toBeNull();
+  });
+
+  // ── priority among the new views ─────────────────────────────────────
+  it('a 3-col cat+series+num result goes stacked, not table or chart', () => {
+    const d = detectView(fixtures['stacked-bars']);
+    expect(d.auto).toBe('stacked');
+    expect(d.available).not.toContain('chart');
+  });
 });
 
 describe('cell classifiers', () => {

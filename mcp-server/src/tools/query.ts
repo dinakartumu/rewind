@@ -291,7 +291,7 @@ export function registerQueryTools(
     {
       title: 'Query Rewind (SQL)',
       description:
-        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. In MCP Apps hosts it ALSO renders an interactive view auto-selected from the result shape (or forced via `view`): a calendar heatmap when the result is a daily-date (YYYY-MM-DD) column plus one numeric column, a polar clock (radial histogram) when it is an hour-of-day (0-23) or weekday column plus a count, big-number stat cards when a single row has numeric columns, a ranked list or card grid when a CDN image-URL column pairs with a name/label column and a metric, a chart when the result is one category-or-period column plus one numeric column, a tile-less point/route map plotted from lat/lng or polyline columns (no tiles, no external requests), and a styled table otherwise. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.',
+        'Run a read-only SQL SELECT against the Rewind SQLite database. FIRST call get_schema (or read the rewind://schema resource) to see the tables and columns. Single SELECT (or WITH … SELECT) only; a LIMIT is auto-applied (200 default, 500 max). Great for any cross-domain or ad-hoc question the specialized tools do not cover — e.g. joining watches to check-ins, or ranking sources by article count. It cannot write, run DDL, or read secret tables (API keys, OAuth tokens); those are rejected server-side. Returns column names and row tuples in structuredContent plus a compact table preview. In MCP Apps hosts it ALSO renders an interactive view auto-selected from the result shape (or forced via `view`): a calendar heatmap when the result is a daily-date (YYYY-MM-DD) column plus one numeric column, a polar clock (radial histogram) when it is an hour-of-day (0-23) or weekday column plus a count, big-number stat cards when a single row has numeric columns, a ranked list or card grid when a CDN image-URL column pairs with a name/label column and a metric, a stacked bar when the result is a category plus a series plus a numeric value (three columns), a scatter plot when the result is exactly two numeric columns, a histogram when the result is a single numeric column of raw values, a chart when the result is one category-or-period column plus one numeric column, a tile-less point/route map plotted from lat/lng or polyline columns (no tiles, no external requests), and a styled table otherwise. To include album art or posters in the answer, SELECT the composed CDN image URL — see the images-table note in get_schema; query_rewind renders any https://cdn.dinakartumu.com image URLs in the results as inline thumbnails (first 8 distinct, in row order). Set embed_art:true to ALSO get those matched CDN image URLs back as small base64 WebP data URIs in structuredContent.art (a map keyed by the original URL exactly as it appears in the row) — inline them when authoring a sandboxed artifact whose iframe cannot fetch the CDN directly; look up each row art URL in art[url]. It is downsampled (64px) and opt-in because it adds payload; leave it false for normal data queries.',
       inputSchema: {
         sql: z
           .string()
@@ -310,10 +310,13 @@ export function registerQueryTools(
             'clock',
             'stat',
             'list',
+            'histogram',
+            'scatter',
+            'stacked',
           ])
           .default('auto')
           .describe(
-            "Preferred rendered view in MCP Apps hosts. 'auto' (default) auto-detects from the result shape: a calendar heatmap for a daily-date (YYYY-MM-DD) column + one numeric column, a polar clock for an hour-of-day (0-23) or weekday column + a count, stat cards for a single-row result with numeric columns, a ranked list (or card grid) for a CDN image URL + label + metric, a chart for one category/period column + one numeric column, a tile-less lat/lng or polyline map, else a table. Force one of 'table' | 'chart' | 'map' | 'grid' | 'calendar' | 'clock' | 'stat' | 'list' to override. Echoed back in structuredContent.view. Ignored by non-UI hosts."
+            "Preferred rendered view in MCP Apps hosts. 'auto' (default) auto-detects from the result shape: a calendar heatmap for a daily-date (YYYY-MM-DD) column + one numeric column, a polar clock for an hour-of-day (0-23) or weekday column + a count, stat cards for a single-row result with numeric columns, a ranked list (or card grid) for a CDN image URL + label + metric, a stacked bar for a category + series + numeric (3 columns), a scatter plot for exactly two numeric columns, a histogram for a single numeric column of raw values, a chart for one category/period column + one numeric column, a tile-less lat/lng or polyline map, else a table. Force one of 'table' | 'chart' | 'map' | 'grid' | 'calendar' | 'clock' | 'stat' | 'list' | 'histogram' | 'scatter' | 'stacked' to override. Echoed back in structuredContent.view. Ignored by non-UI hosts."
           ),
         embed_art: z
           .boolean()
@@ -358,7 +361,10 @@ export function registerQueryTools(
             | 'calendar'
             | 'clock'
             | 'stat'
-            | 'list';
+            | 'list'
+            | 'histogram'
+            | 'scatter'
+            | 'stacked';
           art?: Record<string, string>;
           art_truncated?: boolean;
           map_config?: ReturnType<typeof buildMapConfig>;

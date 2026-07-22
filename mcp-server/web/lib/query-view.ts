@@ -43,7 +43,10 @@ export type ViewMode =
   | 'calendar'
   | 'clock'
   | 'stat'
-  | 'list';
+  | 'list'
+  | 'histogram'
+  | 'scatter'
+  | 'stacked';
 
 /** Public CDN origin — a cell under this host is Rewind artwork. */
 export const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
@@ -257,7 +260,85 @@ export type Detection = {
   clockKind: 'hour' | 'weekday' | null;
   /** Ranked-list / grid metric: the numeric column ranked in the list view. */
   metricIndex: number | null;
+  /**
+   * Histogram: a single numeric column of RAW values, pre-binned into buckets
+   * so the view is a pure renderer. Null when the shape isn't a distribution.
+   */
+  histogramValueIndex: number | null;
+  histogramBins: HistogramBin[] | null;
+  /** Scatter: two numeric columns (x, y) plus an optional text point label. */
+  scatterXIndex: number | null;
+  scatterYIndex: number | null;
+  scatterLabelIndex: number | null;
+  /** Stacked bar: category (text) + series (text) + numeric value columns. */
+  stackedCategoryIndex: number | null;
+  stackedSeriesIndex: number | null;
+  stackedValueIndex: number | null;
 };
+
+/** One histogram bucket: half-open [lo, hi) with the count of values inside. */
+export type HistogramBin = {
+  lo: number;
+  hi: number;
+  count: number;
+};
+
+/** Minimum rows to bin a single numeric column into a histogram. */
+const HISTOGRAM_MIN_ROWS = 8;
+/** Cap on histogram buckets so the SVG stays legible. */
+const HISTOGRAM_MAX_BINS = 30;
+/** Minimum rows for a scatter plot to read as a cloud, not a couple of dots. */
+const SCATTER_MIN_ROWS = 5;
+
+/**
+ * Bin an array of finite numbers into a histogram. Bucket count uses the
+ * Freedman–Diaconis rule (bin width = 2·IQR·n^(-1/3)), falling back to
+ * ~sqrt(n) when the IQR is zero, capped at HISTOGRAM_MAX_BINS. Pure; returns []
+ * for fewer than 2 distinct values (nothing meaningful to bin).
+ */
+export function binValues(values: number[]): HistogramBin[] {
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (nums.length < 2) return [];
+  const sorted = [...nums].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  if (min === max) return [];
+  const n = sorted.length;
+
+  const quantile = (q: number): number => {
+    const pos = (n - 1) * q;
+    const lo = Math.floor(pos);
+    const hi = Math.ceil(pos);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  };
+  const iqr = quantile(0.75) - quantile(0.25);
+
+  let binCount: number;
+  if (iqr > 0) {
+    const width = (2 * iqr) / Math.cbrt(n);
+    binCount =
+      width > 0 ? Math.ceil((max - min) / width) : Math.ceil(Math.sqrt(n));
+  } else {
+    binCount = Math.ceil(Math.sqrt(n));
+  }
+  binCount = Math.max(1, Math.min(HISTOGRAM_MAX_BINS, binCount));
+
+  const span = max - min;
+  const step = span / binCount;
+  const bins: HistogramBin[] = [];
+  for (let i = 0; i < binCount; i++) {
+    bins.push({ lo: min + i * step, hi: min + (i + 1) * step, count: 0 });
+  }
+  for (const v of sorted) {
+    // Clamp into the last bucket so the max value lands in-range.
+    let idx = Math.floor((v - min) / step);
+    if (idx < 0) idx = 0;
+    if (idx >= binCount) idx = binCount - 1;
+    bins[idx].count++;
+  }
+  return bins;
+}
 
 /** Pick a label column: an image-adjacent name/title/text column. */
 function pickLabelIndex(cols: ColInfo[]): number | null {
@@ -385,6 +466,107 @@ export function detectView(result: QueryResultShape): Detection {
     available.push('list');
   }
 
+  const textColInfos = cols.filter((c) => c.kind === 'text');
+
+  // STACKED BAR: exactly three columns resolving to one CATEGORY + one SERIES
+  // (both discrete, non-metric) + one NUMERIC value, with ≥2 distinct
+  // categories. Groups by category on the x-axis and stacks series segments.
+  // Guarded tight so an ordinary category+metric (2 cols) stays a plain bar
+  // chart. A period-ish column (e.g. `year` → "2023") reads as the category
+  // even though it classifies numeric, so `year, genre, count` works.
+  let stackedCategoryIndex: number | null = null;
+  let stackedSeriesIndex: number | null = null;
+  let stackedValueIndex: number | null = null;
+  if (cols.length === 3 && rows.length > 0) {
+    // A column is a discrete "axis" (category/series) if it's text, or a
+    // period-looking column (year/year-month) we'd rather bucket than measure.
+    const axisCols = cols.filter((c) => {
+      if (c.kind === 'text') return true;
+      if (c.kind === 'numeric') {
+        return (
+          fractionMatching(sampleColumn(rows, c.index), looksLikePeriod) >= 0.6
+        );
+      }
+      return false;
+    });
+    // The value column: a numeric column that isn't one of the two axes.
+    const valueCols = numericColInfos.filter(
+      (c) => !axisCols.some((a) => a.index === c.index)
+    );
+    if (axisCols.length === 2 && valueCols.length === 1) {
+      // Category is col0 when it's an axis, else the first axis column; series
+      // is the other axis column.
+      const first = cols[0];
+      const category = axisCols.some((a) => a.index === first.index)
+        ? first
+        : axisCols[0];
+      const series = axisCols.find((c) => c.index !== category.index)!;
+      const distinctCategories = new Set(
+        sampleColumn(rows, category.index).map((c) => String(c))
+      );
+      if (distinctCategories.size >= 2) {
+        stackedCategoryIndex = category.index;
+        stackedSeriesIndex = series.index;
+        stackedValueIndex = valueCols[0].index;
+      }
+    }
+  }
+  const hasStacked = stackedCategoryIndex !== null;
+  if (hasStacked) available.push('stacked');
+
+  // SCATTER: exactly two NUMERIC columns + ≥5 rows, and NOT a period/date on
+  // col0 (that stays a time-series chart). An optional 3rd text column supplies
+  // point labels. NB: with a 3rd text col this is 3 columns total, so it must be
+  // guarded so a stacked shape (2 text + 1 numeric) never reaches here.
+  let scatterXIndex: number | null = null;
+  let scatterYIndex: number | null = null;
+  let scatterLabelIndex: number | null = null;
+  if (
+    !hasStacked &&
+    rows.length >= SCATTER_MIN_ROWS &&
+    numericColInfos.length === 2 &&
+    (cols.length === 2 || (cols.length === 3 && textColInfos.length === 1))
+  ) {
+    const x = numericColInfos[0];
+    const y = numericColInfos[1];
+    const xCells = sampleColumn(rows, x.index);
+    // Reject when the x column reads as a period/date — that's a time series.
+    if (fractionMatching(xCells, looksLikePeriod) < 0.6) {
+      scatterXIndex = x.index;
+      scatterYIndex = y.index;
+      scatterLabelIndex =
+        textColInfos.length === 1 ? textColInfos[0].index : null;
+    }
+  }
+  const hasScatter = scatterXIndex !== null;
+  if (hasScatter) available.push('scatter');
+
+  // HISTOGRAM: a SINGLE numeric column of RAW values with enough rows to bin.
+  // This is a distribution ("all my movie ratings"), distinct from a chart
+  // (which needs a category/period + a metric). Requires ≥8 rows and ≥2
+  // distinct bucketed values (binValues returns [] otherwise).
+  let histogramValueIndex: number | null = null;
+  let histogramBins: HistogramBin[] | null = null;
+  if (
+    cols.length === 1 &&
+    numericColInfos.length === 1 &&
+    rows.length >= HISTOGRAM_MIN_ROWS
+  ) {
+    const idx = numericColInfos[0].index;
+    const vals: number[] = [];
+    for (const r of rows) {
+      const n = toNumber(r[idx]);
+      if (Number.isFinite(n)) vals.push(n);
+    }
+    const bins = binValues(vals);
+    if (bins.length > 0) {
+      histogramValueIndex = idx;
+      histogramBins = bins;
+    }
+  }
+  const hasHistogram = histogramValueIndex !== null;
+  if (hasHistogram) available.push('histogram');
+
   // CHART: exactly one text/period column + exactly one numeric column
   // (i.e. a 2-column category→value shape). We locate them by role.
   let chartLabelIndex: number | null = null;
@@ -413,16 +595,23 @@ export function detectView(result: QueryResultShape): Detection {
     }
   }
 
-  // Default view priority: map > calendar > clock > stat > (grid|list) > chart
-  // > table. Table is always the safe default tab in the UI, but `auto` picks
-  // the richest applicable view. When both grid+list apply, prefer `list` only
-  // when there's exactly one obvious metric to rank by; else prefer `grid`.
+  // Default view priority:
+  //   map > calendar > clock > stat > (grid|list) > stacked > scatter >
+  //   histogram > chart > table.
+  // stacked (3-col cat+series+num), scatter (2 numerics), and histogram (1
+  // numeric) are MORE specific than the generic chart, so they sit just before
+  // it. Table is always the safe default tab in the UI, but `auto` picks the
+  // richest applicable view. When both grid+list apply, prefer `list` only when
+  // there's exactly one obvious metric to rank by; else prefer `grid`.
   let auto: ViewMode = 'table';
   if (hasMap) auto = 'map';
   else if (hasCalendar) auto = 'calendar';
   else if (hasClock) auto = 'clock';
   else if (hasStat) auto = 'stat';
   else if (hasArtList) auto = metricIndex !== null ? 'list' : 'grid';
+  else if (hasStacked) auto = 'stacked';
+  else if (hasScatter) auto = 'scatter';
+  else if (hasHistogram) auto = 'histogram';
   else if (chartValueIndex !== null) auto = 'chart';
 
   return {
@@ -443,5 +632,13 @@ export function detectView(result: QueryResultShape): Detection {
     clockValueIndex,
     clockKind,
     metricIndex,
+    histogramValueIndex,
+    histogramBins,
+    scatterXIndex,
+    scatterYIndex,
+    scatterLabelIndex,
+    stackedCategoryIndex,
+    stackedSeriesIndex,
+    stackedValueIndex,
   };
 }

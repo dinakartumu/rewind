@@ -223,6 +223,9 @@ describe('query_rewind generic UI wiring', () => {
       'clock',
       'stat',
       'list',
+      'histogram',
+      'scatter',
+      'stacked',
     ] as const) {
       const result = await client.callTool({
         name: 'query_rewind',

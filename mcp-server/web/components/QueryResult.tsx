@@ -440,6 +440,468 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
+// ── HISTOGRAM ────────────────────────────────────────────────────────
+// Distribution of a single numeric column: the detector pre-bins the raw
+// values (Freedman–Diaconis) and this is a pure renderer. Bars run along the
+// value axis; the y-axis is a frequency (count) axis.
+const HIST_W = 480;
+const HIST_H = 180;
+const HIST_TOP = 8;
+const HIST_LEFT = 30; // room for the count axis
+const HIST_LABEL_BAND = 24; // room for value axis labels
+const HIST_PLOT_H = HIST_H - HIST_TOP - HIST_LABEL_BAND;
+const HIST_PLOT_W = HIST_W - HIST_LEFT;
+
+/** Compact numeric label for an axis tick. */
+function axisNumber(v: number): string {
+  if (!Number.isFinite(v)) return '';
+  const abs = Math.abs(v);
+  const decimals = Number.isInteger(v) ? 0 : abs < 10 ? 1 : abs < 100 ? 1 : 0;
+  return v.toLocaleString('en-US', { maximumFractionDigits: decimals });
+}
+
+function HistogramView({
+  bins,
+  columnName,
+}: {
+  bins: { lo: number; hi: number; count: number }[];
+  columnName: string;
+}) {
+  const maxCount = Math.max(0, ...bins.map((b) => b.count));
+  if (!bins.length || maxCount <= 0) {
+    return <div style={emptyStyle}>No distribution to chart</div>;
+  }
+  const n = bins.length;
+  const barSlot = HIST_PLOT_W / n;
+  const barGap = Math.min(2, barSlot * 0.12);
+  const barWidth = Math.max(1, barSlot - barGap);
+
+  // Count-axis ticks: 0, mid, max.
+  const yTicks = [0, Math.round(maxCount / 2), maxCount].filter(
+    (v, i, a) => a.indexOf(v) === i
+  );
+  // Value-axis labels: bin edges, thinned when crowded.
+  const edgeStride = Math.max(1, Math.ceil(n / 8));
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${HIST_W} ${HIST_H}`}
+        role="img"
+        aria-label={`Histogram of ${columnName}`}
+        style={{ width: '100%', height: 'auto' }}
+      >
+        {/* count-axis gridlines + labels */}
+        {yTicks.map((t, i) => {
+          const y = HIST_TOP + HIST_PLOT_H - (t / maxCount) * HIST_PLOT_H;
+          return (
+            <g key={i}>
+              <line
+                x1={HIST_LEFT}
+                y1={round1(y)}
+                x2={HIST_W}
+                y2={round1(y)}
+                stroke="var(--color-border-tertiary, rgba(0,0,0,0.08))"
+                strokeWidth={1}
+              />
+              <text
+                x={HIST_LEFT - 4}
+                y={round1(y) + 3}
+                fontSize={9}
+                textAnchor="end"
+                fill="var(--color-text-secondary, rgba(0,0,0,0.55))"
+              >
+                {axisNumber(t)}
+              </text>
+            </g>
+          );
+        })}
+        {bins.map((b, i) => {
+          const h = (b.count / maxCount) * HIST_PLOT_H;
+          const x = HIST_LEFT + i * barSlot + barGap / 2;
+          const y = HIST_TOP + HIST_PLOT_H - h;
+          return (
+            <rect
+              key={i}
+              x={round1(x)}
+              y={round1(y)}
+              width={round1(barWidth)}
+              height={round1(h)}
+              rx={1}
+              fill={ACCENT}
+              opacity={0.82}
+            >
+              <title>{`${axisNumber(b.lo)}–${axisNumber(b.hi)}: ${b.count}`}</title>
+            </rect>
+          );
+        })}
+        {/* value-axis edge labels */}
+        {bins.map((b, i) =>
+          i % edgeStride === 0 ? (
+            <text
+              key={i}
+              x={round1(HIST_LEFT + i * barSlot)}
+              y={HIST_H - 8}
+              fontSize={9}
+              textAnchor="middle"
+              fill="var(--color-text-secondary, rgba(0,0,0,0.6))"
+            >
+              {axisNumber(b.lo)}
+            </text>
+          ) : null
+        )}
+        {/* trailing edge label for the last bin */}
+        <text
+          x={round1(HIST_LEFT + n * barSlot)}
+          y={HIST_H - 8}
+          fontSize={9}
+          textAnchor="middle"
+          fill="var(--color-text-secondary, rgba(0,0,0,0.6))"
+        >
+          {axisNumber(bins[n - 1].hi)}
+        </text>
+      </svg>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+        {humanizeColumn(columnName)} · {n} bins
+      </div>
+    </div>
+  );
+}
+
+// ── SCATTER ──────────────────────────────────────────────────────────
+// Two numeric columns → a dot cloud. x = col0, y = col1; an optional 3rd text
+// column labels each point (tooltip title).
+const SCAT_W = 480;
+const SCAT_H = 300;
+const SCAT_PAD_L = 34;
+const SCAT_PAD_B = 26;
+const SCAT_PAD_T = 10;
+const SCAT_PAD_R = 10;
+
+function ScatterView({
+  rows,
+  xIndex,
+  yIndex,
+  labelIndex,
+  xName,
+  yName,
+}: {
+  rows: unknown[][];
+  xIndex: number;
+  yIndex: number;
+  labelIndex: number | null;
+  xName: string;
+  yName: string;
+}) {
+  const pts = useMemo(() => {
+    const out: { x: number; y: number; label: string }[] = [];
+    for (const r of rows) {
+      const x = toNumber(r[xIndex]);
+      const y = toNumber(r[yIndex]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const label = labelIndex !== null ? displayCell(r[labelIndex]) : '';
+      out.push({ x, y, label });
+    }
+    return out;
+  }, [rows, xIndex, yIndex, labelIndex]);
+
+  const bounds = useMemo(() => {
+    if (!pts.length) return null;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    // Pad degenerate spans so a single-valued axis still renders.
+    if (minX === maxX) {
+      minX -= 0.5;
+      maxX += 0.5;
+    }
+    if (minY === maxY) {
+      minY -= 0.5;
+      maxY += 0.5;
+    }
+    return { minX, maxX, minY, maxY };
+  }, [pts]);
+
+  if (!bounds) {
+    return <div style={emptyStyle}>No points to plot</div>;
+  }
+
+  const plotW = SCAT_W - SCAT_PAD_L - SCAT_PAD_R;
+  const plotH = SCAT_H - SCAT_PAD_T - SCAT_PAD_B;
+  const sx = (x: number) =>
+    SCAT_PAD_L + ((x - bounds.minX) / (bounds.maxX - bounds.minX)) * plotW;
+  const sy = (y: number) =>
+    SCAT_PAD_T +
+    plotH -
+    ((y - bounds.minY) / (bounds.maxY - bounds.minY)) * plotH;
+
+  const dotR = pts.length > 200 ? 2 : pts.length > 60 ? 2.75 : 3.5;
+  const xTicks = [bounds.minX, (bounds.minX + bounds.maxX) / 2, bounds.maxX];
+  const yTicks = [bounds.minY, (bounds.minY + bounds.maxY) / 2, bounds.maxY];
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${SCAT_W} ${SCAT_H}`}
+        role="img"
+        aria-label={`Scatter plot of ${yName} vs ${xName}`}
+        style={{ width: '100%', height: 'auto' }}
+      >
+        {/* axes */}
+        <line
+          x1={SCAT_PAD_L}
+          y1={SCAT_PAD_T}
+          x2={SCAT_PAD_L}
+          y2={SCAT_PAD_T + plotH}
+          stroke="var(--color-border-tertiary, rgba(0,0,0,0.15))"
+          strokeWidth={1}
+        />
+        <line
+          x1={SCAT_PAD_L}
+          y1={SCAT_PAD_T + plotH}
+          x2={SCAT_PAD_L + plotW}
+          y2={SCAT_PAD_T + plotH}
+          stroke="var(--color-border-tertiary, rgba(0,0,0,0.15))"
+          strokeWidth={1}
+        />
+        {/* y ticks */}
+        {yTicks.map((t, i) => (
+          <text
+            key={`y${i}`}
+            x={SCAT_PAD_L - 4}
+            y={round1(sy(t)) + 3}
+            fontSize={9}
+            textAnchor="end"
+            fill="var(--color-text-secondary, rgba(0,0,0,0.55))"
+          >
+            {axisNumber(t)}
+          </text>
+        ))}
+        {/* x ticks */}
+        {xTicks.map((t, i) => (
+          <text
+            key={`x${i}`}
+            x={round1(sx(t))}
+            y={SCAT_PAD_T + plotH + 14}
+            fontSize={9}
+            textAnchor="middle"
+            fill="var(--color-text-secondary, rgba(0,0,0,0.55))"
+          >
+            {axisNumber(t)}
+          </text>
+        ))}
+        {pts.map((p, i) => (
+          <circle
+            key={i}
+            cx={round1(sx(p.x))}
+            cy={round1(sy(p.y))}
+            r={dotR}
+            fill={ACCENT}
+            opacity={0.7}
+          >
+            {p.label ? (
+              <title>{`${p.label} (${axisNumber(p.x)}, ${axisNumber(p.y)})`}</title>
+            ) : (
+              <title>{`(${axisNumber(p.x)}, ${axisNumber(p.y)})`}</title>
+            )}
+          </circle>
+        ))}
+      </svg>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+        {humanizeColumn(xName)} (x) · {humanizeColumn(yName)} (y)
+      </div>
+    </div>
+  );
+}
+
+// ── STACKED BAR ──────────────────────────────────────────────────────
+// category (x-axis) + series (stacked segments) + numeric value. Segments are
+// colored by series with a legend below.
+const STACK_W = 480;
+const STACK_H = 200;
+const STACK_TOP = 8;
+const STACK_LEFT = 30;
+const STACK_LABEL_BAND = 24;
+const STACK_PLOT_H = STACK_H - STACK_TOP - STACK_LABEL_BAND;
+const STACK_PLOT_W = STACK_W - STACK_LEFT;
+
+// A small categorical palette derived from the accent hue plus muted tones;
+// opacity varies so it reads on both light and dark cards without new colors.
+const SERIES_OPACITY = [0.9, 0.68, 0.5, 0.36, 0.26, 0.85, 0.6, 0.44];
+
+function StackedView({
+  rows,
+  categoryIndex,
+  seriesIndex,
+  valueIndex,
+  categoryName,
+}: {
+  rows: unknown[][];
+  categoryIndex: number;
+  seriesIndex: number;
+  valueIndex: number;
+  categoryName: string;
+}) {
+  const { categories, series, matrix, max } = useMemo(() => {
+    const catOrder: string[] = [];
+    const catSeen = new Set<string>();
+    const serOrder: string[] = [];
+    const serSeen = new Set<string>();
+    // category → series → summed value
+    const map = new Map<string, Map<string, number>>();
+    for (const r of rows) {
+      const cat = displayCell(r[categoryIndex]);
+      const ser = displayCell(r[seriesIndex]);
+      const v = toNumber(r[valueIndex]);
+      const val = Number.isFinite(v) ? v : 0;
+      if (!catSeen.has(cat)) {
+        catSeen.add(cat);
+        catOrder.push(cat);
+      }
+      if (!serSeen.has(ser)) {
+        serSeen.add(ser);
+        serOrder.push(ser);
+      }
+      let inner = map.get(cat);
+      if (!inner) {
+        inner = new Map();
+        map.set(cat, inner);
+      }
+      inner.set(ser, (inner.get(ser) ?? 0) + val);
+    }
+    // Dense matrix [category][series]; totals per category for the y-scale.
+    const mtx = catOrder.map((cat) =>
+      serOrder.map((ser) => map.get(cat)?.get(ser) ?? 0)
+    );
+    const mx = Math.max(0, ...mtx.map((row) => row.reduce((a, b) => a + b, 0)));
+    return { categories: catOrder, series: serOrder, matrix: mtx, max: mx };
+  }, [rows, categoryIndex, seriesIndex, valueIndex]);
+
+  if (!categories.length || max <= 0) {
+    return <div style={emptyStyle}>No data to chart</div>;
+  }
+
+  const n = categories.length;
+  const slot = STACK_PLOT_W / n;
+  const barWidth = Math.min(40, slot * 0.66);
+  const labelStride = Math.max(1, Math.ceil(n / 12));
+  const yTicks = [0, Math.round(max / 2), max].filter(
+    (v, i, a) => a.indexOf(v) === i
+  );
+  const colorFor = (si: number) => SERIES_OPACITY[si % SERIES_OPACITY.length];
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${STACK_W} ${STACK_H}`}
+        role="img"
+        aria-label={`Stacked bar chart by ${categoryName}`}
+        style={{ width: '100%', height: 'auto' }}
+      >
+        {yTicks.map((t, i) => {
+          const y = STACK_TOP + STACK_PLOT_H - (t / max) * STACK_PLOT_H;
+          return (
+            <g key={i}>
+              <line
+                x1={STACK_LEFT}
+                y1={round1(y)}
+                x2={STACK_W}
+                y2={round1(y)}
+                stroke="var(--color-border-tertiary, rgba(0,0,0,0.08))"
+                strokeWidth={1}
+              />
+              <text
+                x={STACK_LEFT - 4}
+                y={round1(y) + 3}
+                fontSize={9}
+                textAnchor="end"
+                fill="var(--color-text-secondary, rgba(0,0,0,0.55))"
+              >
+                {axisNumber(t)}
+              </text>
+            </g>
+          );
+        })}
+        {categories.map((cat, ci) => {
+          const x = STACK_LEFT + ci * slot + (slot - barWidth) / 2;
+          let cursorY = STACK_TOP + STACK_PLOT_H;
+          return (
+            <g key={ci}>
+              {series.map((ser, si) => {
+                const val = matrix[ci][si];
+                if (val <= 0) return null;
+                const h = (val / max) * STACK_PLOT_H;
+                cursorY -= h;
+                return (
+                  <rect
+                    key={si}
+                    x={round1(x)}
+                    y={round1(cursorY)}
+                    width={round1(barWidth)}
+                    height={round1(h)}
+                    fill={ACCENT}
+                    opacity={colorFor(si)}
+                  >
+                    <title>{`${cat} · ${ser}: ${formatNumber(val)}`}</title>
+                  </rect>
+                );
+              })}
+              {ci % labelStride === 0 ? (
+                <text
+                  x={round1(STACK_LEFT + ci * slot + slot / 2)}
+                  y={STACK_H - 8}
+                  fontSize={9}
+                  textAnchor="middle"
+                  fill="var(--color-text-secondary, rgba(0,0,0,0.6))"
+                >
+                  {cat}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+      {/* legend */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          marginTop: 8,
+          fontSize: 11,
+          opacity: 0.75,
+        }}
+      >
+        {series.map((ser, si) => (
+          <span
+            key={si}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                background: ACCENT,
+                opacity: colorFor(si),
+                display: 'inline-block',
+              }}
+            />
+            {ser}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── shared formatting ────────────────────────────────────────────────
 /** Humanize a snake/camel column name into a Title-Cased label. */
 function humanizeColumn(name: string): string {
@@ -1452,6 +1914,9 @@ export function QueryResult({
       'stat',
       'calendar',
       'clock',
+      'stacked',
+      'scatter',
+      'histogram',
       'chart',
       'map',
       'list',
@@ -1579,6 +2044,38 @@ export function QueryResult({
               labelIndex={detection.chartLabelIndex}
               valueIndex={detection.chartValueIndex}
               isTimeSeries={detection.chartIsTimeSeries}
+            />
+          )}
+        {view === 'histogram' &&
+          detection.histogramValueIndex !== null &&
+          detection.histogramBins !== null && (
+            <HistogramView
+              bins={detection.histogramBins}
+              columnName={columns[detection.histogramValueIndex] ?? ''}
+            />
+          )}
+        {view === 'scatter' &&
+          detection.scatterXIndex !== null &&
+          detection.scatterYIndex !== null && (
+            <ScatterView
+              rows={rows}
+              xIndex={detection.scatterXIndex}
+              yIndex={detection.scatterYIndex}
+              labelIndex={detection.scatterLabelIndex}
+              xName={columns[detection.scatterXIndex] ?? ''}
+              yName={columns[detection.scatterYIndex] ?? ''}
+            />
+          )}
+        {view === 'stacked' &&
+          detection.stackedCategoryIndex !== null &&
+          detection.stackedSeriesIndex !== null &&
+          detection.stackedValueIndex !== null && (
+            <StackedView
+              rows={rows}
+              categoryIndex={detection.stackedCategoryIndex}
+              seriesIndex={detection.stackedSeriesIndex}
+              valueIndex={detection.stackedValueIndex}
+              categoryName={columns[detection.stackedCategoryIndex] ?? ''}
             />
           )}
         {view === 'map' && (
