@@ -397,26 +397,32 @@ export default {
           );
         }
 
-        // Reading sync (Instapaper)
-        const readingRetry = await shouldRetry(db, 'reading');
-        if (readingRetry.shouldRetry) {
+        // Reading sync (Instapaper). Skipped when ENABLE_INSTAPAPER === 'false'.
+        if (env.ENABLE_INSTAPAPER === 'false') {
           console.log(
-            `[SYNC] Retrying failed reading sync (${readingRetry.consecutiveFailures} consecutive failures)`
+            '[SYNC] Instapaper bookmarks disabled (ENABLE_INSTAPAPER=false)'
+          );
+        } else {
+          const readingRetry = await shouldRetry(db, 'reading');
+          if (readingRetry.shouldRetry) {
+            console.log(
+              `[SYNC] Retrying failed reading sync (${readingRetry.consecutiveFailures} consecutive failures)`
+            );
+          }
+          console.log('[SYNC] Instapaper bookmarks');
+          ctx.waitUntil(
+            (async () => {
+              try {
+                await syncReading(db, env);
+                await processReadingImages(db, env);
+              } catch (error) {
+                console.log(
+                  `[ERROR] Instapaper sync failed: ${error instanceof Error ? error.message : String(error)}`
+                );
+              }
+            })()
           );
         }
-        console.log('[SYNC] Instapaper bookmarks');
-        ctx.waitUntil(
-          (async () => {
-            try {
-              await syncReading(db, env);
-              await processReadingImages(db, env);
-            } catch (error) {
-              console.log(
-                `[ERROR] Instapaper sync failed: ${error instanceof Error ? error.message : String(error)}`
-              );
-            }
-          })()
-        );
         break;
       }
       case '0 4 * * *': {
@@ -464,6 +470,12 @@ export default {
         // The 6-hour bookmarks sync only sees deletions in the 500-newest
         // window per folder; this pass enumerates every folder fully so
         // older deletions get caught.
+        if (env.ENABLE_INSTAPAPER === 'false') {
+          console.log(
+            '[SYNC] Instapaper deletion reconciliation disabled (ENABLE_INSTAPAPER=false)'
+          );
+          break;
+        }
         console.log('[SYNC] Instapaper deletion reconciliation');
         ctx.waitUntil(
           (async () => {

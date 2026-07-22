@@ -123,6 +123,7 @@ docs/                      -- Project documentation
 | `INSTAPAPER_CONSUMER_SECRET`     | Reading              | Instapaper OAuth consumer secret                                            |
 | `INSTAPAPER_ACCESS_TOKEN`        | Reading              | Instapaper OAuth access token (from xAuth)                                  |
 | `INSTAPAPER_ACCESS_TOKEN_SECRET` | Reading              | Instapaper OAuth token secret                                               |
+| `ENABLE_INSTAPAPER`              | Reading              | Kill-switch: `"false"` skips Instapaper cron sync + reconciliation          |
 | `FOURSQUARE_ACCESS_TOKEN`        | Places               | Foursquare/Swarm OAuth user token (does not expire)                         |
 | `APPLE_MUSIC_DEVELOPER_TOKEN`    | Images               | Apple Music JWT                                                             |
 | `FANART_TV_API_KEY`              | Images               | Fanart.tv project API key                                                   |

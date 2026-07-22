@@ -56,7 +56,17 @@ crons = [
 [images]
 binding = "IMAGE_TRANSFORMS"
 
+# Persist request + console logs in the Cloudflare dashboard
+# (Workers Observability -> Logs). head_sampling_rate = 1 keeps 100% of
+# invocations; cron runs are low-volume so full retention is cheap.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [vars]
 ALLOWED_ORIGINS = "localhost:3000"
 PLEX_OWNER_ACCOUNT_TITLE = "dinakartumu"
 LASTFM_USERNAME = "dinakartumu"
+# Instapaper sync disabled — access token returns 401. Set to "true" or
+# remove (and refresh INSTAPAPER_ACCESS_TOKEN/_SECRET) to re-enable.
+ENABLE_INSTAPAPER = "false"

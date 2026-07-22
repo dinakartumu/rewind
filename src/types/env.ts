@@ -61,6 +61,10 @@ export interface Env {
   INSTAPAPER_CONSUMER_SECRET: string;
   INSTAPAPER_ACCESS_TOKEN: string;
   INSTAPAPER_ACCESS_TOKEN_SECRET: string;
+  // Reading sync kill-switch. Cron Instapaper sync + weekly deletion
+  // reconciliation are skipped when this is exactly "false". Absent/any other
+  // value → enabled (preserves default behavior). Set in [vars].
+  ENABLE_INSTAPAPER?: string;
 
   // Images
   APPLE_MUSIC_DEVELOPER_TOKEN: string;

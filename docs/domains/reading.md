@@ -13,7 +13,7 @@ Instapaper articles, reading progress, highlights, and enrichment metadata.
 
 ## Sync
 
-- Cron: every 6 hours (alongside Letterboxd)
+- Cron: every 6 hours (alongside Letterboxd). Gated by the `ENABLE_INSTAPAPER` var — both the 6-hourly bookmarks sync and the weekly deletion reconciliation are skipped when it is `"false"`. Currently disabled (access token returns 401); re-enable by refreshing the token and setting the var to `"true"` or removing it.
 - **Delta sync** via Instapaper `have` parameter: sends known bookmark ID:hash pairs so the API only returns new or changed bookmarks
 - **Inline highlights** via `highlights` parameter: sends known highlight IDs so the API returns only new highlights alongside bookmarks, reducing per-bookmark API calls
 - Handles `delete_ids` from the API to remove bookmarks deleted in Instapaper
