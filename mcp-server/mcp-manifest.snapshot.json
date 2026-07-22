@@ -4008,7 +4008,7 @@
     {
       "uri": "ui://rewind/query-result.html",
       "name": "Rewind -- Query Result",
-      "description": "Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / tile-less map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are tile-less point/route plots from lat/lng or polyline columns. Consumes query_rewind structuredContent {columns, rows, view?, art?}.",
+      "description": "Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are real Leaflet + OpenStreetMap slippy maps plotting point/route geometry from lat/lng or polyline columns (with a tile-less SVG fallback when tiles are unreachable). Consumes query_rewind structuredContent {columns, rows, view?, art?}.",
       "mimeType": "text/html;profile=mcp-app"
     },
     {

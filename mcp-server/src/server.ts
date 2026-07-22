@@ -225,9 +225,18 @@ export function createServer(client: RewindClient): McpServer {
     uri: 'ui://rewind/query-result.html',
     html: UI_BUNDLES['query-result.html'],
     description:
-      'Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / tile-less map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are tile-less point/route plots from lat/lng or polyline columns. Consumes query_rewind structuredContent {columns, rows, view?, art?}.',
+      'Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are real Leaflet + OpenStreetMap slippy maps plotting point/route geometry from lat/lng or polyline columns (with a tile-less SVG fallback when tiles are unreachable). Consumes query_rewind structuredContent {columns, rows, view?, art?}.',
     csp: {
-      resourceDomains: ['https://cdn.dinakartumu.com'],
+      // cdn.dinakartumu.com serves embedded Rewind artwork (<img>); the OSM
+      // tile hosts serve the slippy-map raster tiles, also loaded as <img>,
+      // so resourceDomains (img-src) covers both. No API token needed.
+      resourceDomains: [
+        'https://cdn.dinakartumu.com',
+        'https://a.tile.openstreetmap.org',
+        'https://b.tile.openstreetmap.org',
+        'https://c.tile.openstreetmap.org',
+        'https://tile.openstreetmap.org',
+      ],
     },
   });
 

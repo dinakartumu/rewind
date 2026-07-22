@@ -1,4 +1,12 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { cardOuterChrome, CARD_OUTER_CLASSNAME } from '../lib/card-tokens.js';
 import {
   detectView,
@@ -430,24 +438,43 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
-// ── MAP (tile-less) ──────────────────────────────────────────────────
+// ── MAP ──────────────────────────────────────────────────────────────
+// A real slippy map: Leaflet + OpenStreetMap raster tiles (no API token).
+// Falls back to a tile-less SVG projector render if Leaflet fails to init
+// (e.g. no network / tile errors / a thrown init), so the view never fully
+// breaks. Tiles load as <img> under the resource CSP resourceDomains.
 const MAP_W = 480;
 const MAP_H = 300;
 const MAP_PAD = 16;
+const MAP_HEIGHT = 360; // Leaflet needs a definite container height.
 
-function MapView({
-  rows,
-  latIndex,
-  lngIndex,
-  polylineIndex,
-}: {
-  rows: unknown[][];
-  latIndex: number | null;
-  lngIndex: number | null;
-  polylineIndex: number | null;
-}) {
-  const { pointCoords, routes, bounds } = useMemo(() => {
-    const pointCoords: [number, number][] = [];
+// Point-marker stroke: Leaflet circleMarker (no default PNG icon → no extra
+// unpkg CSP origin, no broken icons in the sandboxed iframe).
+const ROUTE_STROKE = '#e2503f';
+const POINT_STROKE = '#e2503f';
+
+type MapData = {
+  /** [lat, lng, label] tuples for point markers. */
+  points: { lat: number; lng: number; label: string }[];
+  /** decoded [lat, lng][] paths for route polylines. */
+  routes: [number, number][][];
+  bounds: Bounds | null;
+};
+
+/**
+ * Decode result rows into point markers and route paths + combined bounds.
+ * Shared by both the Leaflet renderer and the SVG fallback so they always
+ * plot the same geometry.
+ */
+function useMapData(
+  rows: unknown[][],
+  latIndex: number | null,
+  lngIndex: number | null,
+  polylineIndex: number | null,
+  labelIndex: number | null
+): MapData {
+  return useMemo(() => {
+    const points: MapData['points'] = [];
     if (latIndex !== null && lngIndex !== null) {
       for (const row of rows) {
         const lat = toNumber(row[latIndex]);
@@ -460,7 +487,8 @@ function MapView({
           lng >= -180 &&
           lng <= 180
         ) {
-          pointCoords.push([lat, lng]);
+          const label = labelIndex !== null ? displayCell(row[labelIndex]) : '';
+          points.push({ lat, lng, label });
         }
       }
     }
@@ -475,7 +503,7 @@ function MapView({
       }
     }
     // Combined bounds over all points + all route vertices.
-    let bounds: Bounds | null = boundsOf(pointCoords);
+    let bounds: Bounds | null = boundsOf(points.map((p) => [p.lat, p.lng]));
     for (const r of routes) {
       const b = boundsOf(r);
       if (b) {
@@ -489,16 +517,37 @@ function MapView({
           : b;
       }
     }
-    return { pointCoords, routes, bounds };
-  }, [rows, latIndex, lngIndex, polylineIndex]);
+    return { points, routes, bounds };
+  }, [rows, latIndex, lngIndex, polylineIndex, labelIndex]);
+}
 
+function mapLegend(
+  data: MapData,
+  source: 'OpenStreetMap' | 'tile-less'
+): string {
+  const parts: string[] = [];
+  if (data.points.length > 0) {
+    parts.push(
+      `${data.points.length} point${data.points.length === 1 ? '' : 's'}`
+    );
+  }
+  if (data.routes.length > 0) {
+    parts.push(
+      `${data.routes.length} route${data.routes.length === 1 ? '' : 's'}`
+    );
+  }
+  parts.push(source);
+  return parts.join(' · ');
+}
+
+/** Tile-less SVG projector render — the fallback when Leaflet can't init. */
+function SvgMapView({ data }: { data: MapData }) {
+  const { points, routes, bounds } = data;
   if (!bounds) {
     return <div style={emptyStyle}>No mappable coordinates</div>;
   }
-
   const project = makeProjector(bounds, MAP_W, MAP_H, MAP_PAD);
-  const dotR =
-    pointCoords.length > 200 ? 1.5 : pointCoords.length > 50 ? 2.5 : 4;
+  const dotR = points.length > 200 ? 1.5 : points.length > 50 ? 2.5 : 4;
 
   return (
     <div>
@@ -532,7 +581,7 @@ function MapView({
             />
           ) : null;
         })}
-        {pointCoords.map(([lat, lng], i) => {
+        {points.map(({ lat, lng }, i) => {
           const [x, y] = project(lat, lng);
           return (
             <circle
@@ -547,12 +596,140 @@ function MapView({
         })}
       </svg>
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
-        {pointCoords.length > 0 &&
-          `${pointCoords.length} point${pointCoords.length === 1 ? '' : 's'}`}
-        {pointCoords.length > 0 && routes.length > 0 && ' · '}
-        {routes.length > 0 &&
-          `${routes.length} route${routes.length === 1 ? '' : 's'}`}
-        {' · tile-less'}
+        {mapLegend(data, 'tile-less')}
+      </div>
+    </div>
+  );
+}
+
+function MapView({
+  rows,
+  latIndex,
+  lngIndex,
+  polylineIndex,
+  labelIndex,
+}: {
+  rows: unknown[][];
+  latIndex: number | null;
+  lngIndex: number | null;
+  polylineIndex: number | null;
+  labelIndex: number | null;
+}) {
+  const data = useMapData(rows, latIndex, lngIndex, polylineIndex, labelIndex);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // null = not yet attempted; true = Leaflet is live; false = fell back to SVG.
+  const [leafletOk, setLeafletOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !data.bounds) return;
+
+    let map: L.Map | null = null;
+    try {
+      map = L.map(el, {
+        zoomControl: true,
+        attributionControl: true,
+        // Keep interactions contained inside the small iframe card.
+        scrollWheelZoom: false,
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Routes as polylines.
+      for (const r of data.routes) {
+        L.polyline(r, {
+          color: ROUTE_STROKE,
+          weight: 3,
+          opacity: 0.85,
+          lineJoin: 'round',
+          lineCap: 'round',
+        }).addTo(map);
+      }
+
+      // Points as circleMarkers (never the default PNG icon).
+      for (const p of data.points) {
+        const marker = L.circleMarker([p.lat, p.lng], {
+          radius: 5,
+          color: POINT_STROKE,
+          weight: 2,
+          fillColor: POINT_STROKE,
+          fillOpacity: 0.7,
+        }).addTo(map);
+        if (p.label) marker.bindTooltip(p.label);
+      }
+
+      // Fit to combined geometry; a lone point gets a sensible zoom.
+      const b = data.bounds;
+      if (
+        data.points.length === 1 &&
+        data.routes.length === 0 &&
+        b.minLat === b.maxLat &&
+        b.minLng === b.maxLng
+      ) {
+        map.setView([b.minLat, b.minLng], 13);
+      } else {
+        map.fitBounds(
+          [
+            [b.minLat, b.minLng],
+            [b.maxLat, b.maxLng],
+          ],
+          { padding: [24, 24] }
+        );
+      }
+
+      // The iframe/card mounts the container at a definite height, but
+      // Leaflet still needs a nudge once it's actually in layout.
+      map.invalidateSize();
+      setLeafletOk(true);
+    } catch {
+      // Init threw → tear down and fall back to the SVG projector render.
+      try {
+        map?.remove();
+      } catch {
+        /* ignore */
+      }
+      map = null;
+      setLeafletOk(false);
+      return;
+    }
+
+    return () => {
+      try {
+        map?.remove();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [data]);
+
+  if (!data.bounds) {
+    return <div style={emptyStyle}>No mappable coordinates</div>;
+  }
+
+  // Fell back: render the tile-less SVG map instead.
+  if (leafletOk === false) {
+    return <SvgMapView data={data} />;
+  }
+
+  return (
+    <div>
+      <div
+        ref={containerRef}
+        role="application"
+        aria-label="Map of coordinates"
+        style={{
+          width: '100%',
+          height: MAP_HEIGHT,
+          borderRadius: 8,
+          overflow: 'hidden',
+          background: 'var(--color-background-secondary, rgba(0,0,0,0.03))',
+        }}
+      />
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
+        {mapLegend(data, 'OpenStreetMap')}
       </div>
     </div>
   );
@@ -690,6 +867,7 @@ export function QueryResult({
             latIndex={detection.latIndex}
             lngIndex={detection.lngIndex}
             polylineIndex={detection.polylineIndex}
+            labelIndex={detection.labelIndex}
           />
         )}
       </div>

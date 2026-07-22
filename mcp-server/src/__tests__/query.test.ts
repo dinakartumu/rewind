@@ -169,6 +169,25 @@ describe('query_rewind generic UI wiring', () => {
     await client.close();
   });
 
+  it('allows OSM slippy-map tile origins in the query-result resource CSP', async () => {
+    const { client } = await createTestClient();
+    const read = await client.readResource({
+      uri: 'ui://rewind/query-result.html',
+    });
+    const content = read.contents[0] as {
+      _meta?: { ui?: { csp?: { resourceDomains?: string[] } } };
+    };
+    const resourceDomains = content._meta?.ui?.csp?.resourceDomains ?? [];
+    // Rewind artwork host stays present; the OSM tile hosts (loaded as <img>)
+    // are what makes the real slippy-map tiles fetchable under the resource CSP.
+    expect(resourceDomains).toContain('https://cdn.dinakartumu.com');
+    expect(resourceDomains).toContain('https://a.tile.openstreetmap.org');
+    expect(
+      resourceDomains.some((d) => d.includes('tile.openstreetmap.org'))
+    ).toBe(true);
+    await client.close();
+  });
+
   it('attaches _meta.ui.resourceUri on the query_rewind result', async () => {
     const { client } = await createTestClient();
     const result = await client.callTool({
