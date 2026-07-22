@@ -46,7 +46,10 @@ export type ViewMode =
   | 'list'
   | 'histogram'
   | 'scatter'
-  | 'stacked';
+  | 'stacked'
+  | 'treemap'
+  | 'sankey'
+  | 'mosaic';
 
 /** Public CDN origin — a cell under this host is Rewind artwork. */
 export const CDN_ORIGIN = 'https://cdn.dinakartumu.com';
@@ -274,6 +277,28 @@ export type Detection = {
   stackedCategoryIndex: number | null;
   stackedSeriesIndex: number | null;
   stackedValueIndex: number | null;
+  /**
+   * Treemap: a category (text) column + a numeric value column, offered as an
+   * additional tab on the SAME shape the bar chart fires on, but only when there
+   * are MANY distinct categories (≥8) so it reads as share-of-whole.
+   */
+  treemapLabelIndex: number | null;
+  treemapValueIndex: number | null;
+  /**
+   * Sankey flow: one source (text) + one target (text) + one numeric value. A
+   * NEW auto view for the 3-col two-free-form-categorical shape; shares the
+   * shape with `stacked`, and the two are distinguished by whether col0 reads
+   * ordinal/temporal (→ stacked default) or free-form (→ sankey default).
+   */
+  sankeySourceIndex: number | null;
+  sankeyTargetIndex: number | null;
+  sankeyValueIndex: number | null;
+  /**
+   * Cover mosaic: the SAME image + label signal as grid, offered as an extra
+   * tab whenever grid applies AND there's a numeric metric to size tiles by.
+   * Reuses imageIndex / labelIndex / metricIndex; this flag records eligibility.
+   */
+  mosaicMetricIndex: number | null;
 };
 
 /** One histogram bucket: half-open [lo, hi) with the count of values inside. */
@@ -466,6 +491,16 @@ export function detectView(result: QueryResultShape): Detection {
     available.push('list');
   }
 
+  // COVER MOSAIC: a variant of grid. Offered as an ADDITIONAL tab whenever the
+  // grid signal holds (image + label) AND there's a numeric metric to size the
+  // tiles by (bigger tile = more plays/watches). Reuses imageIndex/labelIndex;
+  // sizing uses metricIndex. Never becomes the `auto` default — grid/list keep
+  // that — it's purely an extra tab the user can pick.
+  const mosaicMetricIndex =
+    hasArtList && metricIndex !== null ? metricIndex : null;
+  const hasMosaic = mosaicMetricIndex !== null;
+  if (hasMosaic) available.push('mosaic');
+
   const textColInfos = cols.filter((c) => c.kind === 'text');
 
   // STACKED BAR: exactly three columns resolving to one CATEGORY + one SERIES
@@ -512,7 +547,62 @@ export function detectView(result: QueryResultShape): Detection {
     }
   }
   const hasStacked = stackedCategoryIndex !== null;
-  if (hasStacked) available.push('stacked');
+
+  // SANKEY: a flow diagram over the SAME 3-col text+text+num shape as stacked.
+  // Guard: exactly one source text col + one target text col + one numeric, and
+  // ≥2 distinct sources OR ≥2 distinct targets. Both stacked and sankey are
+  // offered as tabs whenever this shape holds; only the `auto` DEFAULT differs.
+  //
+  // STACKED-vs-SANKEY DEFAULT RULE: col0 is the category/source. When col0 reads
+  // as ordinal/temporal — a period (year / YYYY-MM / date) — you'd read the
+  // result over an ordered x-axis, so `stacked` is the default. When col0 is a
+  // free-form categorical (neither col reads period-ish), it's two categorical
+  // dimensions flowing into each other, so `sankey` is the default.
+  let sankeySourceIndex: number | null = null;
+  let sankeyTargetIndex: number | null = null;
+  let sankeyValueIndex: number | null = null;
+  let sankeyIsDefault = false;
+  if (cols.length === 3 && rows.length > 0) {
+    const textCols = cols.filter((c) => c.kind === 'text');
+    const numCols = numericColInfos.filter(
+      (c) => !textCols.some((t) => t.index === c.index)
+    );
+    if (textCols.length === 2 && numCols.length === 1) {
+      // Source = col0 when it's one of the two text cols, else the first text
+      // col; target = the other text col.
+      const first = cols[0];
+      const source = textCols.some((t) => t.index === first.index)
+        ? first
+        : textCols[0];
+      const target = textCols.find((c) => c.index !== source.index)!;
+      const distinctSources = new Set(
+        sampleColumn(rows, source.index).map((c) => String(c))
+      ).size;
+      const distinctTargets = new Set(
+        sampleColumn(rows, target.index).map((c) => String(c))
+      ).size;
+      if (distinctSources >= 2 || distinctTargets >= 2) {
+        sankeySourceIndex = source.index;
+        sankeyTargetIndex = target.index;
+        sankeyValueIndex = numCols[0].index;
+        // Free-form col0 (not a period) → sankey is the default; a period-ish
+        // col0 (year/month/date) → stacked is the default.
+        const col0Cells = sampleColumn(rows, cols[0].index);
+        sankeyIsDefault = fractionMatching(col0Cells, looksLikePeriod) < 0.6;
+      }
+    }
+  }
+  const hasSankey = sankeySourceIndex !== null;
+
+  // Tab order for the shared 3-col shape: push the DEFAULT view first so it
+  // reads as primary, then the alternate. Both remain selectable tabs.
+  if (hasSankey && sankeyIsDefault) {
+    available.push('sankey');
+    if (hasStacked) available.push('stacked');
+  } else {
+    if (hasStacked) available.push('stacked');
+    if (hasSankey) available.push('sankey');
+  }
 
   // SCATTER: exactly two NUMERIC columns + ≥5 rows, and NOT a period/date on
   // col0 (that stays a time-series chart). An optional 3rd text column supplies
@@ -595,24 +685,57 @@ export function detectView(result: QueryResultShape): Detection {
     }
   }
 
+  // TREEMAP: the SAME category+metric shape the bar chart fires on, offered as
+  // an ADDITIONAL tab whenever there are MANY distinct categories (≥8) so a
+  // share-of-whole treemap reads better than a long row of bars. Only fires on
+  // a NON-time-series category chart (a treemap of months makes no sense). Both
+  // chart and treemap tabs are shown; `auto` stays chart for small N and flips
+  // to treemap for large N (≥8 distinct categories).
+  let treemapLabelIndex: number | null = null;
+  let treemapValueIndex: number | null = null;
+  if (
+    chartLabelIndex !== null &&
+    chartValueIndex !== null &&
+    !chartIsTimeSeries
+  ) {
+    const distinctCats = new Set(
+      sampleColumn(rows, chartLabelIndex).map((c) => String(c))
+    ).size;
+    if (distinctCats >= 8) {
+      treemapLabelIndex = chartLabelIndex;
+      treemapValueIndex = chartValueIndex;
+    }
+  }
+  const hasTreemap = treemapLabelIndex !== null;
+  if (hasTreemap) available.push('treemap');
+
   // Default view priority:
-  //   map > calendar > clock > stat > (grid|list) > stacked > scatter >
-  //   histogram > chart > table.
-  // stacked (3-col cat+series+num), scatter (2 numerics), and histogram (1
-  // numeric) are MORE specific than the generic chart, so they sit just before
-  // it. Table is always the safe default tab in the UI, but `auto` picks the
-  // richest applicable view. When both grid+list apply, prefer `list` only when
-  // there's exactly one obvious metric to rank by; else prefer `grid`.
+  //   map > calendar > clock > stat > (grid|list) > (stacked|sankey) > scatter >
+  //   histogram > (chart|treemap) > table.
+  // stacked/sankey (3-col cat+series/target+num), scatter (2 numerics), and
+  // histogram (1 numeric) are MORE specific than the generic chart, so they sit
+  // just before it. Table is always the safe default tab in the UI, but `auto`
+  // picks the richest applicable view. When both grid+list apply, prefer `list`
+  // only when there's exactly one obvious metric to rank by; else prefer `grid`
+  // (mosaic is only ever an extra tab, never `auto`).
+  //
+  // For the shared 3-col text+text+num shape, stacked and sankey are BOTH
+  // offered; `auto` picks per the stacked-vs-sankey default rule (period col0 →
+  // stacked, free-form col0 → sankey). For the category+metric chart shape,
+  // `auto` stays `chart` for small N but flips to `treemap` once there are ≥8
+  // distinct categories (share-of-whole reads better than a long bar row);
+  // both tabs remain available.
   let auto: ViewMode = 'table';
   if (hasMap) auto = 'map';
   else if (hasCalendar) auto = 'calendar';
   else if (hasClock) auto = 'clock';
   else if (hasStat) auto = 'stat';
   else if (hasArtList) auto = metricIndex !== null ? 'list' : 'grid';
-  else if (hasStacked) auto = 'stacked';
+  else if (hasStacked || hasSankey)
+    auto = sankeyIsDefault ? 'sankey' : hasStacked ? 'stacked' : 'sankey';
   else if (hasScatter) auto = 'scatter';
   else if (hasHistogram) auto = 'histogram';
-  else if (chartValueIndex !== null) auto = 'chart';
+  else if (chartValueIndex !== null) auto = hasTreemap ? 'treemap' : 'chart';
 
   return {
     auto,
@@ -640,5 +763,11 @@ export function detectView(result: QueryResultShape): Detection {
     stackedCategoryIndex,
     stackedSeriesIndex,
     stackedValueIndex,
+    treemapLabelIndex,
+    treemapValueIndex,
+    sankeySourceIndex,
+    sankeyTargetIndex,
+    sankeyValueIndex,
+    mosaicMetricIndex,
   };
 }

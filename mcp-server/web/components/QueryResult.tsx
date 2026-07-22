@@ -902,6 +902,481 @@ function StackedView({
   );
 }
 
+// ── TREEMAP ──────────────────────────────────────────────────────────
+// category (text) + numeric value with MANY categories → share-of-whole
+// rectangles sized by value. A squarified-ish slice-and-dice layout keeps tiles
+// close to square; sequential opacity by value (bigger = more opaque). Labels
+// render only when a tile is big enough to hold them. Handles 1 dominant + a
+// long tail gracefully (tiny tiles simply drop their label).
+const TREE_W = 480;
+const TREE_H = 300;
+
+type TreeTile = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  name: string;
+  value: number;
+};
+
+/**
+ * Squarified-ish slice-and-dice: recursively split the remaining rectangle
+ * along its LONGER edge, packing a prefix of items whose summed value fills a
+ * proportional slice, so tiles stay close to square. Pure; deterministic.
+ */
+function layoutTreemap(
+  items: { name: string; value: number }[],
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): TreeTile[] {
+  if (items.length === 0 || w <= 0 || h <= 0) return [];
+  if (items.length === 1) {
+    return [{ x, y, w, h, name: items[0].name, value: items[0].value }];
+  }
+  const total = items.reduce((a, b) => a + b.value, 0);
+  if (total <= 0) return [];
+  // Take a prefix summing to ~half the value so each split is balanced.
+  const half = total / 2;
+  let acc = 0;
+  let split = 1;
+  for (let i = 0; i < items.length; i++) {
+    acc += items[i].value;
+    split = i + 1;
+    if (acc >= half) break;
+  }
+  // Guard against a lone dominant item swallowing the whole prefix.
+  if (split >= items.length) split = items.length - 1;
+  const headItems = items.slice(0, split);
+  const tailItems = items.slice(split);
+  const headSum = headItems.reduce((a, b) => a + b.value, 0);
+  const frac = headSum / total;
+  // Split along the longer edge so tiles trend square.
+  if (w >= h) {
+    const wHead = w * frac;
+    return [
+      ...layoutTreemap(headItems, x, y, wHead, h),
+      ...layoutTreemap(tailItems, x + wHead, y, w - wHead, h),
+    ];
+  }
+  const hHead = h * frac;
+  return [
+    ...layoutTreemap(headItems, x, y, w, hHead),
+    ...layoutTreemap(tailItems, x, y + hHead, w, h - hHead),
+  ];
+}
+
+function TreemapView({
+  rows,
+  labelIndex,
+  valueIndex,
+  valueName,
+}: {
+  rows: unknown[][];
+  labelIndex: number;
+  valueIndex: number;
+  valueName: string;
+}) {
+  const { tiles, max } = useMemo(() => {
+    const items: { name: string; value: number }[] = [];
+    for (const r of rows) {
+      const v = toNumber(r[valueIndex]);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      items.push({ name: displayCell(r[labelIndex]), value: v });
+    }
+    // Largest-first so the layout packs the dominant tile first.
+    items.sort((a, b) => b.value - a.value);
+    const mx = items.length ? items[0].value : 0;
+    return {
+      tiles: layoutTreemap(items, 0, 0, TREE_W, TREE_H),
+      max: mx,
+    };
+  }, [rows, labelIndex, valueIndex]);
+
+  if (!tiles.length || max <= 0) {
+    return <div style={emptyStyle}>No data to chart</div>;
+  }
+
+  // Sequential opacity by value: bigger tile = more opaque.
+  const opacityFor = (v: number) => 0.28 + 0.62 * (v / max);
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${TREE_W} ${TREE_H}`}
+        role="img"
+        aria-label={`Treemap of ${valueName}`}
+        style={{ width: '100%', height: 'auto' }}
+      >
+        {tiles.map((t, i) => {
+          // Label only when the tile can hold it.
+          const showName = t.w >= 46 && t.h >= 22;
+          const showValue = t.w >= 46 && t.h >= 34;
+          return (
+            <g key={i}>
+              <rect
+                x={round1(t.x)}
+                y={round1(t.y)}
+                width={round1(Math.max(0, t.w - 1))}
+                height={round1(Math.max(0, t.h - 1))}
+                rx={2}
+                fill={ACCENT}
+                opacity={opacityFor(t.value)}
+                stroke="var(--color-background-primary, #fff)"
+                strokeWidth={1}
+              >
+                <title>{`${t.name}: ${formatNumber(t.value)}`}</title>
+              </rect>
+              {showName ? (
+                <text
+                  x={round1(t.x + 5)}
+                  y={round1(t.y + 14)}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="var(--color-text-primary, #fff)"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {t.name.length > 18 ? t.name.slice(0, 17) + '…' : t.name}
+                </text>
+              ) : null}
+              {showValue ? (
+                <text
+                  x={round1(t.x + 5)}
+                  y={round1(t.y + 27)}
+                  fontSize={10}
+                  fill="var(--color-text-primary, rgba(255,255,255,0.8))"
+                  opacity={0.85}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {formatNumber(t.value)}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+        {humanizeColumn(valueName)} · {tiles.length} categories
+      </div>
+    </div>
+  );
+}
+
+// ── SANKEY ───────────────────────────────────────────────────────────
+// source (text) + target (text) + numeric value → a 2-column flow diagram.
+// Left nodes (sources) and right nodes (targets) are sized by throughput;
+// curved links are width-proportional to value. Nodes are capped (~12 per side)
+// with the overflow bucketed into "Other" so the diagram stays legible.
+const SANK_W = 480;
+const SANK_H = 320;
+const SANK_PAD_T = 12;
+const SANK_PAD_B = 12;
+const SANK_NODE_W = 12;
+const SANK_NODE_GAP = 6;
+const SANK_MAX_NODES = 12;
+
+type SankNode = { name: string; value: number; y0: number; y1: number };
+
+/** Aggregate + cap a side's nodes to SANK_MAX_NODES, bucketing the rest. */
+function capNodes(entries: [string, number][]): [string, number][] {
+  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
+  if (sorted.length <= SANK_MAX_NODES) return sorted;
+  const head = sorted.slice(0, SANK_MAX_NODES - 1);
+  const tail = sorted.slice(SANK_MAX_NODES - 1);
+  const other = tail.reduce((a, b) => a + b[1], 0);
+  return [...head, ['Other', other]];
+}
+
+function SankeyView({
+  rows,
+  sourceIndex,
+  targetIndex,
+  valueIndex,
+}: {
+  rows: unknown[][];
+  sourceIndex: number;
+  targetIndex: number;
+  valueIndex: number;
+}) {
+  const model = useMemo(() => {
+    // Aggregate source totals, target totals, and per source→target flow.
+    const srcTotals = new Map<string, number>();
+    const tgtTotals = new Map<string, number>();
+    const flows = new Map<string, number>(); // "src tgt" → value
+    for (const r of rows) {
+      const src = displayCell(r[sourceIndex]);
+      const tgt = displayCell(r[targetIndex]);
+      const v = toNumber(r[valueIndex]);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      srcTotals.set(src, (srcTotals.get(src) ?? 0) + v);
+      tgtTotals.set(tgt, (tgtTotals.get(tgt) ?? 0) + v);
+      const key = `${src} ${tgt}`;
+      flows.set(key, (flows.get(key) ?? 0) + v);
+    }
+    const srcCapped = capNodes([...srcTotals.entries()]);
+    const tgtCapped = capNodes([...tgtTotals.entries()]);
+    // Map any bucketed original names to "Other".
+    const srcKeep = new Set(srcCapped.map((e) => e[0]));
+    const tgtKeep = new Set(tgtCapped.map((e) => e[0]));
+    const remap = (name: string, keep: Set<string>) =>
+      keep.has(name) ? name : 'Other';
+
+    // Rebuild flows against the capped node sets.
+    const capFlows = new Map<string, number>();
+    for (const [key, v] of flows) {
+      const [src, tgt] = key.split(' ');
+      const s = remap(src, srcKeep);
+      const t = remap(tgt, tgtKeep);
+      const k = `${s} ${t}`;
+      capFlows.set(k, (capFlows.get(k) ?? 0) + v);
+    }
+
+    const grand = srcCapped.reduce((a, b) => a + b[1], 0);
+    return { srcCapped, tgtCapped, capFlows, grand };
+  }, [rows, sourceIndex, targetIndex, valueIndex]);
+
+  const { srcCapped, tgtCapped, capFlows, grand } = model;
+  if (!srcCapped.length || !tgtCapped.length || grand <= 0) {
+    return <div style={emptyStyle}>No flows to chart</div>;
+  }
+
+  // Lay out each side vertically: node height ∝ throughput, with a small gap.
+  const layoutSide = (entries: [string, number][]): SankNode[] => {
+    const n = entries.length;
+    const gaps = (n - 1) * SANK_NODE_GAP;
+    const avail = SANK_H - SANK_PAD_T - SANK_PAD_B - gaps;
+    const sum = entries.reduce((a, b) => a + b[1], 0) || 1;
+    const nodes: SankNode[] = [];
+    let cursor = SANK_PAD_T;
+    for (const [name, value] of entries) {
+      const h = Math.max(3, (value / sum) * avail);
+      nodes.push({ name, value, y0: cursor, y1: cursor + h });
+      cursor += h + SANK_NODE_GAP;
+    }
+    return nodes;
+  };
+
+  const srcNodes = layoutSide(srcCapped);
+  const tgtNodes = layoutSide(tgtCapped);
+  const srcByName = new Map(srcNodes.map((nd) => [nd.name, nd]));
+  const tgtByName = new Map(tgtNodes.map((nd) => [nd.name, nd]));
+
+  const leftX = 4;
+  const rightX = SANK_W - SANK_NODE_W - 4;
+  const linkLeftX = leftX + SANK_NODE_W;
+  const linkRightX = rightX;
+
+  // Vertical cursors tracking where the next link attaches on each node.
+  const srcCursor = new Map(srcNodes.map((nd) => [nd.name, nd.y0]));
+  const tgtCursor = new Map(tgtNodes.map((nd) => [nd.name, nd.y0]));
+
+  // Build link ribbons in a stable order (source-major, target order).
+  const links: {
+    d: string;
+    value: number;
+    src: string;
+    tgt: string;
+    opacity: number;
+  }[] = [];
+  const flowSum = [...capFlows.values()].reduce((a, b) => a + b, 0) || 1;
+  for (const [srcName] of srcCapped) {
+    for (const [tgtName] of tgtCapped) {
+      const v = capFlows.get(`${srcName} ${tgtName}`);
+      if (!v || v <= 0) continue;
+      const s = srcByName.get(srcName)!;
+      const t = tgtByName.get(tgtName)!;
+      const sSum = s.value || 1;
+      const tSum = t.value || 1;
+      const sThick = (v / sSum) * (s.y1 - s.y0);
+      const tThick = (v / tSum) * (t.y1 - t.y0);
+      const sy = srcCursor.get(srcName)!;
+      const ty = tgtCursor.get(tgtName)!;
+      srcCursor.set(srcName, sy + sThick);
+      tgtCursor.set(tgtName, ty + tThick);
+      const sy0 = sy;
+      const sy1 = sy + sThick;
+      const ty0 = ty;
+      const ty1 = ty + tThick;
+      const midX = (linkLeftX + linkRightX) / 2;
+      // A filled ribbon: top edge left→right (cubic), down the right node,
+      // bottom edge right→left (cubic), close.
+      const d = [
+        `M ${round1(linkLeftX)},${round1(sy0)}`,
+        `C ${round1(midX)},${round1(sy0)} ${round1(midX)},${round1(ty0)} ${round1(linkRightX)},${round1(ty0)}`,
+        `L ${round1(linkRightX)},${round1(ty1)}`,
+        `C ${round1(midX)},${round1(ty1)} ${round1(midX)},${round1(sy1)} ${round1(linkLeftX)},${round1(sy1)}`,
+        'Z',
+      ].join(' ');
+      links.push({
+        d,
+        value: v,
+        src: srcName,
+        tgt: tgtName,
+        opacity: 0.18 + 0.32 * (v / flowSum),
+      });
+    }
+  }
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${SANK_W} ${SANK_H}`}
+        role="img"
+        aria-label="Sankey flow diagram"
+        style={{ width: '100%', height: 'auto' }}
+      >
+        {/* link ribbons (drawn under the node bars) */}
+        {links.map((lk, i) => (
+          <path key={i} d={lk.d} fill={ACCENT} opacity={lk.opacity}>
+            <title>{`${lk.src} → ${lk.tgt}: ${formatNumber(lk.value)}`}</title>
+          </path>
+        ))}
+        {/* source node bars + labels (left) */}
+        {srcNodes.map((nd, i) => (
+          <g key={`s${i}`}>
+            <rect
+              x={leftX}
+              y={round1(nd.y0)}
+              width={SANK_NODE_W}
+              height={round1(nd.y1 - nd.y0)}
+              rx={2}
+              fill={ACCENT}
+              opacity={0.85}
+            >
+              <title>{`${nd.name}: ${formatNumber(nd.value)}`}</title>
+            </rect>
+            <text
+              x={leftX + SANK_NODE_W + 4}
+              y={round1((nd.y0 + nd.y1) / 2) + 3}
+              fontSize={10}
+              textAnchor="start"
+              fill="var(--color-text-secondary, rgba(0,0,0,0.7))"
+            >
+              {nd.name.length > 16 ? nd.name.slice(0, 15) + '…' : nd.name}
+            </text>
+          </g>
+        ))}
+        {/* target node bars + labels (right) */}
+        {tgtNodes.map((nd, i) => (
+          <g key={`t${i}`}>
+            <rect
+              x={rightX}
+              y={round1(nd.y0)}
+              width={SANK_NODE_W}
+              height={round1(nd.y1 - nd.y0)}
+              rx={2}
+              fill={ACCENT}
+              opacity={0.85}
+            >
+              <title>{`${nd.name}: ${formatNumber(nd.value)}`}</title>
+            </rect>
+            <text
+              x={rightX - 4}
+              y={round1((nd.y0 + nd.y1) / 2) + 3}
+              fontSize={10}
+              textAnchor="end"
+              fill="var(--color-text-secondary, rgba(0,0,0,0.7))"
+            >
+              {nd.name.length > 16 ? nd.name.slice(0, 15) + '…' : nd.name}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// ── COVER MOSAIC ─────────────────────────────────────────────────────
+// A packed wall of cover images SIZED by the metric (bigger = more plays). A
+// simple sized-tile flow: each cover's edge scales between a min and max by the
+// metric's share of the max, wrapping with flexbox. Images load straight from
+// the CDN (already CSP-allowed); names are captions/tooltips.
+const MOSAIC_MIN = 56;
+const MOSAIC_MAX = 132;
+
+function MosaicView({
+  rows,
+  imageIndex,
+  labelIndex,
+  metricIndex,
+  metricLabel,
+  art,
+  onOpen,
+}: {
+  rows: unknown[][];
+  imageIndex: number;
+  labelIndex: number;
+  metricIndex: number;
+  metricLabel: string | null;
+  art?: Record<string, string>;
+  onOpen?: (url: string) => void;
+}) {
+  const values = rows.map((r) => {
+    const n = toNumber(r[metricIndex]);
+    return Number.isFinite(n) ? n : 0;
+  });
+  const max = Math.max(0, ...values);
+
+  const sizeFor = (v: number) => {
+    if (max <= 0) return MOSAIC_MIN;
+    // sqrt scale so area (not edge) trends with the metric — a big value doesn't
+    // dwarf the wall.
+    const frac = Math.sqrt(v / max);
+    return Math.round(MOSAIC_MIN + frac * (MOSAIC_MAX - MOSAIC_MIN));
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 6,
+        alignItems: 'flex-end',
+      }}
+    >
+      {rows.map((row, i) => {
+        const rawUrl = row[imageIndex];
+        const url = typeof rawUrl === 'string' ? rawUrl : '';
+        const src = (url && art?.[url]) || url;
+        const label = displayCell(row[labelIndex]);
+        const value = values[i];
+        const edge = sizeFor(value);
+        const caption = metricLabel
+          ? `${label} · ${formatNumber(value)} ${metricLabel}`
+          : `${label} · ${formatNumber(value)}`;
+        return (
+          <div
+            key={i}
+            role={onOpen && url ? 'button' : undefined}
+            onClick={onOpen && url ? () => onOpen(url) : undefined}
+            title={caption}
+            style={{
+              width: edge,
+              height: edge,
+              borderRadius: 6,
+              overflow: 'hidden',
+              flexShrink: 0,
+              cursor: onOpen && url ? 'pointer' : 'default',
+              background: 'var(--color-background-secondary, rgba(0,0,0,0.04))',
+            }}
+          >
+            {src ? (
+              <img
+                src={src}
+                alt={label}
+                loading="lazy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── shared formatting ────────────────────────────────────────────────
 /** Humanize a snake/camel column name into a Title-Cased label. */
 function humanizeColumn(name: string): string {
@@ -1915,12 +2390,15 @@ export function QueryResult({
       'calendar',
       'clock',
       'stacked',
+      'sankey',
       'scatter',
       'histogram',
       'chart',
+      'treemap',
       'map',
       'list',
       'grid',
+      'mosaic',
     ];
     return order.filter(
       (v) => v === 'table' || detection.available.includes(v)
@@ -1948,10 +2426,13 @@ export function QueryResult({
     );
   }
 
-  // Grid/list metric: a numeric column that isn't the image or label column.
-  // detection.metricIndex already resolves this; keep the local for callers.
+  // Grid/list/mosaic metric: a numeric column that isn't the image or label
+  // column. detection.metricIndex already resolves this; keep the local for
+  // callers.
   const metricIndex =
-    view === 'grid' || view === 'list' ? detection.metricIndex : null;
+    view === 'grid' || view === 'list' || view === 'mosaic'
+      ? detection.metricIndex
+      : null;
   const metricLabel = metricIndex !== null ? columns[metricIndex] : null;
 
   return (
@@ -2076,6 +2557,41 @@ export function QueryResult({
               seriesIndex={detection.stackedSeriesIndex}
               valueIndex={detection.stackedValueIndex}
               categoryName={columns[detection.stackedCategoryIndex] ?? ''}
+            />
+          )}
+        {view === 'treemap' &&
+          detection.treemapLabelIndex !== null &&
+          detection.treemapValueIndex !== null && (
+            <TreemapView
+              rows={rows}
+              labelIndex={detection.treemapLabelIndex}
+              valueIndex={detection.treemapValueIndex}
+              valueName={columns[detection.treemapValueIndex] ?? ''}
+            />
+          )}
+        {view === 'sankey' &&
+          detection.sankeySourceIndex !== null &&
+          detection.sankeyTargetIndex !== null &&
+          detection.sankeyValueIndex !== null && (
+            <SankeyView
+              rows={rows}
+              sourceIndex={detection.sankeySourceIndex}
+              targetIndex={detection.sankeyTargetIndex}
+              valueIndex={detection.sankeyValueIndex}
+            />
+          )}
+        {view === 'mosaic' &&
+          detection.imageIndex !== null &&
+          detection.labelIndex !== null &&
+          detection.mosaicMetricIndex !== null && (
+            <MosaicView
+              rows={rows}
+              imageIndex={detection.imageIndex}
+              labelIndex={detection.labelIndex}
+              metricIndex={detection.mosaicMetricIndex}
+              metricLabel={metricLabel}
+              art={payload.art}
+              onOpen={onOpen}
             />
           )}
         {view === 'map' && (

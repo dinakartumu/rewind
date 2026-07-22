@@ -141,6 +141,74 @@ describe('StackedView render', () => {
   });
 });
 
+// ── TREEMAP ──────────────────────────────────────────────────────────
+describe('TreemapView render', () => {
+  it('renders one <rect> tile per positive-value category with labels', async () => {
+    // treemap-shares auto-detects to treemap (15 categories); force is not
+    // needed but assert the detected auto is treemap.
+    const fx = fixtures['treemap-shares'];
+    expect(detectView(fx).auto).toBe('treemap');
+    const container = await mount(fx);
+    const svg = card(container).querySelector('svg');
+    expect(svg).toBeTruthy();
+    // Tiles are the <rect>s; one per (positive) category row.
+    expect(svg!.querySelectorAll('rect')).toHaveLength(fx.rows.length);
+    // The dominant category label renders as SVG text.
+    const labels = [...svg!.querySelectorAll('text')].map((t) => t.textContent);
+    expect(labels).toContain('Drama');
+    // Footer names the value column + category count.
+    expect(card(container).textContent).toContain('categories');
+  });
+});
+
+// ── SANKEY ───────────────────────────────────────────────────────────
+describe('SankeyView render', () => {
+  it('renders source + target node rects, link paths, and node labels', async () => {
+    const fx = fixtures['sankey-flow']; // genre → decade
+    expect(detectView(fx).auto).toBe('sankey');
+    const container = await mount(fx);
+    const c = card(container);
+    const svg = c.querySelector('svg');
+    expect(svg).toBeTruthy();
+    // 5 distinct sources (genres) + 5 distinct targets (decades) = 10 node rects.
+    const sources = new Set(fx.rows.map((r) => r[0]));
+    const targets = new Set(fx.rows.map((r) => r[1]));
+    expect(svg!.querySelectorAll('rect')).toHaveLength(
+      sources.size + targets.size
+    );
+    // Link ribbons are <path>s; there is at least one flow.
+    expect(svg!.querySelectorAll('path').length).toBeGreaterThan(0);
+    // Node labels: a source (genre) and a target (decade) both appear.
+    const labels = [...svg!.querySelectorAll('text')].map((t) => t.textContent);
+    expect(labels).toContain('Drama');
+    expect(labels).toContain('2010s');
+  });
+});
+
+// ── COVER MOSAIC ─────────────────────────────────────────────────────
+describe('MosaicView render', () => {
+  it('renders one CDN <img> per row sized differently by the metric', async () => {
+    // cover-mosaic auto-detects to `list` (image+label+metric); force `mosaic`.
+    const fx: QueryResultShape = {
+      ...fixtures['cover-mosaic'],
+      view: 'mosaic',
+    };
+    const container = await mount(fx);
+    const c = card(container);
+    const imgs = c.querySelectorAll('img');
+    expect(imgs).toHaveLength(fixtures['cover-mosaic'].rows.length); // 12
+    // Every <img> src points at the CDN origin.
+    for (const img of imgs) {
+      expect(img.getAttribute('src')).toContain(`${CDN}/`);
+    }
+    // Tiles are sized by the metric: the tile wrapping each <img> has a width,
+    // and the largest-metric tile is wider than the smallest.
+    const wrappers = [...imgs].map((img) => img.parentElement as HTMLElement);
+    const widths = wrappers.map((w) => parseFloat(w.style.width));
+    expect(Math.max(...widths)).toBeGreaterThan(Math.min(...widths));
+  });
+});
+
 // ── CALENDAR HEATMAP ─────────────────────────────────────────────────
 describe('CalendarView render', () => {
   it('renders a full year of day cells with month labels', async () => {
@@ -321,9 +389,14 @@ describe('resolver → render integration', () => {
       case 'histogram':
       case 'scatter':
       case 'stacked':
+      case 'sankey':
+      case 'treemap':
       case 'calendar':
       case 'clock':
         expect(c.querySelector('svg')).toBeTruthy();
+        break;
+      case 'mosaic':
+        expect(c.querySelector('img')).toBeTruthy();
         break;
       case 'stat':
         // KPI tiles are divs (no table/img/svg); assert a humanized label tile.

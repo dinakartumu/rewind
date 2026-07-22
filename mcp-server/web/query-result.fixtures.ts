@@ -204,6 +204,78 @@ const stackedBars: QueryResultShape = {
   ],
 };
 
+/**
+ * category (text) + numeric value with MANY distinct categories (15) → treemap
+ * offered alongside the bar chart, and `auto` flips to treemap for large N.
+ * Watch time by genre: one dominant genre + a long tail.
+ */
+const treemapShares: QueryResultShape = {
+  columns: ['genre', 'hours'],
+  rows: [
+    ['Drama', 412],
+    ['Comedy', 268],
+    ['Documentary', 190],
+    ['Thriller', 154],
+    ['Sci-Fi', 132],
+    ['Horror', 98],
+    ['Animation', 84],
+    ['Romance', 71],
+    ['Action', 66],
+    ['Crime', 52],
+    ['Mystery', 41],
+    ['Fantasy', 33],
+    ['War', 22],
+    ['Musical', 14],
+    ['Western', 9],
+  ],
+};
+
+/**
+ * source (text) + target (text) + numeric value → sankey flow. Genre → decade
+ * watch counts: two free-form categorical dimensions, so `auto` is sankey (and
+ * stacked is offered as a tab too).
+ */
+const sankeyFlow: QueryResultShape = {
+  columns: ['genre', 'decade', 'films'],
+  rows: [
+    ['Drama', '1970s', 8],
+    ['Drama', '1990s', 14],
+    ['Drama', '2010s', 22],
+    ['Comedy', '1980s', 11],
+    ['Comedy', '2000s', 17],
+    ['Comedy', '2010s', 9],
+    ['Sci-Fi', '1970s', 6],
+    ['Sci-Fi', '1980s', 10],
+    ['Sci-Fi', '2010s', 19],
+    ['Horror', '1980s', 13],
+    ['Horror', '2000s', 7],
+    ['Thriller', '1990s', 12],
+    ['Thriller', '2010s', 15],
+  ],
+};
+
+/**
+ * name + CDN cover URL + plays (~12 rows) → cover mosaic. Same image + label +
+ * metric signal as grid/list, but the mosaic tab sizes each cover by plays.
+ */
+const coverMosaic: QueryResultShape = {
+  columns: ['album', 'cover', 'plays'],
+  rows: [
+    ['GUTS', `${CDN}/listening/albums/1/original.jpg?v=1`, 4120],
+    ['SOUR', `${CDN}/listening/albums/2/original.jpg?v=1`, 3880],
+    ['Short n’ Sweet', `${CDN}/listening/albums/3/original.jpg?v=1`, 3010],
+    ['emails i can’t send', `${CDN}/listening/albums/4/original.jpg?v=1`, 2540],
+    ['Midnights', `${CDN}/listening/albums/5/original.jpg?v=1`, 2110],
+    ['folklore', `${CDN}/listening/albums/6/original.jpg?v=1`, 1980],
+    ['Sling', `${CDN}/listening/albums/7/original.jpg?v=1`, 1640],
+    ['Punisher', `${CDN}/listening/albums/8/original.jpg?v=1`, 1420],
+    ['Immunity', `${CDN}/listening/albums/9/original.jpg?v=1`, 1180],
+    ['Norman Rockwell', `${CDN}/listening/albums/10/original.jpg?v=1`, 940],
+    ['Melodrama', `${CDN}/listening/albums/11/original.jpg?v=1`, 720],
+    ['Pure Heroine', `${CDN}/listening/albums/12/original.jpg?v=1`, 510],
+  ],
+};
+
 /** Same image-grid data but forced to the table view via `view`. */
 const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 
@@ -221,5 +293,8 @@ export const fixtures: Record<string, QueryResultShape> = {
   'histogram-dist': histogramDist,
   'scatter-plot': scatterPlot,
   'stacked-bars': stackedBars,
+  'treemap-shares': treemapShares,
+  'sankey-flow': sankeyFlow,
+  'cover-mosaic': coverMosaic,
   'forced-table': forcedTable,
 };

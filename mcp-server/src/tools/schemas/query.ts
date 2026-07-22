@@ -16,7 +16,8 @@ export const queryOutputSchema = z
     /**
      * Echo of the requested render view for the generic query-result UI
      * bundle: 'auto' (auto-detect) or a forced 'table' | 'chart' | 'map' |
-     * 'grid' | 'calendar' | 'clock' | 'stat' | 'list'. Present on every
+     * 'grid' | 'calendar' | 'clock' | 'stat' | 'list' | 'histogram' |
+     * 'scatter' | 'stacked' | 'treemap' | 'sankey' | 'mosaic'. Present on every
      * result; ignored by non-UI hosts.
      */
     view: z
@@ -33,6 +34,9 @@ export const queryOutputSchema = z
         'histogram',
         'scatter',
         'stacked',
+        'treemap',
+        'sankey',
+        'mosaic',
       ])
       .optional(),
     /**

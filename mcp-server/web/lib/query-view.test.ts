@@ -294,6 +294,140 @@ describe('detectView', () => {
     expect(d.auto).toBe('stacked');
     expect(d.available).not.toContain('chart');
   });
+
+  // ── treemap (category + metric, many categories) ─────────────────────
+  it('offers treemap on a category + metric result with ≥8 categories', () => {
+    const d = detectView(fixtures['treemap-shares']);
+    // Both chart and treemap tabs are offered; large N → treemap is the default.
+    expect(d.available).toContain('chart');
+    expect(d.available).toContain('treemap');
+    expect(d.auto).toBe('treemap');
+    expect(d.treemapLabelIndex).toBe(0);
+    expect(d.treemapValueIndex).toBe(1);
+  });
+
+  it('does NOT offer treemap for a category + metric with <8 categories', () => {
+    // category-chart has only 5 distinct categories.
+    const d = detectView(fixtures['category-chart']);
+    expect(d.available).toContain('chart');
+    expect(d.available).not.toContain('treemap');
+    expect(d.auto).toBe('chart');
+    expect(d.treemapLabelIndex).toBeNull();
+  });
+
+  it('does NOT offer treemap for a time-series (period) chart', () => {
+    const d = detectView(fixtures['period-chart']);
+    expect(d.available).not.toContain('treemap');
+    expect(d.treemapLabelIndex).toBeNull();
+  });
+
+  // ── sankey (source + target + value) ─────────────────────────────────
+  it('auto-selects sankey for a free-form source + target + value result', () => {
+    const d = detectView(fixtures['sankey-flow']);
+    expect(d.auto).toBe('sankey');
+    expect(d.available).toContain('sankey');
+    expect(d.sankeySourceIndex).toBe(0);
+    expect(d.sankeyTargetIndex).toBe(1);
+    expect(d.sankeyValueIndex).toBe(2);
+    // The same 3-col shape also resolves as a stacked bar, offered as a tab.
+    expect(d.available).toContain('stacked');
+  });
+
+  it('defaults to stacked (not sankey) when col0 is ordinal/temporal', () => {
+    // stacked-bars col0 is `year` (period-ish) → stacked is the default, but
+    // year classifies numeric so sankey (needs 2 text cols) never fires.
+    const d = detectView(fixtures['stacked-bars']);
+    expect(d.auto).toBe('stacked');
+    expect(d.sankeySourceIndex).toBeNull();
+  });
+
+  it('defaults to stacked when BOTH text cols but col0 reads period-ish', () => {
+    // Two free-form text cols would fire sankey; here col0 is a YYYY period
+    // stored as text, so the default rule prefers stacked.
+    const d = detectView({
+      columns: ['year', 'genre', 'count'],
+      rows: [
+        ['2019', 'Drama', 12],
+        ['2019', 'Comedy', 8],
+        ['2020', 'Drama', 15],
+        ['2020', 'Comedy', 9],
+        ['2021', 'Drama', 11],
+      ],
+    });
+    // year is a 4-digit string → classifies numeric/period, so this is the
+    // stacked shape (1 text col), never sankey. Default stacked.
+    expect(d.auto).toBe('stacked');
+    expect(d.available).toContain('stacked');
+    expect(d.available).not.toContain('sankey');
+  });
+
+  it('defaults to sankey for two free-form categorical dimensions', () => {
+    const d = detectView({
+      columns: ['sport', 'city', 'sessions'],
+      rows: [
+        ['Running', 'San Francisco', 42],
+        ['Running', 'Oakland', 18],
+        ['Cycling', 'San Francisco', 27],
+        ['Cycling', 'Berkeley', 11],
+        ['Swimming', 'San Francisco', 9],
+      ],
+    });
+    expect(d.auto).toBe('sankey');
+    expect(d.available).toContain('sankey');
+    expect(d.available).toContain('stacked');
+  });
+
+  it('does NOT sankey a plain category + metric (2 cols)', () => {
+    const d = detectView(fixtures['category-chart']);
+    expect(d.available).not.toContain('sankey');
+    expect(d.sankeySourceIndex).toBeNull();
+  });
+
+  it('does NOT sankey when there are not two distinct sources or targets', () => {
+    const d = detectView({
+      columns: ['source', 'target', 'value'],
+      rows: [['A', 'B', 5]],
+    });
+    expect(d.available).not.toContain('sankey');
+    expect(d.sankeySourceIndex).toBeNull();
+  });
+
+  // ── cover mosaic (image + label + metric) ────────────────────────────
+  it('offers mosaic on an image + label + metric result (extra tab)', () => {
+    const d = detectView(fixtures['cover-mosaic']);
+    expect(d.available).toContain('grid');
+    expect(d.available).toContain('list');
+    expect(d.available).toContain('mosaic');
+    expect(d.mosaicMetricIndex).not.toBeNull();
+    // Mosaic is never the auto default — grid/list keep that.
+    expect(d.auto).toBe('list');
+  });
+
+  it('does NOT offer mosaic for an image + label result with no metric', () => {
+    const d = detectView({
+      columns: ['album', 'cover'],
+      rows: [['GUTS', 'https://cdn.dinakartumu.com/a/1.jpg']],
+    });
+    expect(d.available).toContain('grid');
+    expect(d.available).not.toContain('mosaic');
+    expect(d.mosaicMetricIndex).toBeNull();
+  });
+
+  // ── priority integration: existing cases unchanged ───────────────────
+  it('leaves existing auto selections unchanged by the new views', () => {
+    expect(detectView(fixtures['scalar-table']).auto).toBe('table');
+    expect(detectView(fixtures['period-chart']).auto).toBe('chart');
+    expect(detectView(fixtures['category-chart']).auto).toBe('chart');
+    expect(detectView(fixtures['latlng-map']).auto).toBe('map');
+    expect(detectView(fixtures['image-grid']).auto).toBe('list');
+    expect(detectView(fixtures['calendar-heatmap']).auto).toBe('calendar');
+    expect(detectView(fixtures['stat-cards']).auto).toBe('stat');
+    expect(detectView(fixtures['ranked-list']).auto).toBe('list');
+    expect(detectView(fixtures['hour-clock']).auto).toBe('clock');
+    expect(detectView(fixtures['histogram-dist']).auto).toBe('histogram');
+    expect(detectView(fixtures['scatter-plot']).auto).toBe('scatter');
+    expect(detectView(fixtures['stacked-bars']).auto).toBe('stacked');
+  });
 });
 
 describe('cell classifiers', () => {

@@ -95,16 +95,59 @@ Never throws; **table is always available and is the universal fallback.**
   (`YYYY`, `YYYY-MM`, or ISO date, ≥60% of samples) → **line/area time-series**;
   otherwise → **bar chart**. Two numeric columns count as a chart only when the
   first looks period-ish (e.g. `year, plays`).
+- **treemap** — the SAME category (text) + one numeric column shape the bar
+  **chart** fires on, offered as an **additional tab** — but only when there are
+  **≥8 distinct categories** and the category column is NOT a period
+  (a treemap of months makes no sense). Reads as share-of-whole: rectangles
+  sized by value (squarified-ish slice-and-dice so tiles trend square), labeled
+  (name + value) when the tile is big enough, sequential opacity by value
+  (bigger = more opaque). Handles a single dominant tile + a long tail
+  gracefully (tiny tiles drop their labels). BOTH the `chart` and `treemap`
+  tabs are shown; `auto` stays **chart** for small N and flips to **treemap**
+  once there are ≥8 categories.
+- **sankey** — a **flow diagram** over a 3-col shape: exactly **one source
+  (text)** + **one target (text)** + **one numeric value**, with **≥2 distinct
+  sources OR targets**. Left nodes (sources) and right nodes (targets) are sized
+  by throughput; curved link ribbons are width-proportional to value; nodes are
+  capped at **~12 per side** with the overflow bucketed into an "Other" node so
+  the diagram stays legible (2 columns of nodes only — no multi-level). This is
+  the **same text+text+num shape as `stacked`**, so BOTH are offered as tabs;
+  see the **stacked-vs-sankey default rule** below.
+- **mosaic** (cover mosaic) — a **variant of `grid`**: detects the SAME signal
+  (CDN image-URL column + name/label column) AND requires a **numeric metric**,
+  offered as an **additional tab** whenever grid applies with a metric. Renders
+  a packed wall of cover images **sized by the metric** (bigger = more
+  plays/watches; a `sqrt` scale keeps area — not edge — proportional so one big
+  value doesn't dwarf the wall), wrapping via flexbox; names are tooltips/
+  captions. Images load straight from the CDN (already CSP-allowed). **Never the
+  `auto` default** — grid/list keep that; mosaic is purely an extra tab.
 - **table** — everything else, and the fallback whenever a richer view fails.
 
+**Stacked-vs-sankey default rule.** `stacked` and `sankey` share the 3-col
+text+text+num shape, so BOTH are always offered as tabs for it. The `auto`
+DEFAULT is chosen from **col0** (the category/source): when col0 reads
+**ordinal/temporal** — a period (`YYYY` / `YYYY-MM` / date, ≥60% of samples) —
+you'd read the result over an ordered x-axis, so **stacked** is the default;
+when col0 is a **free-form categorical** (col0 is NOT period-ish), it's two
+categorical dimensions flowing into each other, so **sankey** is the default.
+Practically, a `year, genre, count` result has col0 (`year`) classify numeric/
+period, which leaves only ONE text column — so it never satisfies sankey's
+"two text cols" guard and stays **stacked**; a `genre, decade, count` (both
+free-form text) satisfies sankey and, because col0 (`genre`) isn't period-ish,
+defaults to **sankey** (with a `stacked` tab still available).
+
 **Auto priority (finalized):**
-`map > calendar > clock > stat > (grid | list) > stacked > scatter > histogram > chart > table`.
-The `stacked` (3-col cat+series+num), `scatter` (2 numerics), and `histogram`
-(1 numeric) views are MORE specific than the generic chart, so they sit just
-before it; each guard stays tight so an ordinary category+metric still lands on
-`chart` and odd shapes fall back to `table`. The `view` arg forces one mode
-(validated by the input enum:
-`auto | table | chart | map | grid | calendar | clock | stat | list | histogram | scatter | stacked`).
+`map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter > histogram > (chart | treemap) > table`.
+The `stacked`/`sankey` (3-col cat+series/target+num), `scatter` (2 numerics),
+and `histogram` (1 numeric) views are MORE specific than the generic chart, so
+they sit just before it; each guard stays tight so an ordinary category+metric
+still lands on `chart` (or `treemap` at ≥8 categories) and odd shapes fall back
+to `table`. `treemap` and `mosaic` are **additional tabs** layered onto shapes
+that already resolve (category+metric / image+metric); `sankey` is a **new auto
+view** for the free-form source+target+value shape (default chosen by the
+stacked-vs-sankey rule above). The `view` arg forces one mode (validated by the
+input enum:
+`auto | table | chart | map | grid | calendar | clock | stat | list | histogram | scatter | stacked | treemap | sankey | mosaic`).
 The UI always shows a **table** tab plus a tab for each detected richer view;
 table is the safe default tab, and `auto` selects the richest applicable view on
 first render.
@@ -132,6 +175,21 @@ WHERE distance_km > 0` (two numeric columns + a text label → pace vs distance;
 - **histogram** — `SELECT rating FROM watching_movies WHERE rating IS NOT NULL`
   (one numeric column of raw values → binned distribution of all ratings; "run
   distances" via `SELECT distance_km FROM strava_activities` is the same shape).
+- **treemap** — `SELECT genre, SUM(runtime)/60 AS hours FROM watching_movies m
+JOIN movie_genres g ON … GROUP BY genre ORDER BY hours DESC` (one category +
+  one metric with ≥8 genres → share-of-whole tiles; "scrobbles by artist" via
+  `SELECT name AS artist, play_count AS scrobbles FROM lastfm_artists ORDER BY
+scrobbles DESC LIMIT 20` is the same shape). Fewer than 8 categories stays a
+  bar `chart`.
+- **sankey** — `SELECT genre, decade, COUNT(*) AS films FROM … GROUP BY genre,
+decade` (source + target + value flow → genre→decade ribbons); "sport → city"
+  via `SELECT sport, city, COUNT(*) AS sessions FROM … GROUP BY sport, city` is
+  the same shape. Both free-form categoricals → sankey default (stacked tab also
+  offered).
+- **mosaic** — `SELECT name AS album, image_url AS cover, play_count AS plays
+FROM lastfm_albums ORDER BY plays DESC LIMIT 24` (image + label + metric →
+  a cover wall with each cover sized by plays). Same shape as list/grid; mosaic
+  is the extra tab, never the auto default.
 
 ## Map view — Leaflet with a configurable tile provider
 
@@ -240,6 +298,22 @@ histogram binner lives beside the detectors in `query-view.ts`; the `view` input
 enum + result schema grew to `… | histogram | scatter | stacked`. Final auto
 priority: `map > calendar > clock > stat > (grid | list) > stacked > scatter >
 histogram > chart > table`.
+
+**Added later (visualization batch, issue #5):** three more views, again
+pure-detection + inline-SVG, **zero new runtime deps** — **treemap**
+(category+metric with ≥8 distinct categories, squarified-ish share-of-whole
+tiles; an extra tab on the bar-chart shape, and the `auto` default for large N),
+**sankey** (a NEW auto view for the free-form source+target+value 3-col shape:
+sized left/right nodes + width-proportional curved link ribbons, ~12 nodes/side
+with an "Other" bucket), and **mosaic** (a `grid` variant sizing cover images by
+a metric; an extra tab on the image+metric shape, never the auto default). The
+`treemap`/`mosaic` tabs layer onto shapes that already resolve; `sankey` shares
+the 3-col text+text+num shape with `stacked` and is disambiguated by the
+**stacked-vs-sankey default rule** (period col0 → stacked, free-form col0 →
+sankey). The `view` input enum + result schema grew to
+`… | treemap | sankey | mosaic`. Final auto priority:
+`map > calendar > clock > stat > (grid | list) > (stacked | sankey) > scatter >
+histogram > (chart | treemap) > table`.
 
 **Added:** `web/lib/query-view.ts` (detection), `web/lib/geo-projection.ts`
 (SVG fallback projector, ported from the website), `leaflet` (bundled
