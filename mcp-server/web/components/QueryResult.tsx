@@ -15,6 +15,7 @@ import {
   isNumericCell,
   looksLikeTimestamp,
   toNumber,
+  type MapConfig,
   type QueryResultShape,
   type ViewMode,
 } from '../lib/query-view.js';
@@ -439,10 +440,13 @@ function round1(v: number): number {
 }
 
 // ── MAP ──────────────────────────────────────────────────────────────
-// A real slippy map: Leaflet + OpenStreetMap raster tiles (no API token).
-// Falls back to a tile-less SVG projector render if Leaflet fails to init
-// (e.g. no network / tile errors / a thrown init), so the view never fully
-// breaks. Tiles load as <img> under the resource CSP resourceDomains.
+// A real slippy map: Leaflet with a configurable raster tile provider. When the
+// server supplies structuredContent.map_config (provider 'mapbox'), we use its
+// Mapbox tile URL / attribution / maxZoom; otherwise we default to
+// OpenStreetMap (no API token). Falls back to a tile-less SVG projector render
+// if Leaflet fails to init (e.g. no network / tile errors / a thrown init), so
+// the view never fully breaks. Tiles load as <img> under the resource CSP
+// resourceDomains.
 const MAP_W = 480;
 const MAP_H = 300;
 const MAP_PAD = 16;
@@ -452,6 +456,35 @@ const MAP_HEIGHT = 360; // Leaflet needs a definite container height.
 // unpkg CSP origin, no broken icons in the sandboxed iframe).
 const ROUTE_STROKE = '#e2503f';
 const POINT_STROKE = '#e2503f';
+
+// Default OpenStreetMap tile layer — used when no map_config is supplied.
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTRIBUTION = '© OpenStreetMap contributors';
+const OSM_MAX_ZOOM = 19;
+
+/** Resolve the effective tile layer from an optional server map_config. */
+function resolveTileLayer(mapConfig?: MapConfig): {
+  tileUrl: string;
+  attribution: string;
+  maxZoom: number;
+  /** Short legend label for the provider. */
+  source: string;
+} {
+  if (mapConfig && mapConfig.provider === 'mapbox') {
+    return {
+      tileUrl: mapConfig.tileUrl,
+      attribution: mapConfig.attribution,
+      maxZoom: mapConfig.maxZoom,
+      source: 'Mapbox',
+    };
+  }
+  return {
+    tileUrl: OSM_TILE_URL,
+    attribution: OSM_ATTRIBUTION,
+    maxZoom: OSM_MAX_ZOOM,
+    source: 'OpenStreetMap',
+  };
+}
 
 type MapData = {
   /** [lat, lng, label] tuples for point markers. */
@@ -521,10 +554,7 @@ function useMapData(
   }, [rows, latIndex, lngIndex, polylineIndex, labelIndex]);
 }
 
-function mapLegend(
-  data: MapData,
-  source: 'OpenStreetMap' | 'tile-less'
-): string {
+function mapLegend(data: MapData, source: string): string {
   const parts: string[] = [];
   if (data.points.length > 0) {
     parts.push(
@@ -608,17 +638,22 @@ function MapView({
   lngIndex,
   polylineIndex,
   labelIndex,
+  mapConfig,
 }: {
   rows: unknown[][];
   latIndex: number | null;
   lngIndex: number | null;
   polylineIndex: number | null;
   labelIndex: number | null;
+  mapConfig?: MapConfig;
 }) {
   const data = useMapData(rows, latIndex, lngIndex, polylineIndex, labelIndex);
   const containerRef = useRef<HTMLDivElement | null>(null);
   // null = not yet attempted; true = Leaflet is live; false = fell back to SVG.
   const [leafletOk, setLeafletOk] = useState<boolean | null>(null);
+  // Effective tile provider: Mapbox when the server supplied map_config, else
+  // the OpenStreetMap default.
+  const tiles = resolveTileLayer(mapConfig);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -633,9 +668,14 @@ function MapView({
         scrollWheelZoom: false,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
+      // The URL is authored with a 256px tile grid (@2x for retina density),
+      // so tileSize 256 / zoomOffset 0 matches both OSM and the Mapbox
+      // outdoors-v12 256/@2x tile URL.
+      L.tileLayer(tiles.tileUrl, {
+        attribution: tiles.attribution,
+        maxZoom: tiles.maxZoom,
+        tileSize: 256,
+        zoomOffset: 0,
       }).addTo(map);
 
       // Routes as polylines.
@@ -703,7 +743,7 @@ function MapView({
         /* ignore */
       }
     };
-  }, [data]);
+  }, [data, tiles.tileUrl, tiles.attribution, tiles.maxZoom]);
 
   if (!data.bounds) {
     return <div style={emptyStyle}>No mappable coordinates</div>;
@@ -729,7 +769,7 @@ function MapView({
         }}
       />
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 8 }}>
-        {mapLegend(data, 'OpenStreetMap')}
+        {mapLegend(data, tiles.source)}
       </div>
     </div>
   );
@@ -868,6 +908,7 @@ export function QueryResult({
             lngIndex={detection.lngIndex}
             polylineIndex={detection.polylineIndex}
             labelIndex={detection.labelIndex}
+            mapConfig={payload.map_config}
           />
         )}
       </div>

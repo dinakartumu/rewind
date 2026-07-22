@@ -54,7 +54,22 @@ const SERVER_INSTRUCTIONS = [
   'instapaper_url).',
 ].join('\n');
 
-export function createServer(client: RewindClient): McpServer {
+/** Optional server configuration threaded in from the Worker env / process.env. */
+export interface ServerConfig {
+  /**
+   * Public Mapbox access token. When set, the query-result map view uses Mapbox
+   * raster tiles; otherwise it falls back to OpenStreetMap. Sourced from a
+   * Worker secret (env.MAPBOX_TOKEN) remotely or process.env.MAPBOX_TOKEN
+   * locally. Must be a PUBLIC, rotatable token — it is baked into
+   * structuredContent (model-visible), never a secret/private token.
+   */
+  mapboxToken?: string;
+}
+
+export function createServer(
+  client: RewindClient,
+  config: ServerConfig = {}
+): McpServer {
   const server = new McpServer(
     {
       name: 'rewind',
@@ -157,7 +172,7 @@ export function createServer(client: RewindClient): McpServer {
 
   // SQL-first primitives — the general-purpose surface. Register first so
   // they lead the tool list.
-  registerQueryTools(server, client);
+  registerQueryTools(server, client, { mapboxToken: config.mapboxToken });
 
   // Rich/widget + search tools that remain after retiring the thin wrappers.
   registerListeningTools(server, client);
@@ -225,13 +240,16 @@ export function createServer(client: RewindClient): McpServer {
     uri: 'ui://rewind/query-result.html',
     html: UI_BUNDLES['query-result.html'],
     description:
-      'Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are real Leaflet + OpenStreetMap slippy maps plotting point/route geometry from lat/lng or polyline columns (with a tile-less SVG fallback when tiles are unreachable). Consumes query_rewind structuredContent {columns, rows, view?, art?}.',
+      'Generic adaptive renderer for any query_rewind SQL result: an interactive table / chart / map / card-grid view auto-selected from the result shape (or forced via the query_rewind `view` arg). Maps are real Leaflet slippy maps plotting point/route geometry from lat/lng or polyline columns; the tile provider is configurable (Mapbox raster tiles when a MAPBOX_TOKEN is set via structuredContent.map_config, OpenStreetMap otherwise) with a tile-less SVG fallback when tiles are unreachable. Consumes query_rewind structuredContent {columns, rows, view?, art?, map_config?}.',
     csp: {
-      // cdn.dinakartumu.com serves embedded Rewind artwork (<img>); the OSM
-      // tile hosts serve the slippy-map raster tiles, also loaded as <img>,
-      // so resourceDomains (img-src) covers both. No API token needed.
+      // cdn.dinakartumu.com serves embedded Rewind artwork (<img>); the tile
+      // hosts serve the slippy-map raster tiles, also loaded as <img>, so
+      // resourceDomains (img-src) covers all of them. api.mapbox.com is the
+      // Mapbox raster-tile host used when a MAPBOX_TOKEN is configured; the OSM
+      // hosts remain as the tokenless fallback.
       resourceDomains: [
         'https://cdn.dinakartumu.com',
+        'https://api.mapbox.com',
         'https://a.tile.openstreetmap.org',
         'https://b.tile.openstreetmap.org',
         'https://c.tile.openstreetmap.org',

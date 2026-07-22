@@ -13,6 +13,17 @@
 export type Cell = unknown;
 export type Row = Cell[];
 
+/**
+ * Optional tile-provider config for the map view. Present when the server has a
+ * MAPBOX_TOKEN configured; absent → the map defaults to OpenStreetMap tiles.
+ */
+export type MapConfig = {
+  provider: 'mapbox' | 'osm';
+  tileUrl: string;
+  attribution: string;
+  maxZoom: number;
+};
+
 export type QueryResultShape = {
   columns: string[];
   rows: Row[];
@@ -20,6 +31,8 @@ export type QueryResultShape = {
   view?: ViewMode | 'auto';
   /** Optional base64 art map keyed by original CDN URL (embed_art). */
   art?: Record<string, string>;
+  /** Optional tile-provider config for the map view (Mapbox when configured). */
+  map_config?: MapConfig;
 };
 
 export type ViewMode = 'table' | 'chart' | 'map' | 'grid';

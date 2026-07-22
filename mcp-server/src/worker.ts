@@ -26,6 +26,13 @@ interface Env {
   GITHUB_CLIENT_SECRET: string;
   /** JSON map of GitHub user ID -> Rewind user_id, e.g. {"12345": 1} */
   USER_ALLOWLIST: string;
+  /**
+   * Optional PUBLIC Mapbox access token (Worker secret). When set, the
+   * query-result map view uses Mapbox raster tiles; otherwise it falls back to
+   * OpenStreetMap. Baked into structuredContent, so must be a public `pk.`
+   * token, never a private `sk.` one.
+   */
+  MAPBOX_TOKEN?: string;
 }
 
 /** Props stored with each OAuth grant (accessible via ctx.props in API handler) */
@@ -85,7 +92,7 @@ const mcpHandler: ExportedHandler<Env> = {
 
     const apiUrl = env.REWIND_API_URL || 'https://api.rewind.rest';
     const client = new RewindClient(apiUrl, props.rewindApiKey);
-    const server = createServer(client);
+    const server = createServer(client, { mapboxToken: env.MAPBOX_TOKEN });
 
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

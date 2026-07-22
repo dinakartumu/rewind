@@ -37,7 +37,8 @@ const MOCK_SCHEMA = {
 
 async function createTestClient(
   queryResult: unknown = MOCK_QUERY_RESULT,
-  binary?: (url: string) => Promise<{ bytes: Uint8Array; mimeType: string }>
+  binary?: (url: string) => Promise<{ bytes: Uint8Array; mimeType: string }>,
+  config?: { mapboxToken?: string }
 ) {
   const rewindClient = new RewindClient('https://api.test', 'rw_test');
 
@@ -58,7 +59,7 @@ async function createTestClient(
       })) as never)
   );
 
-  const server = createServer(rewindClient);
+  const server = createServer(rewindClient, config);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
 
@@ -169,7 +170,7 @@ describe('query_rewind generic UI wiring', () => {
     await client.close();
   });
 
-  it('allows OSM slippy-map tile origins in the query-result resource CSP', async () => {
+  it('allows Mapbox + OSM slippy-map tile origins in the query-result resource CSP', async () => {
     const { client } = await createTestClient();
     const read = await client.readResource({
       uri: 'ui://rewind/query-result.html',
@@ -178,9 +179,12 @@ describe('query_rewind generic UI wiring', () => {
       _meta?: { ui?: { csp?: { resourceDomains?: string[] } } };
     };
     const resourceDomains = content._meta?.ui?.csp?.resourceDomains ?? [];
-    // Rewind artwork host stays present; the OSM tile hosts (loaded as <img>)
-    // are what makes the real slippy-map tiles fetchable under the resource CSP.
+    // Rewind artwork host stays present; the tile hosts (loaded as <img>) are
+    // what makes the real slippy-map tiles fetchable under the resource CSP.
+    // api.mapbox.com serves the Mapbox raster tiles; the OSM hosts are the
+    // tokenless fallback.
     expect(resourceDomains).toContain('https://cdn.dinakartumu.com');
+    expect(resourceDomains).toContain('https://api.mapbox.com');
     expect(resourceDomains).toContain('https://a.tile.openstreetmap.org');
     expect(
       resourceDomains.some((d) => d.includes('tile.openstreetmap.org'))
@@ -562,6 +566,71 @@ describe('query_rewind embed_art', () => {
     const art = artOf(result)!;
     expect(Object.keys(art)).toEqual([ok]);
     expect((result as { isError?: boolean }).isError).toBeFalsy();
+    await client.close();
+  });
+});
+
+// Helper: pull structuredContent.map_config off a result.
+function mapConfigOf(result: unknown):
+  | {
+      provider?: string;
+      tileUrl?: string;
+      attribution?: string;
+      maxZoom?: number;
+    }
+  | undefined {
+  return (
+    result as {
+      structuredContent?: {
+        map_config?: {
+          provider?: string;
+          tileUrl?: string;
+          attribution?: string;
+          maxZoom?: number;
+        };
+      };
+    }
+  ).structuredContent?.map_config;
+}
+
+// A map-eligible result: lat/lng columns the bundle plots as points.
+const MAP_RESULT = {
+  columns: ['name', 'lat', 'lng'],
+  rows: [
+    ['Home', 40.7128, -74.006],
+    ['Work', 40.73, -73.99],
+  ],
+  row_count: 2,
+  truncated: false,
+};
+
+describe('query_rewind map tile provider (map_config)', () => {
+  it('includes a mapbox map_config with the token in tileUrl when a token is configured', async () => {
+    const { client } = await createTestClient(MAP_RESULT, undefined, {
+      mapboxToken: 'pk.test',
+    });
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', view: 'map' },
+    });
+    const mc = mapConfigOf(result);
+    expect(mc).toBeDefined();
+    expect(mc?.provider).toBe('mapbox');
+    expect(mc?.tileUrl).toContain('api.mapbox.com');
+    // The public token is baked into the tile URL (model-visible, acceptable).
+    expect(mc?.tileUrl).toContain('access_token=pk.test');
+    expect(mc?.attribution).toBe('© Mapbox © OpenStreetMap');
+    expect(mc?.maxZoom).toBe(22);
+    await client.close();
+  });
+
+  it('omits map_config entirely when no token is configured (OSM fallback)', async () => {
+    const { client } = await createTestClient(MAP_RESULT);
+    const result = await client.callTool({
+      name: 'query_rewind',
+      arguments: { sql: 'SELECT 1', view: 'map' },
+    });
+    expect(mapConfigOf(result)).toBeUndefined();
     await client.close();
   });
 });

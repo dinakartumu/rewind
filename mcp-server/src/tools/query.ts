@@ -246,9 +246,44 @@ function renderSchema(schema: SchemaDoc): string {
   return lines.join('\n');
 }
 
+/** Optional config threaded from createServer (Worker env / process.env). */
+export interface QueryToolsConfig {
+  /**
+   * Public Mapbox access token. When present, map-eligible query results carry
+   * a `map_config` pointing the map view at Mapbox raster tiles; otherwise the
+   * bundle falls back to OpenStreetMap. See buildMapConfig for why the token in
+   * the tile URL is acceptable here.
+   */
+  mapboxToken?: string;
+}
+
+/**
+ * Build the Mapbox tile config embedded in structuredContent.map_config.
+ *
+ * SECURITY NOTE: the token ends up in `tileUrl`, which lives in
+ * structuredContent and is therefore MODEL-VISIBLE. This is acceptable ONLY
+ * because MAPBOX_TOKEN is a PUBLIC, rotatable Mapbox access token (a `pk.`
+ * token) — it grants read access to public tile styles and can be rotated at
+ * will. Never pass a secret/private (`sk.`) token here.
+ */
+function buildMapConfig(token: string): {
+  provider: 'mapbox';
+  tileUrl: string;
+  attribution: string;
+  maxZoom: number;
+} {
+  return {
+    provider: 'mapbox',
+    tileUrl: `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 22,
+  };
+}
+
 export function registerQueryTools(
   server: McpServer,
-  client: RewindClient
+  client: RewindClient,
+  config: QueryToolsConfig = {}
 ): void {
   // query_rewind ───────────────────────────────────────────────────
   server.registerTool(
@@ -307,7 +342,17 @@ export function registerQueryTools(
           view: 'auto' | 'table' | 'chart' | 'map' | 'grid';
           art?: Record<string, string>;
           art_truncated?: boolean;
+          map_config?: ReturnType<typeof buildMapConfig>;
         };
+
+        // Tile-provider config for the map view: when a public Mapbox token is
+        // configured, attach map_config so the bundle uses Mapbox raster tiles;
+        // when absent we OMIT it and the bundle defaults to OpenStreetMap. The
+        // bundle only reads map_config in the map view, so it's harmless on
+        // non-map results — kept small.
+        if (config.mapboxToken) {
+          structuredContent.map_config = buildMapConfig(config.mapboxToken);
+        }
 
         // Opt-in: additionally embed matched artwork as base64 WebP data URIs
         // in structuredContent.art for sandboxed-artifact authors. Purely

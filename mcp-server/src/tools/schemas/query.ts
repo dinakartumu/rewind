@@ -28,6 +28,21 @@ export const queryOutputSchema = z
     art: z.record(z.string(), z.string()).optional(),
     /** True when the cumulative base64 byte ceiling cut off some `art` entries. */
     art_truncated: z.boolean().optional(),
+    /**
+     * Optional map tile-provider config for the query-result map view. Present
+     * only when a MAPBOX_TOKEN is configured on the server; the bundle defaults
+     * to OpenStreetMap tiles when it is absent. The token is baked into
+     * `tileUrl` (a public, rotatable Mapbox access token — safe to expose).
+     */
+    map_config: z
+      .object({
+        provider: z.enum(['mapbox', 'osm']),
+        tileUrl: z.string(),
+        attribution: z.string(),
+        maxZoom: z.number(),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 

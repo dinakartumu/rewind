@@ -15,11 +15,11 @@ SELECTs get rich rendering for free.
 query_rewind (src/tools/query.ts)
   ├─ input: sql, view?: 'auto'|'table'|'chart'|'map'|'grid' (default 'auto'), embed_art?
   ├─ result: text table + inline image blocks (unchanged, backward-compatible)
-  │          structuredContent { columns, rows, row_count, truncated, view, art? }
+  │          structuredContent { columns, rows, row_count, truncated, view, art?, map_config? }
   └─ _meta.ui.resourceUri = ui://rewind/query-result.html   (registration + result)
 
 ui://rewind/query-result.html  (registered in src/server.ts)
-  csp.resourceDomains: ['https://cdn.dinakartumu.com']       (CDN <img> loads)
+  csp.resourceDomains: cdn.dinakartumu.com + api.mapbox.com + OSM tile hosts (<img> loads)
   └─ web/query-result.tsx  →  <QueryResult payload={structuredContent} />
 
 web/components/QueryResult.tsx  — view switcher + 4 views
@@ -57,15 +57,28 @@ mode (still validated by the input enum). The UI always shows a **table** tab
 plus a tab for each detected richer view; table is the safe default tab, and
 `auto` selects the richest applicable view on first render.
 
-## Map view — Leaflet + OpenStreetMap
+## Map view — Leaflet with a configurable tile provider
 
-The map view is now a **real slippy map**: [Leaflet](https://leafletjs.com/)
-(bundled dependency) with **OpenStreetMap raster tiles** — no API token, no
-account.
+The map view is a **real slippy map**: [Leaflet](https://leafletjs.com/)
+(bundled dependency) with a **configurable raster tile provider**.
 
-- **Base layer:** `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`,
-  `maxZoom 19`, attribution `© OpenStreetMap contributors`. Leaflet's `{s}`
-  cycles the `a`/`b`/`c` tile subdomains.
+- **Tile provider (configurable):** when a `MAPBOX_TOKEN` is configured on the
+  server, the query tool attaches a `map_config` to structuredContent and the
+  bundle renders **Mapbox `outdoors-v12` raster tiles**
+  (`https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/{z}/{x}/{y}@2x?access_token=<TOKEN>`,
+  `maxZoom 22`, attribution `© Mapbox © OpenStreetMap`, `tileSize 256` /
+  `zoomOffset 0` to match the 256/@2x URL). When no token is set, `map_config`
+  is **omitted** and the bundle falls back to **OpenStreetMap raster tiles**
+  (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`, `maxZoom 19`,
+  attribution `© OpenStreetMap contributors`; Leaflet's `{s}` cycles the
+  `a`/`b`/`c` subdomains). No API token, no account for the OSM fallback.
+- **Token threading:** `MAPBOX_TOKEN` is a **public, rotatable** Mapbox
+  access token. It reaches the query tool via a `{ mapboxToken }` config on
+  `createServer` — read from the Worker secret `env.MAPBOX_TOKEN` in the remote
+  path (`src/worker.ts`) and from `process.env.MAPBOX_TOKEN` in the local stdio
+  path (`src/index.ts`). It is injected into `map_config.tileUrl` per response;
+  since that lives in structuredContent (model-visible), only a **public**
+  token is ever used — never a secret/private `sk.` token.
 - **Geometry:** the same row-decode feeds both renderers. Point rows
   (lat/lng columns) become `L.circleMarker`s (radius 5, filled); route rows
   (decoded via the retained `decodePolyline`) become `L.polyline`s
@@ -77,7 +90,8 @@ account.
   zoom off (keeps the small card contained). `map.invalidateSize()` runs after
   mount because the container has a definite `360px` height. Markers carry a
   tooltip from the row's name/label column when present.
-- **Legend:** `N points · M routes · OpenStreetMap`.
+- **Legend:** `N points · M routes · <provider>`, where `<provider>` is
+  `Mapbox` when a token is configured, else `OpenStreetMap`.
 - **Leaflet CSS** is imported (`import 'leaflet/dist/leaflet.css'`) and
   **inlined** into the single-file bundle by `vite-plugin-singlefile` — the
   built `query-result.html` has zero external `<link rel=stylesheet>` and the
@@ -87,12 +101,14 @@ account.
 ### CSP
 
 Tiles load as `<img>`, so the query-result resource's `csp.resourceDomains`
-(img-src) is extended with the OSM tile hosts alongside the existing artwork
-host — **only this resource** is changed:
+(img-src) includes both `api.mapbox.com` (the Mapbox raster-tile host, used
+when a token is configured) and the OSM tile hosts (the tokenless fallback),
+alongside the existing artwork host — **only this resource** is changed:
 
 ```
 resourceDomains: [
   'https://cdn.dinakartumu.com',
+  'https://api.mapbox.com',
   'https://a.tile.openstreetmap.org',
   'https://b.tile.openstreetmap.org',
   'https://c.tile.openstreetmap.org',
@@ -101,8 +117,8 @@ resourceDomains: [
 ```
 
 Per the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/):
-this is a low-volume personal-archive use with clear attribution and no bulk
-downloading, which the policy permits.
+the OSM fallback is a low-volume personal-archive use with clear attribution
+and no bulk downloading, which the policy permits.
 
 ### Tile-less SVG fallback (retained)
 
