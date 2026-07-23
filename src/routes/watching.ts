@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq, sql, desc, asc, and, count } from 'drizzle-orm';
+import { eq, sql, desc, asc, and, count, inArray } from 'drizzle-orm';
 import { createDb } from '../db/client.js';
 import { setCache } from '../lib/cache.js';
 import { requireAuth } from '../lib/auth.js';
@@ -571,6 +571,47 @@ const genresByMonthRoute = createRoute({
               },
             ],
           },
+        },
+      },
+    },
+    ...errorResponses(401),
+  },
+});
+
+const watchedShowsRoute = createRoute({
+  method: 'get',
+  path: '/watched-shows',
+  operationId: 'getWatchedShows',
+  tags: ['Watching'],
+  summary: 'TV shows watched in a range',
+  description:
+    'Shows with at least one episode watched in the date range, most-watched first. Each carries the episode count in range and `months` (0-11, distinct months with an episode) so the UI can filter by month. Supports date filtering.',
+  request: {
+    query: z
+      .object({
+        limit: z.coerce.number().int().min(1).max(100).optional().default(24),
+      })
+      .merge(DateFilterQuery),
+  },
+  responses: {
+    200: {
+      description: 'Watched shows',
+      content: {
+        'application/json': {
+          schema: z.object({
+            data: z.array(
+              z.object({
+                id: z.number(),
+                title: z.string(),
+                year: z.number().nullable(),
+                tmdb_id: z.number().nullable(),
+                image: z.any().nullable(),
+                total_episodes: z.number(),
+                episodes_watched: z.number(),
+                months: z.array(z.number()),
+              })
+            ),
+          }),
         },
       },
     },
@@ -1768,6 +1809,66 @@ watching.openapi(genresByMonthRoute, async (c) => {
     genres: b.items,
     total: b.total,
   }));
+
+  return c.json({ data }) as any;
+});
+
+// ─── Watched shows in a range (year/month scoped) ────────────────────
+
+watching.openapi(watchedShowsRoute, async (c) => {
+  setCache(c, 'medium');
+  const db = createDb(c.env.DB);
+
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? 24)), 100);
+  const dateCondition = buildDateCondition(
+    episodesWatched.watchedAt,
+    c.req.query()
+  );
+  const conditions = [eq(episodesWatched.userId, 1)];
+  if (dateCondition) conditions.push(dateCondition);
+
+  const grouped = await db
+    .select({
+      showId: episodesWatched.showId,
+      episodesWatched: sql<number>`count(*)`,
+      months: sql<string>`group_concat(distinct strftime('%m', ${episodesWatched.watchedAt}))`,
+    })
+    .from(episodesWatched)
+    .where(and(...conditions))
+    .groupBy(episodesWatched.showId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit);
+
+  if (grouped.length === 0) return c.json({ data: [] }) as any;
+
+  const ids = grouped.map((g) => g.showId);
+  const showRows = await db.select().from(shows).where(inArray(shows.id, ids));
+  const showMap = new Map(showRows.map((s) => [s.id, s]));
+  const imageMap = await getImageAttachmentBatch(
+    db,
+    'watching',
+    'shows',
+    ids.map(String)
+  );
+
+  const data = grouped.map((g) => {
+    const s = showMap.get(g.showId);
+    const months = (g.months ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map((mm) => Number(mm) - 1)
+      .filter((m) => m >= 0 && m <= 11);
+    return {
+      id: g.showId,
+      title: s?.title ?? 'Unknown',
+      year: s?.year ?? null,
+      tmdb_id: s?.tmdbId ?? null,
+      image: imageMap.get(String(g.showId)) ?? null,
+      total_episodes: s?.totalEpisodes ?? 0,
+      episodes_watched: g.episodesWatched,
+      months,
+    };
+  });
 
   return c.json({ data }) as any;
 });
