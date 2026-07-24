@@ -8,7 +8,11 @@ import {
 } from '../../db/schema/rescuetime.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
-import { syncRescuetimeDay, syncRescuetime } from './sync.js';
+import {
+  syncRescuetimeDay,
+  syncRescuetime,
+  backfillRescuetime,
+} from './sync.js';
 import type {
   RescuetimeClient,
   RescuetimeActivity,
@@ -356,5 +360,144 @@ describe('syncRescuetime', () => {
     const failed = runs.find((r) => r.error?.includes('RESCUETIME_API_KEY'));
     expect(failed).toBeDefined();
     expect(failed?.status).toBe('failed');
+  });
+});
+
+describe('backfillRescuetime', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function rescuetimeEnv(apiKey?: string): Env {
+    return { ...env, RESCUETIME_API_KEY: apiKey } as unknown as Env;
+  }
+
+  /** Build an analytic-data Response for a given date with one activity row. */
+  function dataResponse(date: string, empty = false): Response {
+    return new Response(
+      JSON.stringify({
+        row_headers: [
+          'Date',
+          'Time Spent (seconds)',
+          'Number of People',
+          'Activity',
+          'Category',
+          'Productivity',
+        ],
+        rows: empty
+          ? []
+          : [[`${date}T09:00:00`, 300, 1, 'VS Code', 'Editing & IDEs', 2]],
+      })
+    );
+  }
+
+  it('walks one month (30 days) backward and returns the next cursor 30 days earlier', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        return new Response(JSON.stringify([]));
+      }
+      const date = new URL(url).searchParams.get('restrict_begin')!;
+      return dataResponse(date);
+    });
+
+    const result = await backfillRescuetime(
+      rescuetimeEnv('rescue'),
+      '2026-06-30'
+    );
+
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    // 30-day chunk: 2026-06-30 .. 2026-06-01 inclusive; next cursor = 2026-05-31.
+    expect(result.nextCursor).toBe('2026-05-31');
+  });
+
+  it('fetches the daily_summary_feed pulse map exactly once', async () => {
+    let feedCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        feedCalls += 1;
+        return new Response(JSON.stringify([]));
+      }
+      const date = new URL(url).searchParams.get('restrict_begin')!;
+      return dataResponse(date, true);
+    });
+
+    await backfillRescuetime(rescuetimeEnv('rescue'), '2026-06-30');
+    expect(feedCalls).toBe(1);
+  });
+
+  it('defaults the start cursor to yesterday (UTC)', async () => {
+    const fetched: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        return new Response(JSON.stringify([]));
+      }
+      const date = new URL(url).searchParams.get('restrict_begin')!;
+      fetched.push(date);
+      return dataResponse(date);
+    });
+
+    await backfillRescuetime(rescuetimeEnv('rescue'));
+
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    expect(fetched[0]).toBe(yesterday.toISOString().slice(0, 10));
+  });
+
+  it('stops (nextCursor null) on an empty month', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        return new Response(JSON.stringify([]));
+      }
+      const date = new URL(url).searchParams.get('restrict_begin')!;
+      return dataResponse(date, true);
+    });
+
+    const result = await backfillRescuetime(
+      rescuetimeEnv('rescue'),
+      '2026-06-30'
+    );
+    expect(result.itemsSynced).toBe(0);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('treats a mid-chunk API error as terminal once some data has synced', async () => {
+    let dataCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        return new Response(JSON.stringify([]));
+      }
+      dataCalls += 1;
+      // First 5 days succeed, then out-of-range error.
+      if (dataCalls <= 5) {
+        const date = new URL(url).searchParams.get('restrict_begin')!;
+        return dataResponse(date);
+      }
+      return new Response('out of range', { status: 400 });
+    });
+
+    const result = await backfillRescuetime(
+      rescuetimeEnv('rescue'),
+      '2026-06-30'
+    );
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('rethrows when the very first chunk errors with no data synced', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('daily_summary_feed')) {
+        return new Response(JSON.stringify([]));
+      }
+      return new Response('server error', { status: 500 });
+    });
+
+    // No cursor (first chunk) and the first day errors → rethrow.
+    await expect(backfillRescuetime(rescuetimeEnv('rescue'))).rejects.toThrow();
   });
 });

@@ -6,8 +6,18 @@ import {
   wakatimeDailyLanguages,
 } from '../../db/schema/wakatime.js';
 import { syncRuns } from '../../db/schema/system.js';
-import { WakatimeClient } from './client.js';
+import { WakatimeClient, WakatimeHistoryLimitError } from './client.js';
 import type { Env } from '../../types/env.js';
+
+/** Result of one bounded backfill chunk. */
+export interface BackfillChunkResult {
+  itemsSynced: number;
+  /** The next cursor to resume from, or null when the walk is complete. */
+  nextCursor: string | null;
+}
+
+/** Days fetched per WakaTime backfill invocation. */
+const WAKATIME_BACKFILL_CHUNK_DAYS = 14;
 
 export interface WakatimeDaySyncResult {
   synced: number;
@@ -124,6 +134,79 @@ export async function syncWakatimeDay(
 /** UTC YYYY-MM-DD for a Date. */
 function utcDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/** The day (YYYY-MM-DD) one calendar day before the given YYYY-MM-DD (UTC). */
+function previousDay(date: string): string {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return utcDate(d);
+}
+
+/**
+ * One bounded WakaTime backfill chunk: syncs up to
+ * WAKATIME_BACKFILL_CHUNK_DAYS days walking BACKWARD from `cursor` (the next
+ * date to fetch). Defaults the start cursor to yesterday (UTC).
+ *
+ * The next cursor is the day immediately before the last day fetched — the
+ * caller loops, passing it back, until nextCursor is null. The walk terminates
+ * (nextCursor null) when:
+ *   - a WakatimeHistoryLimitError (402) is hit — the free-plan history window
+ *     has been walked past; there is nothing older to fetch, or
+ *   - the whole chunk of WAKATIME_BACKFILL_CHUNK_DAYS days was empty — no data
+ *     that far back, treat it as the end of history.
+ *
+ * @param cursor YYYY-MM-DD next day to fetch; defaults to yesterday (UTC).
+ */
+export async function backfillWakatime(
+  env: Env,
+  cursor?: string
+): Promise<BackfillChunkResult> {
+  const apiKey = env.WAKATIME_API_KEY;
+  if (!apiKey) {
+    throw new Error('WAKATIME_API_KEY is not configured');
+  }
+  const client = new WakatimeClient(apiKey);
+  const db = createDb(env.DB);
+
+  let day =
+    cursor ??
+    (() => {
+      const yesterday = new Date();
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      return utcDate(yesterday);
+    })();
+
+  let itemsSynced = 0;
+  let daysFetched = 0;
+
+  for (let i = 0; i < WAKATIME_BACKFILL_CHUNK_DAYS; i++) {
+    try {
+      const result = await syncWakatimeDay(db, client, day);
+      itemsSynced += result.synced;
+    } catch (err) {
+      if (err instanceof WakatimeHistoryLimitError) {
+        // Past the accessible history window: terminal.
+        console.log(
+          `[SYNC] WakaTime backfill reached history limit at ${day}; stopping`
+        );
+        return { itemsSynced, nextCursor: null };
+      }
+      throw err;
+    }
+    daysFetched += 1;
+    day = previousDay(day);
+  }
+
+  // A fully-empty chunk means we have walked past all available data.
+  if (itemsSynced === 0) {
+    console.log(
+      `[SYNC] WakaTime backfill: ${daysFetched} consecutive empty days; stopping`
+    );
+    return { itemsSynced, nextCursor: null };
+  }
+
+  return { itemsSynced, nextCursor: day };
 }
 
 /**

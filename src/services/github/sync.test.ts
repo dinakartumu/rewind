@@ -10,7 +10,7 @@ import {
 } from '../../db/schema/github.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
-import { syncGithubIncremental, syncGithub } from './sync.js';
+import { syncGithubIncremental, syncGithub, backfillGithub } from './sync.js';
 import { GithubRateLimitError } from './client.js';
 import type {
   GithubClient,
@@ -649,5 +649,207 @@ describe('syncGithub', () => {
     const failed = runs.find((r) => r.error?.includes('GITHUB_USERNAME'));
     expect(failed).toBeDefined();
     expect(failed?.status).toBe('failed');
+  });
+});
+
+describe('backfillGithub', () => {
+  const USERNAME = 'me';
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function githubEnv(token = 'tok', username = USERNAME): Env {
+    return {
+      ...env,
+      GITHUB_TOKEN: token,
+      GITHUB_USERNAME: username,
+    } as unknown as Env;
+  }
+
+  /** A GraphQL calendar Response with the given per-day counts. */
+  function calendarResponse(days: Array<{ date: string; count: number }>) {
+    return new Response(
+      JSON.stringify({
+        data: {
+          user: {
+            contributionsCollection: {
+              contributionCalendar: {
+                weeks: [
+                  {
+                    contributionDays: days.map((d) => ({
+                      date: d.date,
+                      contributionCount: d.count,
+                    })),
+                  },
+                ],
+              },
+            },
+          },
+        },
+      })
+    );
+  }
+
+  /** A Search-issues Response with `count` synthetic items and a total. */
+  function searchResponse(
+    count: number,
+    totalCount: number,
+    kind: 'pr' | 'issue'
+  ) {
+    const items = Array.from({ length: count }, (_, i) => ({
+      repository_url: 'https://api.github.com/repos/me/rewind',
+      number: 1000 + i,
+      title: `${kind} ${i}`,
+      state: 'open',
+      created_at: '2026-07-20T10:00:00Z',
+      closed_at: null,
+      html_url: `https://github.com/me/rewind/${kind === 'pr' ? 'pull' : 'issues'}/${1000 + i}`,
+      ...(kind === 'pr' ? { pull_request: { merged_at: null } } : {}),
+    }));
+    return new Response(JSON.stringify({ total_count: totalCount, items }));
+  }
+
+  it('contributions phase: a non-empty year advances to the previous year', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('graphql')) {
+        return calendarResponse([{ date: '2026-03-01', count: 5 }]);
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'contributions', year: 2026 })
+    );
+
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    expect(result.nextCursor).toBe(
+      JSON.stringify({ phase: 'contributions', year: 2025 })
+    );
+    const rows = await createDb(env.DB).select().from(githubContributionDays);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('contributions phase: an all-zero year advances to the prs phase', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('graphql')) {
+        return calendarResponse([{ date: '2015-01-01', count: 0 }]);
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'contributions', year: 2015 })
+    );
+
+    expect(result.nextCursor).toBe(JSON.stringify({ phase: 'prs', page: 1 }));
+  });
+
+  it('defaults the start cursor to the contributions phase for the current UTC year', async () => {
+    let graphqlBody: string | null = null;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('graphql')) {
+        graphqlBody = String(init?.body ?? '');
+        return calendarResponse([{ date: '2026-01-01', count: 1 }]);
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    await backfillGithub(githubEnv());
+
+    const year = new Date().getUTCFullYear();
+    expect(graphqlBody).toContain(`${year}-01-01`);
+  });
+
+  it('prs phase: a partial page (fewer than the cap) advances to the issues phase', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/search/issues')) {
+        // 40 items, total 40 → page 1 exhausts the results.
+        return searchResponse(40, 40, 'pr');
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'prs', page: 1 })
+    );
+
+    expect(result.itemsSynced).toBe(40);
+    expect(result.nextCursor).toBe(
+      JSON.stringify({ phase: 'issues', page: 1 })
+    );
+    const prs = await createDb(env.DB).select().from(githubPullRequests);
+    expect(prs.length).toBeGreaterThan(0);
+  });
+
+  it('prs phase: a full page advances to the next page', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/search/issues')) {
+        // 100 items, total 250 → page 1 has more to fetch.
+        return searchResponse(100, 250, 'pr');
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'prs', page: 1 })
+    );
+
+    expect(result.nextCursor).toBe(JSON.stringify({ phase: 'prs', page: 2 }));
+  });
+
+  it('caps pagination at 1000 (Search API limit) and logs truncation', async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => {
+      logs.push(String(msg));
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/search/issues')) {
+        // total 4000 but page 10 hits the 1000 cap → phase done.
+        return searchResponse(100, 4000, 'pr');
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'prs', page: 10 })
+    );
+
+    expect(result.nextCursor).toBe(
+      JSON.stringify({ phase: 'issues', page: 1 })
+    );
+    expect(logs.some((l) => l.includes('[INFO]') && l.includes('1000'))).toBe(
+      true
+    );
+  });
+
+  it('issues phase: an exhausted page completes the walk (null cursor)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/search/issues')) {
+        return searchResponse(10, 10, 'issue');
+      }
+      return new Response(JSON.stringify({ total_count: 0, items: [] }));
+    });
+
+    const result = await backfillGithub(
+      githubEnv(),
+      JSON.stringify({ phase: 'issues', page: 1 })
+    );
+
+    expect(result.nextCursor).toBeNull();
+    const issues = await createDb(env.DB).select().from(githubIssues);
+    expect(issues.length).toBeGreaterThan(0);
   });
 });

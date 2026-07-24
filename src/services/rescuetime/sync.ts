@@ -8,6 +8,16 @@ import { syncRuns } from '../../db/schema/system.js';
 import { RescuetimeClient } from './client.js';
 import type { Env } from '../../types/env.js';
 
+/** Result of one bounded backfill chunk. */
+export interface BackfillChunkResult {
+  itemsSynced: number;
+  /** The next cursor to resume from, or null when the walk is complete. */
+  nextCursor: string | null;
+}
+
+/** Days fetched per RescueTime backfill invocation (one month). */
+const RESCUETIME_BACKFILL_CHUNK_DAYS = 30;
+
 export interface RescuetimeDaySyncResult {
   synced: number;
   totalSeconds: number;
@@ -188,6 +198,89 @@ export async function syncRescuetimeDay(
 /** UTC YYYY-MM-DD for a Date. */
 function utcDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/** The day (YYYY-MM-DD) one calendar day before the given YYYY-MM-DD (UTC). */
+function previousDay(date: string): string {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return utcDate(d);
+}
+
+/**
+ * One bounded RescueTime backfill chunk: syncs one month
+ * (RESCUETIME_BACKFILL_CHUNK_DAYS days) walking BACKWARD from `cursor` (the
+ * next date to fetch). Defaults the start cursor to yesterday (UTC). The pulse
+ * feed is fetched once and shared across the whole chunk (it only covers ~2
+ * recent weeks, so older days simply get a null pulse).
+ *
+ * The next cursor is the day immediately before the last day fetched — the
+ * caller loops until nextCursor is null. Termination (nextCursor null):
+ *   - the whole month came back empty (no data that far back), or
+ *   - the RescueTime API threw partway through AFTER ≥1 day had already synced
+ *     in this chunk, or a cursor was supplied (prior chunks succeeded) — an
+ *     out-of-range signal, treated as the end of accessible history.
+ * If the VERY FIRST chunk (no cursor) errors before any day synced, the error
+ * is rethrown so a genuine outage is not mistaken for "end of history".
+ *
+ * @param cursor YYYY-MM-DD next day to fetch; defaults to yesterday (UTC).
+ */
+export async function backfillRescuetime(
+  env: Env,
+  cursor?: string
+): Promise<BackfillChunkResult> {
+  const apiKey = env.RESCUETIME_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESCUETIME_API_KEY is not configured');
+  }
+  const client = new RescuetimeClient(apiKey);
+  const db = createDb(env.DB);
+
+  // Pulse feed once for the whole chunk.
+  const summaries = await client.getDailySummaries();
+  const pulseByDate = new Map(
+    summaries.map((s) => [s.date, s.productivityPulse])
+  );
+
+  const isFirstChunk = cursor === undefined;
+  let day =
+    cursor ??
+    (() => {
+      const yesterday = new Date();
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      return utcDate(yesterday);
+    })();
+
+  let itemsSynced = 0;
+
+  for (let i = 0; i < RESCUETIME_BACKFILL_CHUNK_DAYS; i++) {
+    try {
+      const result = await syncRescuetimeDay(db, client, day, pulseByDate);
+      itemsSynced += result.synced;
+    } catch (err) {
+      // A first-chunk error before any data synced is a real failure: rethrow.
+      if (isFirstChunk && itemsSynced === 0) {
+        throw err;
+      }
+      // Otherwise treat it as an out-of-range signal: terminal.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(
+        `[SYNC] RescueTime backfill: API error at ${day} after ${itemsSynced} items; stopping (${msg})`
+      );
+      return { itemsSynced, nextCursor: null };
+    }
+    day = previousDay(day);
+  }
+
+  // A fully-empty month means we have walked past all available data.
+  if (itemsSynced === 0) {
+    console.log(
+      `[SYNC] RescueTime backfill: empty month ending at ${cursor ?? 'yesterday'}; stopping`
+    );
+    return { itemsSynced, nextCursor: null };
+  }
+
+  return { itemsSynced, nextCursor: day };
 }
 
 /**

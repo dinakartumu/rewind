@@ -51,6 +51,196 @@ function utcDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Result of one bounded backfill chunk. */
+export interface BackfillChunkResult {
+  itemsSynced: number;
+  /** The next cursor (JSON string) to resume from, or null when complete. */
+  nextCursor: string | null;
+}
+
+/**
+ * Phase cursor for the GitHub backfill. The walk proceeds:
+ *   contributions (year by year, backward) → prs (page by page) →
+ *   issues (page by page) → done (null cursor).
+ */
+type GithubBackfillCursor =
+  | { phase: 'contributions'; year: number }
+  | { phase: 'prs'; page: number }
+  | { phase: 'issues'; page: number };
+
+/** GitHub Search API hard cap: at most 1000 results (10 pages of 100). */
+const GITHUB_SEARCH_CAP = 1000;
+const GITHUB_SEARCH_PER_PAGE = 100;
+
+/**
+ * One phase-step of the GitHub backfill. Advances exactly ONE unit of work per
+ * invocation (one contribution year, or one PR/issue search page) and returns
+ * the next cursor; the caller loops until nextCursor is null.
+ *
+ * Contributions: fetches the full calendar for `year` (Jan 1 → Dec 31) and
+ * upserts on (user, date). A year whose days are all empty/zero means we've
+ * walked past the account's first activity → advance to the prs phase.
+ * Otherwise the next cursor is the previous year.
+ *
+ * PRs / issues: fetches one Search page (100/page). The phase is done when the
+ * page is the last one — either the results are exhausted (`page * 100 >=
+ * totalCount`) or the Search API's 1000-result cap is reached. When totalCount
+ * exceeds 1000, a `[INFO]` line is logged so the (unavoidable) truncation is
+ * visible. Otherwise the next cursor is the next page.
+ *
+ * @param cursor JSON string; defaults to contributions for the current UTC
+ *   year when omitted.
+ */
+export async function backfillGithub(
+  env: Env,
+  cursor?: string
+): Promise<BackfillChunkResult> {
+  const token = env.GITHUB_TOKEN;
+  if (!token) {
+    throw new Error('GITHUB_TOKEN is not configured');
+  }
+  const username = env.GITHUB_USERNAME;
+  if (!username) {
+    throw new Error('GITHUB_USERNAME is not configured');
+  }
+
+  const client = new GithubClient(token, username);
+  const db = createDb(env.DB);
+  const userId = 1;
+
+  const parsed: GithubBackfillCursor = cursor
+    ? (JSON.parse(cursor) as GithubBackfillCursor)
+    : { phase: 'contributions', year: new Date().getUTCFullYear() };
+
+  if (parsed.phase === 'contributions') {
+    const { year } = parsed;
+    const days = await client.getContributionDays(
+      `${year}-01-01`,
+      `${year}-12-31`
+    );
+
+    let synced = 0;
+    for (const day of days) {
+      await db
+        .insert(githubContributionDays)
+        .values({ userId, date: day.date, contributionCount: day.count })
+        .onConflictDoUpdate({
+          target: [githubContributionDays.userId, githubContributionDays.date],
+          set: { contributionCount: day.count },
+        });
+      synced += 1;
+    }
+
+    const hasActivity = days.some((d) => d.count > 0);
+    if (!hasActivity) {
+      // No activity this far back — the contributions history is exhausted.
+      console.log(
+        `[SYNC] GitHub backfill: year ${year} had no contributions; moving to PRs`
+      );
+      return {
+        itemsSynced: synced,
+        nextCursor: JSON.stringify({ phase: 'prs', page: 1 }),
+      };
+    }
+
+    return {
+      itemsSynced: synced,
+      nextCursor: JSON.stringify({
+        phase: 'contributions',
+        year: year - 1,
+      }),
+    };
+  }
+
+  // PRs and issues share the same paginated Search shape; branch only on the
+  // type queried and the phase we advance to when this phase completes.
+  const searchType = parsed.phase === 'prs' ? 'pr' : 'issue';
+  const { page } = parsed;
+  const result = await client.searchAuthored(searchType, page);
+
+  if (searchType === 'pr') {
+    for (const item of result.items) {
+      await db
+        .insert(githubPullRequests)
+        .values({
+          userId,
+          repo: item.repo,
+          number: item.number,
+          title: item.title,
+          state: item.state,
+          createdAtGithub: item.createdAt,
+          mergedAt: item.mergedAt,
+          closedAt: item.closedAt,
+          isPrivate: item.isPrivate ? 1 : 0,
+          url: item.url,
+        })
+        .onConflictDoUpdate({
+          target: [githubPullRequests.repo, githubPullRequests.number],
+          set: {
+            title: item.title,
+            state: item.state,
+            mergedAt: item.mergedAt,
+            closedAt: item.closedAt,
+          },
+        });
+    }
+  } else {
+    for (const item of result.items) {
+      await db
+        .insert(githubIssues)
+        .values({
+          userId,
+          repo: item.repo,
+          number: item.number,
+          title: item.title,
+          state: item.state,
+          createdAtGithub: item.createdAt,
+          closedAt: item.closedAt,
+          isPrivate: item.isPrivate ? 1 : 0,
+          url: item.url,
+        })
+        .onConflictDoUpdate({
+          target: [githubIssues.repo, githubIssues.number],
+          set: {
+            title: item.title,
+            state: item.state,
+            closedAt: item.closedAt,
+          },
+        });
+    }
+  }
+
+  // The reachable result count is capped at 1000 by the Search API.
+  const reachable = Math.min(result.totalCount, GITHUB_SEARCH_CAP);
+  const cappedByApi =
+    result.totalCount > GITHUB_SEARCH_CAP &&
+    page * GITHUB_SEARCH_PER_PAGE >= GITHUB_SEARCH_CAP;
+  if (cappedByApi) {
+    console.log(
+      `[INFO] GitHub backfill: ${searchType} results truncated — totalCount ${result.totalCount} exceeds the Search API 1000-result cap`
+    );
+  }
+
+  // The phase is done when this page reached the end of the reachable results
+  // (or the API returned a short/empty page).
+  const phaseDone =
+    page * GITHUB_SEARCH_PER_PAGE >= reachable ||
+    result.items.length < GITHUB_SEARCH_PER_PAGE;
+
+  let nextCursor: string | null;
+  if (searchType === 'pr') {
+    nextCursor = phaseDone
+      ? JSON.stringify({ phase: 'issues', page: 1 })
+      : JSON.stringify({ phase: 'prs', page: page + 1 });
+  } else {
+    nextCursor = phaseDone
+      ? null
+      : JSON.stringify({ phase: 'issues', page: page + 1 });
+  }
+
+  return { itemsSynced: result.items.length, nextCursor };
+}
+
 /**
  * Incremental GitHub sync:
  *

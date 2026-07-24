@@ -9,7 +9,8 @@ import {
 } from '../../db/schema/wakatime.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
-import { syncWakatimeDay, syncWakatime } from './sync.js';
+import { syncWakatimeDay, syncWakatime, backfillWakatime } from './sync.js';
+import { WakatimeHistoryLimitError } from './client.js';
 import type {
   WakatimeClient,
   WakatimeDurationRow,
@@ -282,6 +283,126 @@ describe('syncWakatimeDay', () => {
     expect(langs).toHaveLength(1);
     expect(langs[0].language).toBe('Go');
     expect(langs[0].totalSeconds).toBe(120);
+  });
+});
+
+describe('backfillWakatime', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function wakatimeEnv(apiKey?: string): Env {
+    return { ...env, WAKATIME_API_KEY: apiKey } as unknown as Env;
+  }
+
+  it('walks 14 days backward from a cursor and returns the next cursor 14 days earlier', async () => {
+    // Every day returns one duration slice (timestamped to that day so the
+    // per-day delete windows don't collide) so no empty-streak stop triggers.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/durations')) {
+        const date = new URL(url).searchParams.get('date')!;
+        const epoch = new Date(`${date}T12:00:00.000Z`).getTime() / 1000;
+        return new Response(
+          JSON.stringify({
+            data: [
+              { time: epoch, duration: 60, project: 'rewind', entity: '/x' },
+            ],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response(
+        JSON.stringify({ data: [{ grand_total: { total_seconds: 60 } }] })
+      );
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    // Chunk = 14 days: 2026-06-14 .. 2026-06-01 inclusive; next cursor is the
+    // day before the last fetched day: 2026-05-31.
+    expect(result.nextCursor).toBe('2026-05-31');
+  });
+
+  it('defaults the start cursor to yesterday (UTC) when none is provided', async () => {
+    const fetched: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/durations')) {
+        const date = new URL(url).searchParams.get('date');
+        if (date) fetched.push(date);
+        return new Response(JSON.stringify({ data: [] }));
+      }
+      return new Response(JSON.stringify({ data: [] }));
+    });
+
+    await backfillWakatime(wakatimeEnv('waka'));
+
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    expect(fetched[0]).toBe(yesterday.toISOString().slice(0, 10));
+  });
+
+  it('stops (nextCursor null) on a WakatimeHistoryLimitError', async () => {
+    // First durations call 402s → history limit reached immediately.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/durations')) {
+        return new Response('Payment Required', { status: 402 });
+      }
+      return new Response(JSON.stringify({ data: [] }));
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('stops (nextCursor null) after 14 consecutive empty days', async () => {
+    // Every day empty → the whole 14-day chunk is empty → terminal.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/durations')) {
+        return new Response(JSON.stringify({ data: [] }));
+      }
+      return new Response(JSON.stringify({ data: [] }));
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+    expect(result.itemsSynced).toBe(0);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('throws WakatimeHistoryLimitError type is surfaced as terminal not a throw', async () => {
+    let durationCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/durations')) {
+        durationCalls += 1;
+        // First 3 days have data, then 402.
+        if (durationCalls <= 3) {
+          const date = new URL(url).searchParams.get('date')!;
+          const epoch = new Date(`${date}T12:00:00.000Z`).getTime() / 1000;
+          return new Response(
+            JSON.stringify({
+              data: [{ time: epoch, duration: 60, project: 'p', entity: '/x' }],
+            })
+          );
+        }
+        return new Response('Payment Required', { status: 402 });
+      }
+      return new Response(
+        JSON.stringify({ data: [{ grand_total: { total_seconds: 60 } }] })
+      );
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+    // Some items synced before the 402, then terminal.
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    expect(result.nextCursor).toBeNull();
+    // Sanity: the thrown-limit path is not surfaced to the caller.
+    void WakatimeHistoryLimitError;
   });
 });
 

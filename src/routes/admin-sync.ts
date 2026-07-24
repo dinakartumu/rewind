@@ -23,6 +23,10 @@ import { syncTraktCollection } from '../services/trakt/sync.js';
 import { syncTraktHistory } from '../services/trakt/history-sync.js';
 import { syncReading } from '../services/instapaper/sync.js';
 import { syncPlaces } from '../services/foursquare/sync.js';
+import { syncCoding } from '../services/coding/sync.js';
+import { backfillWakatime } from '../services/wakatime/sync.js';
+import { backfillRescuetime } from '../services/rescuetime/sync.js';
+import { backfillGithub } from '../services/github/sync.js';
 import {
   processReadingImages,
   processWatchingImages,
@@ -827,6 +831,116 @@ adminSync.openapi(syncAppleMusicAlbumsRoute, async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.log(`[ERROR] POST /admin/sync/apple-music-albums: ${message}`);
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
+// POST /v1/admin/sync/coding
+const syncCodingRoute = createRoute({
+  method: 'post',
+  path: '/admin/sync/coding',
+  operationId: 'adminSyncCoding',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary: 'Trigger coding sync',
+  description:
+    'Runs the coding-domain orchestrator (WakaTime + RescueTime + GitHub) with per-source isolation, then emits the daily feed rollup. Sources with unset credentials are skipped.',
+  responses: {
+    200: {
+      content: { 'application/json': { schema: SyncStatusResponse } },
+      description: 'Sync completed successfully',
+    },
+    ...errorResponses(401, 500),
+  },
+});
+
+adminSync.openapi(syncCodingRoute, async (c) => {
+  try {
+    await syncCoding(c.env);
+    return c.json({
+      status: 'completed' as const,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ERROR] POST /admin/sync/coding: ${message}`);
+    return c.json({ error: message, status: 500 }, 500) as any;
+  }
+});
+
+// POST /v1/admin/sync/coding/backfill
+// One bounded chunk per invocation. The chunk semantics differ per source
+// (WakaTime: 14 days; RescueTime: 1 month; GitHub: one phase-step) but the
+// cursor contract is uniform: pass the returned next_cursor back until it is
+// null. A null next_cursor means that source's backfill is complete.
+const CodingBackfillBody = z
+  .object({
+    source: z.enum(['wakatime', 'rescuetime', 'github']).openapi({
+      example: 'github',
+      description: 'Which coding source to backfill.',
+    }),
+    cursor: z.string().optional().openapi({
+      description:
+        'Opaque resume token from the previous response. Omit to start a fresh backfill.',
+    }),
+  })
+  .openapi('CodingBackfillBody');
+
+const CodingBackfillResponse = z
+  .object({
+    status: z.literal('completed'),
+    items_synced: z.number().int().openapi({ example: 42 }),
+    next_cursor: z.string().nullable().openapi({
+      example: '2026-05-31',
+      description: 'Resume token for the next chunk, or null when complete.',
+    }),
+    timestamp: z.string().datetime(),
+  })
+  .openapi('CodingBackfillResponse');
+
+const syncCodingBackfillRoute = createRoute({
+  method: 'post',
+  path: '/admin/sync/coding/backfill',
+  operationId: 'adminSyncCodingBackfill',
+  'x-hidden': true,
+  tags: ['Admin'],
+  summary: 'Backfill one coding source in bounded chunks',
+  description:
+    'Runs one bounded backfill chunk for the given coding source, walking history backward. Re-run with the returned next_cursor until it is null.',
+  request: {
+    body: {
+      content: { 'application/json': { schema: CodingBackfillBody } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: CodingBackfillResponse } },
+      description: 'Backfill chunk completed',
+    },
+    ...errorResponses(400, 401, 500),
+  },
+});
+
+adminSync.openapi(syncCodingBackfillRoute, async (c) => {
+  const { source, cursor } = c.req.valid('json');
+  try {
+    const backfill =
+      source === 'wakatime'
+        ? backfillWakatime
+        : source === 'rescuetime'
+          ? backfillRescuetime
+          : backfillGithub;
+    const result = await backfill(c.env, cursor);
+    return c.json({
+      status: 'completed' as const,
+      items_synced: result.itemsSynced,
+      next_cursor: result.nextCursor,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[ERROR] POST /admin/sync/coding/backfill: ${message}`);
     return c.json({ error: message, status: 500 }, 500) as any;
   }
 });
