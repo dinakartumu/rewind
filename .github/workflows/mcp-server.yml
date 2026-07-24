@@ -66,7 +66,11 @@ jobs:
     name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/mcp-server-v')
+    # npm package rewind-mcp-server is owned by upstream (pdugan20); forks
+    # cannot publish to it, so this job only runs on the upstream repo.
+    if: >-
+      startsWith(github.ref, 'refs/tags/mcp-server-v') &&
+      github.repository == 'pdugan20/rewind'
     defaults:
       run:
         working-directory: mcp-server
