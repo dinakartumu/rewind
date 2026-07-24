@@ -17,6 +17,7 @@ const DOMAINS = [
   'collecting',
   'reading',
   'attending',
+  'coding',
 ];
 
 const system = createOpenAPIApp();
