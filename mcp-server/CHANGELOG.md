@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.11.0...mcp-server-v0.12.0) (2026-07-24)
+
+
+### Features
+
+* coding domain (WakaTime + RescueTime + GitHub) ([#6](https://github.com/dinakartumu/rewind/issues/6)) ([dcd61c7](https://github.com/dinakartumu/rewind/commit/dcd61c792f5e622d7fba846c0179e7e2b3544cde))
+
 ## [0.11.0](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.10.0...mcp-server-v0.11.0) (2026-07-22)
 
 
