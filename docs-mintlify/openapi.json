@@ -580,13 +580,22 @@
             "type": "boolean",
             "example": false,
             "description": "True when rows were dropped to fit the response ceiling."
+          },
+          "integration": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "lastfm",
+            "description": "The single upstream service the queried tables belong to (lastfm, strava, discogs, …), or null when the query spans several or reads only shared tables. Renderers use it to tint a single-series chart in that service’s colour."
           }
         },
         "required": [
           "columns",
           "rows",
           "row_count",
-          "truncated"
+          "truncated",
+          "integration"
         ]
       },
       "QueryRequest": {

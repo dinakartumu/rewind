@@ -33,6 +33,12 @@ export type QueryResultShape = {
   art?: Record<string, string>;
   /** Optional tile-provider config for the map view (Mapbox when configured). */
   map_config?: MapConfig;
+  /**
+   * Optional integration key from the server: the single upstream service the
+   * queried tables belong to (`lastfm`, `strava`, …), null when the query spans
+   * several. Tints the card's marks — see `brand-colors.ts`.
+   */
+  integration?: string | null;
 };
 
 export type ViewMode =

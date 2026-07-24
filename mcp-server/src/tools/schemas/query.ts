@@ -55,6 +55,13 @@ export const queryOutputSchema = z
     /** True when the cumulative base64 byte ceiling cut off some `art` entries. */
     art_truncated: z.boolean().optional(),
     /**
+     * The single upstream service the queried tables belong to (`lastfm`,
+     * `strava`, `discogs`, …), or null when the query joins several or reads
+     * only shared tables. The UI bundle tints a single-series chart in that
+     * service's colour and labels the card with it; non-UI hosts can ignore it.
+     */
+    integration: z.string().nullable().optional(),
+    /**
      * Optional map tile-provider config for the query-result map view. Present
      * only when a MAPBOX_TOKEN is configured on the server; the bundle defaults
      * to OpenStreetMap tiles when it is absent. The token is baked into

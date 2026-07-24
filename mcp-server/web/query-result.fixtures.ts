@@ -24,6 +24,27 @@ const periodChart: QueryResultShape = {
     ['2025-06', 2180],
     ['2025-07', 2620],
   ],
+  // Came from lastfm_scrobbles, so the API tags it and the card draws the
+  // series in Last.fm's slot and names the service in its header.
+  integration: 'lastfm',
+};
+
+/**
+ * The same chart shape from a different service, to prove the tint follows the
+ * integration rather than the chart type: distance per month from Strava.
+ */
+const stravaChart: QueryResultShape = {
+  columns: ['month', 'miles'],
+  rows: [
+    ['2025-01', 82],
+    ['2025-02', 74],
+    ['2025-03', 96],
+    ['2025-04', 110],
+    ['2025-05', 128],
+    ['2025-06', 118],
+    ['2025-07', 141],
+  ],
+  integration: 'strava',
 };
 
 /** One category column + one numeric column → bar chart. */
@@ -445,6 +466,7 @@ const forcedTable: QueryResultShape = { ...imageGrid, view: 'table' };
 export const fixtures: Record<string, QueryResultShape> = {
   'scalar-table': scalarTable,
   'period-chart': periodChart,
+  'strava-chart': stravaChart,
   'category-chart': categoryChart,
   'latlng-map': latLngMap,
   'polyline-map': polylineMap,

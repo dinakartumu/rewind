@@ -36,7 +36,17 @@
 import { allowedTableNames } from './schema-doc.js';
 
 export type SqlGuardResult =
-  | { ok: true; sql: string }
+  | {
+      ok: true;
+      sql: string;
+      /**
+       * Every base table the query reads, lower-cased and de-duplicated (CTE
+       * names excluded — they are not data sources). The gate already parses
+       * these to enforce the allow-list; surfacing them lets callers tell WHICH
+       * integration a result came from without re-parsing the SQL.
+       */
+      tables: string[];
+    }
   | { ok: false; error: string };
 
 /**
@@ -583,5 +593,14 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
   // 8. LIMIT enforcement (subquery wrap — robust to UNION/compound queries).
   const finalSql = enforceLimit(trimmed);
 
-  return { ok: true, sql: finalSql };
+  // Base tables only: a CTE name is a label for a subquery, not a data source.
+  const tables = [
+    ...new Set(
+      refs
+        .filter((r) => r.ok && !cteNames.has(r.name))
+        .map((r) => r.name as string)
+    ),
+  ];
+
+  return { ok: true, sql: finalSql, tables };
 }

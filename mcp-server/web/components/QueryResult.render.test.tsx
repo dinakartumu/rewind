@@ -443,6 +443,66 @@ describe('StreakView render', () => {
   });
 });
 
+// ── INTEGRATION COLOR ────────────────────────────────────────────────
+describe('integration tint', () => {
+  it('publishes the service series colour on the card and names it', async () => {
+    const container = await mount(fixtures['period-chart']); // integration: lastfm
+    const c = card(container);
+    // The mark colour arrives as a light-dark() pair of documented palette
+    // steps, so every ACCENT consumer inherits it in either theme.
+    expect(c.style.getPropertyValue('--rewind-series')).toBe(
+      'light-dark(#e34948, #e66767)'
+    );
+    // Identity is never colour-alone: the header names the service.
+    expect(c.textContent).toContain('Last.fm');
+  });
+
+  it('gives a different service a different tint for the same chart shape', async () => {
+    const container = await mount(fixtures['strava-chart']);
+    const c = card(container);
+    expect(c.style.getPropertyValue('--rewind-series')).toBe(
+      'light-dark(#eb6834, #d95926)'
+    );
+    expect(c.textContent).toContain('Strava');
+  });
+
+  it('leaves the accent neutral when the result spans services', async () => {
+    // No `integration` on this fixture and no source column → untinted.
+    const container = await mount(fixtures['category-chart']);
+    const c = card(container);
+    expect(c.style.getPropertyValue('--rewind-series')).toBe('');
+  });
+
+  it('reads a source column when the server sent no key', async () => {
+    const container = await mount({
+      columns: ['title', 'source'],
+      rows: [
+        ['Midnight Cowboy', 'trakt'],
+        ['Heat', 'trakt'],
+      ],
+    });
+    const c = card(container);
+    expect(c.style.getPropertyValue('--rewind-series')).toBe(
+      'light-dark(#4a3aa7, #9085e9)'
+    );
+  });
+
+  it('does not tint a result whose source column mixes services', async () => {
+    const container = await mount({
+      columns: ['title', 'source'],
+      rows: [
+        ['Midnight Cowboy', 'trakt'],
+        ['Heat', 'plex'],
+      ],
+    });
+    const c = card(container);
+    expect(c.style.getPropertyValue('--rewind-series')).toBe('');
+    // Both services still get their brand dot in the table cells.
+    expect(c.textContent).toContain('Trakt');
+    expect(c.textContent).toContain('Plex');
+  });
+});
+
 // ── ENTITY DETAIL ────────────────────────────────────────────────────
 describe('DetailView render', () => {
   it('renders the cover image, the primary name, and a humanized field list', async () => {

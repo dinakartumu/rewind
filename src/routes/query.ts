@@ -5,6 +5,7 @@ import { badRequest } from '../lib/errors.js';
 import { setCache } from '../lib/cache.js';
 import { validateReadOnlySql } from '../lib/sql-guard.js';
 import { SCHEMA_DOC } from '../lib/schema-doc.js';
+import { resolveIntegration } from '../lib/integrations.js';
 
 /**
  * SQL-first MCP surface. Two read-scope endpoints:
@@ -59,6 +60,11 @@ const QueryResponseSchema = z
     truncated: z.boolean().openapi({
       example: false,
       description: 'True when rows were dropped to fit the response ceiling.',
+    }),
+    integration: z.string().nullable().openapi({
+      example: 'lastfm',
+      description:
+        'The single upstream service the queried tables belong to (lastfm, strava, discogs, …), or null when the query spans several or reads only shared tables. Renderers use it to tint a single-series chart in that service’s colour.',
     }),
   })
   .openapi('QueryResponse');
@@ -175,6 +181,7 @@ query.openapi(runQueryRoute, async (c) => {
     rows,
     row_count: rows.length,
     truncated,
+    integration: resolveIntegration(gate.tables),
   });
 });
 

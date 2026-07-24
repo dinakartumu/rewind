@@ -11,6 +11,12 @@ export interface QueryResult {
   rows: unknown[][];
   row_count: number;
   truncated: boolean;
+  /**
+   * The single upstream service the queried tables belong to, or null when the
+   * query spans several. Optional so an older API build (which doesn't send it)
+   * still type-checks — the renderer treats absent and null the same.
+   */
+  integration?: string | null;
 }
 
 /** A single column entry in the annotated schema (GET /v1/schema). */
