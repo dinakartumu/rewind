@@ -34,9 +34,12 @@ async function buildSpyingClient(response: unknown = EMPTY) {
   return { client, get };
 }
 
+/** Minimal view of the spy: the recorded (path, params) argument tuples. */
+type GetSpy = { mock: { calls: unknown[][] } };
+
 /** Params the tool passed to `RewindClient.get` for the /search call. */
-function searchParams(get: ReturnType<typeof vi.spyOn>) {
-  const call = get.mock.calls.find((c) => c[0] === '/search');
+function searchParams(get: GetSpy) {
+  const call = get.mock.calls.find((c: unknown[]) => c[0] === '/search');
   expect(call, 'expected a /search request').toBeDefined();
   return call![1] as Record<string, string | number>;
 }
