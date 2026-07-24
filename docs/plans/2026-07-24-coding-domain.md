@@ -549,6 +549,8 @@ searchAuthored(type: 'pr' | 'issue', page?: number): Promise<{ items: GithubItem
 
 Fixtures: hand-write minimal JSON inline in the test file (one PushEvent with 2 commits, one WatchEvent to ignore; one search page with a merged PR; one GraphQL calendar with 2 weeks).
 
+**ETag support (sync best practice):** `getRecentCommits(page?, etag?)` sends `If-None-Match: ${etag}` when provided and returns `{ commits, etag: string | null, notModified: boolean }` — GitHub returns an `ETag` header on `/users/{username}/events`, and a 304 response does not count against the rate limit. On 304 return `{ commits: [], etag, notModified: true }`. Only the events endpoint gets this (GraphQL has no conditional requests; Search ETags are not worth caching). Add test cases: etag sent as If-None-Match; 304 → notModified with empty commits; 200 → new etag captured from the response header.
+
 **Commit** — `git commit -m "feat(coding): github client (graphql contributions, events, search)"`
 
 ---
@@ -579,7 +581,9 @@ export async function syncGithubIncremental(
 export async function syncGithub(env, userId?): Promise<{ synced: number }>;
 ```
 
-**Tests:** contribution upsert (run twice with changed count → updated, not duplicated); commit insert dedup on sha; commit-detail cap honored (stub counts calls); PR upsert updates state open→merged; sync_runs lifecycle.
+**ETag flow in `syncGithubIncremental`:** read the stored events ETag from KV (`env.REWIND_CACHE.get('coding:github:events:etag')`), pass it to `getRecentCommits(1, etag)`. On `notModified`, skip the commits phase entirely (log `[SYNC] GitHub events unchanged (304), skipping commits`). On a 200, store the new etag back (`put`, no TTL). Contributions + PR/issue search still run every time (they have no conditional support). `syncGithubIncremental` therefore takes `env` (or the KV binding) in addition to db/client — pick the cleaner signature and keep the KV interaction stubbed in tests via a minimal `{ get, put }` fake.
+
+**Tests:** contribution upsert (run twice with changed count → updated, not duplicated); commit insert dedup on sha; commit-detail cap honored (stub counts calls); PR upsert updates state open→merged; sync_runs lifecycle; 304 path skips commit processing and preserves the stored etag; 200 path stores the new etag.
 
 **Commit** — `git commit -m "feat(coding): github incremental sync"`
 
@@ -695,7 +699,43 @@ Follow `src/routes/places.ts` structurally (createOpenAPIApp, zod schemas with `
 
 ---
 
+### Task 14: MCP server coding tools + UI
+
+**Files:** under `mcp-server/` (separate package — run its own `npm test` / lint from that directory).
+
+Add coding-domain tools to the MCP server following the existing per-domain pattern exactly. Before writing anything, study: one existing domain tool module in `mcp-server/src/tools/` (e.g. the places one), its Zod output schema in `mcp-server/src/tools/schemas/`, how `server.ts` registers tools, how `client.ts` wraps the REST endpoints, how visual/UI output is produced (image blocks, structuredContent, and any MCP Apps view resources — see how the query-result UI resource is allowlisted in the doc check), and how the docs check enumerates tools (a recent commit "allowlist query-result UI resource in doc check" implies a validation step that MUST be updated).
+
+Tools to add (names and shapes following house conventions):
+
+- `get_coding_stats` — wraps `GET /v1/coding/stats` (optional date range args).
+- `get_recent_coding_activity` — wraps `GET /v1/coding/recent`; render commits/PRs/issues as markdown links to their GitHub URLs in the text block, structuredContent carries the raw rows.
+- `get_coding_languages` — wraps `GET /v1/coding/languages`.
+
+UI: match whatever richness the existing domain tools actually have — if domains expose MCP Apps views or formatted cards, give coding stats the equivalent (e.g. per-language breakdown suited to the stacked/chart views already supported by query_rewind result rendering); do NOT invent a new UI framework. If domain tools are text+structuredContent only, that is the bar. Also update the MCP server's tool docs/reference so the doc check passes, and add tests mirroring the existing tool tests.
+
+**TDD:** write the tool tests first (the package has `mcp-server/src/__tests__/`), then implement. Run the mcp-server test suite + doc check green.
+
+**Commit** — `git commit -m "feat(mcp): coding domain tools"`
+
+---
+
+### Task 15: End-to-end verification
+
+Goal: prove the whole domain works against a real local server, and against real APIs where credentials exist.
+
+**Step 1: Credentials.** Copy `.dev.vars` from the main checkout (`/Users/dinakartumu/Development/rewind/.dev.vars`) into the worktree if present (it is gitignored, so the worktree does not inherit it). For GitHub, if no `GITHUB_TOKEN` is present there, try `gh auth token` + `gh api user --jq .login` to obtain a real token/username. Note which of the three sources have real credentials; do not fail the task over missing WakaTime/RescueTime keys — report them as blocked-on-user instead.
+
+**Step 2: Local stack.** `npm run db:migrate`, then start `npm run dev` (background). Find how a local API key is provisioned (check `src/routes/system.ts` key management + any seed script / docs) and create an admin key.
+
+**Step 3: Exercise the API end to end.** With curl + the admin key: all four `GET /v1/coding/*` endpoints on the empty DB (correct empty shapes); `POST /v1/admin/sync/coding` (sources with creds sync real data; sources without are skipped cleanly); the backfill endpoint for at least one configured source until `next_cursor` advances; re-run the four GET endpoints and verify real rows flow through; `GET /v1/feed?…` (or the feed route's actual path) shows the daily rollup after a backfilled yesterday; `GET /v1/health/sync` shows the coding sync runs. Verify the GitHub 304 path by running sync twice and checking the second run's log line.
+
+**Step 4: Report.** Endpoint-by-endpoint results, which sources ran live vs skipped, any bugs found (fix them TDD-style: failing test → fix → green).
+
+---
+
 ### Task 13: Full verification
+
+Runs LAST, after Tasks 14 and 15.
 
 **Step 1:** `npm test` — full suite green (baseline was 111 files / 1274 tests; expect more now).
 **Step 2:** `npm run lint` and `npx tsc --noEmit` — clean.
