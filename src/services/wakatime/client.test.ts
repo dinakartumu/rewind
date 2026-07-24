@@ -26,7 +26,7 @@ describe('WakatimeClient', () => {
     // WakaTime does not include a per-item `language` in the entity slice,
     // so language is null on duration rows (captured via getSummary instead).
     const item = {
-      time: 1721725200.5, // 2026-07-23T09:00:00.500Z
+      time: 1721725200.5, // 2024-07-23T09:00:00.500Z
       duration: 280.25,
       project: 'rewind',
       entity: '/Users/pat/dev/rewind/src/index.ts',
@@ -52,11 +52,21 @@ describe('WakatimeClient', () => {
     expect(headers['Authorization']).toBe(`Basic ${btoa('waka_test_key')}`);
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].startTime).toBe(new Date(1721725200.5 * 1000).toISOString());
+    expect(rows[0].startTime).toBe('2024-07-23T09:00:00.500Z');
     expect(rows[0].durationSeconds).toBe(280.25);
     expect(rows[0].project).toBe('rewind');
     expect(rows[0].entity).toBe('/Users/pat/dev/rewind/src/index.ts');
     expect(rows[0].language).toBeNull();
+  });
+
+  it('should return an empty array when durations data is empty', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(durationsResponse([])))
+    );
+
+    const rows = await client.getDurations('2024-07-23');
+
+    expect(rows).toEqual([]);
   });
 
   it('should map summary to totals with top language and top project', async () => {
@@ -102,6 +112,21 @@ describe('WakatimeClient', () => {
     expect(summary.totalSeconds).toBe(0);
     expect(summary.topLanguage).toBeNull();
     expect(summary.topProject).toBeNull();
+  });
+
+  it('should return zeroed totals with null tops when summary data is empty', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(summariesResponse([])))
+    );
+
+    const summary = await client.getSummary('2024-07-23');
+
+    expect(summary).toEqual({
+      date: '2024-07-23',
+      totalSeconds: 0,
+      topLanguage: null,
+      topProject: null,
+    });
   });
 
   it('should throw WakatimeHistoryLimitError on a 402 response', async () => {

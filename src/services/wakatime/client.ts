@@ -24,9 +24,9 @@ export class WakatimeHistoryLimitError extends Error {
  * WakaTime does NOT include a per-item `language` in the entity slice, so
  * `language` is always null here; per-day language is captured separately via
  * `getSummary`'s top_language. (Verified against
- * https://wakatime.com/developers#durations — slice_by defaults to 'project'
- * and controls the primary segmentation; only the sliced dimension plus
- * project/time/duration are reliably present per item.)
+ * https://wakatime.com/developers#durations — slice_by controls the primary
+ * segmentation; only the sliced dimension plus project/time/duration are
+ * reliably present per item.)
  */
 export interface WakatimeDurationRow {
   /** ISO 8601 string derived from the item's `time` epoch float. */
@@ -113,7 +113,7 @@ export class WakatimeClient {
       `/users/current/durations?${params.toString()}`
     );
     return (data.data ?? []).map((item) => ({
-      startTime: new Date(item.time * 1000).toISOString(),
+      startTime: new Date(Math.round(item.time * 1000)).toISOString(),
       durationSeconds: item.duration,
       project: item.project ?? null,
       language: item.language ?? null,
