@@ -29,6 +29,7 @@ export const openAPIConfig = {
 | **Collecting** | Discogs, Trakt | Vinyl/CD collection, physical media, wantlist |
 | **Reading** | Instapaper | Articles, highlights, reading progress, word count |
 | **Places** | Foursquare/Swarm | Check-ins, venues, categories, cities |
+| **Coding** | WakaTime, RescueTime, GitHub | Coding time, languages, projects, commits, PRs, issues, screen time |
 | **Attending** | Google Calendar, Gmail | Live events, tickets, sports games, concerts, venues |
 
 ## Authentication
@@ -114,6 +115,11 @@ Common status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500
     {
       name: 'Places',
       description: 'Foursquare/Swarm check-ins, venues, and stats.',
+    },
+    {
+      name: 'Coding',
+      description:
+        'WakaTime coding time and languages, RescueTime screen time, and GitHub commits, PRs, and issues.',
     },
     {
       name: 'Attending',

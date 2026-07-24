@@ -101,6 +101,13 @@ const DOMAINS: {
     description: 'MCP tools for the live events and games you have attended.',
   },
   {
+    key: 'coding',
+    title: 'Coding',
+    icon: 'code',
+    description:
+      'MCP tools for your coding activity: WakaTime editor time, RescueTime screen time, and GitHub commits, PRs, and issues.',
+  },
+  {
     key: 'cross-domain',
     title: 'Cross-domain',
     icon: 'layer-group',

@@ -3,7 +3,7 @@
   "info": {
     "title": "Rewind API",
     "version": "1.0.0",
-    "description": "Personal data aggregation API. Syncs and serves data from Last.fm, Apple Music, Strava, Plex, Letterboxd, Discogs, Trakt, Instapaper, Foursquare/Swarm, Google Calendar, and Gmail.\n\n## Domains\n\n| Domain | Source | Description |\n|--------|--------|-------------|\n| **Listening** | Last.fm, Apple Music | Scrobbles, top artists/albums/tracks, streaks, stats |\n| **Running** | Strava | Activities, splits, gear, personal records, year summaries |\n| **Watching** | Plex, Letterboxd | Movies, TV shows, watch history, ratings, reviews |\n| **Collecting** | Discogs, Trakt | Vinyl/CD collection, physical media, wantlist |\n| **Reading** | Instapaper | Articles, highlights, reading progress, word count |\n| **Places** | Foursquare/Swarm | Check-ins, venues, categories, cities |\n| **Attending** | Google Calendar, Gmail | Live events, tickets, sports games, concerts, venues |\n\n## Authentication\n\nAll endpoints require a Bearer token. There are two key types:\n\n- **Read keys** (`rw_live_...`) — access all GET endpoints\n- **Admin keys** (`rw_admin_...`) — access all endpoints including sync triggers and data management\n\nPass your key in the Authorization header: `Authorization: Bearer rw_live_...`\n\n## Pagination\n\nList endpoints return paginated responses:\n\n```json\n{\n  \"data\": [...],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 150, \"total_pages\": 8 }\n}\n```\n\nThe activity feed uses cursor-based pagination instead.\n\n## Quick Start\n\n```bash\n# Check the API is up\ncurl https://api.rewind.rest/v1/health\n\n# Fetch recent scrobbles (requires read key)\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/listening/recent\n\n# Fetch running stats\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/running/stats\n```\n\n## Errors\n\nAll errors follow the same envelope:\n\n```json\n{ \"error\": \"Not found\", \"status\": 404 }\n```\n\nCommon status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500 (server error).",
+    "description": "Personal data aggregation API. Syncs and serves data from Last.fm, Apple Music, Strava, Plex, Letterboxd, Discogs, Trakt, Instapaper, Foursquare/Swarm, Google Calendar, and Gmail.\n\n## Domains\n\n| Domain | Source | Description |\n|--------|--------|-------------|\n| **Listening** | Last.fm, Apple Music | Scrobbles, top artists/albums/tracks, streaks, stats |\n| **Running** | Strava | Activities, splits, gear, personal records, year summaries |\n| **Watching** | Plex, Letterboxd | Movies, TV shows, watch history, ratings, reviews |\n| **Collecting** | Discogs, Trakt | Vinyl/CD collection, physical media, wantlist |\n| **Reading** | Instapaper | Articles, highlights, reading progress, word count |\n| **Places** | Foursquare/Swarm | Check-ins, venues, categories, cities |\n| **Coding** | WakaTime, RescueTime, GitHub | Coding time, languages, projects, commits, PRs, issues, screen time |\n| **Attending** | Google Calendar, Gmail | Live events, tickets, sports games, concerts, venues |\n\n## Authentication\n\nAll endpoints require a Bearer token. There are two key types:\n\n- **Read keys** (`rw_live_...`) — access all GET endpoints\n- **Admin keys** (`rw_admin_...`) — access all endpoints including sync triggers and data management\n\nPass your key in the Authorization header: `Authorization: Bearer rw_live_...`\n\n## Pagination\n\nList endpoints return paginated responses:\n\n```json\n{\n  \"data\": [...],\n  \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 150, \"total_pages\": 8 }\n}\n```\n\nThe activity feed uses cursor-based pagination instead.\n\n## Quick Start\n\n```bash\n# Check the API is up\ncurl https://api.rewind.rest/v1/health\n\n# Fetch recent scrobbles (requires read key)\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/listening/recent\n\n# Fetch running stats\ncurl -H \"Authorization: Bearer rw_live_...\" \\\n  https://api.rewind.rest/v1/running/stats\n```\n\n## Errors\n\nAll errors follow the same envelope:\n\n```json\n{ \"error\": \"Not found\", \"status\": 404 }\n```\n\nCommon status codes: 400 (bad request), 401 (unauthorized), 404 (not found), 500 (server error).",
     "contact": {
       "url": "https://github.com/pdugan20/rewind"
     }
@@ -38,6 +38,10 @@
     {
       "name": "Places",
       "description": "Foursquare/Swarm check-ins, venues, and stats."
+    },
+    {
+      "name": "Coding",
+      "description": "WakaTime coding time and languages, RescueTime screen time, and GitHub commits, PRs, and issues."
     },
     {
       "name": "Attending",
@@ -2221,6 +2225,61 @@
           "items_synced",
           "skipped",
           "timestamp"
+        ]
+      },
+      "CodingBackfillResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "items_synced": {
+            "type": "integer",
+            "example": 42
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "2026-05-31",
+            "description": "Resume token for the next chunk, or null when complete."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "items_synced",
+          "next_cursor",
+          "timestamp"
+        ]
+      },
+      "CodingBackfillBody": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "wakatime",
+              "rescuetime",
+              "github"
+            ],
+            "example": "github",
+            "description": "Which coding source to backfill."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Opaque resume token from the previous response. Omit to start a fresh backfill."
+          }
+        },
+        "required": [
+          "source"
         ]
       }
     },
@@ -20314,6 +20373,614 @@
         }
       }
     },
+    "/v1/coding/recent": {
+      "get": {
+        "operationId": "getCodingRecent",
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Recent coding activity",
+        "description": "Merged timeline of GitHub commits, pull requests, and issues, newest first, plus a today object with coding seconds (WakaTime) and productivity pulse (RescueTime) for the current UTC date.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "example": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent coding activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "commit",
+                              "pr",
+                              "issue"
+                            ]
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "occurred_at": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "repo",
+                          "title",
+                          "occurred_at",
+                          "state",
+                          "url"
+                        ]
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    },
+                    "today": {
+                      "type": "object",
+                      "properties": {
+                        "coding_seconds": {
+                          "type": "number"
+                        },
+                        "productivity_pulse": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "coding_seconds",
+                        "productivity_pulse"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination",
+                    "today"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "type": "pr",
+                      "repo": "pdugan20/rewind",
+                      "title": "Add coding domain routes",
+                      "occurred_at": "2026-07-24T15:02:00.000Z",
+                      "state": "merged",
+                      "url": "https://github.com/pdugan20/rewind/pull/42"
+                    },
+                    {
+                      "type": "commit",
+                      "repo": "pdugan20/rewind",
+                      "title": "feat(coding): routes",
+                      "occurred_at": "2026-07-24T14:40:00.000Z",
+                      "state": null,
+                      "url": "https://github.com/pdugan20/rewind/commit/abc123"
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "limit": 20,
+                    "total": 128,
+                    "total_pages": 7
+                  },
+                  "today": {
+                    "coding_seconds": 5400,
+                    "productivity_pulse": 72
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coding/stats": {
+      "get": {
+        "operationId": "getCodingStats",
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Coding stats",
+        "description": "Aggregate coding statistics: coding seconds and active days (WakaTime), commit/PR/issue counts (GitHub), and a screen-time breakdown (RescueTime). Optional date/from/to params scope every aggregation to the range.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coding statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "coding_seconds": {
+                      "type": "number"
+                    },
+                    "coding_days": {
+                      "type": "number"
+                    },
+                    "commits": {
+                      "type": "number"
+                    },
+                    "prs": {
+                      "type": "number"
+                    },
+                    "issues": {
+                      "type": "number"
+                    },
+                    "screen_time": {
+                      "type": "object",
+                      "properties": {
+                        "total_seconds": {
+                          "type": "number"
+                        },
+                        "very_productive_seconds": {
+                          "type": "number"
+                        },
+                        "productive_seconds": {
+                          "type": "number"
+                        },
+                        "neutral_seconds": {
+                          "type": "number"
+                        },
+                        "distracting_seconds": {
+                          "type": "number"
+                        },
+                        "very_distracting_seconds": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "total_seconds",
+                        "very_productive_seconds",
+                        "productive_seconds",
+                        "neutral_seconds",
+                        "distracting_seconds",
+                        "very_distracting_seconds"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "coding_seconds",
+                    "coding_days",
+                    "commits",
+                    "prs",
+                    "issues",
+                    "screen_time"
+                  ]
+                },
+                "example": {
+                  "coding_seconds": 486000,
+                  "coding_days": 142,
+                  "commits": 1203,
+                  "prs": 87,
+                  "issues": 41,
+                  "screen_time": {
+                    "total_seconds": 720000,
+                    "very_productive_seconds": 410000,
+                    "productive_seconds": 150000,
+                    "neutral_seconds": 80000,
+                    "distracting_seconds": 60000,
+                    "very_distracting_seconds": 20000
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coding/languages": {
+      "get": {
+        "operationId": "getCodingLanguages",
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Top languages",
+        "description": "Per-language coding time over the range (from wakatime_daily_languages), with percent of the range total. Supports date filtering and limit (default 10, max 50).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top languages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "language": {
+                            "type": "string"
+                          },
+                          "total_seconds": {
+                            "type": "number"
+                          },
+                          "percent": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "language",
+                          "total_seconds",
+                          "percent"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "language": "TypeScript",
+                      "total_seconds": 360000,
+                      "percent": 74.1
+                    },
+                    {
+                      "language": "Python",
+                      "total_seconds": 90000,
+                      "percent": 18.5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coding/projects": {
+      "get": {
+        "operationId": "getCodingProjects",
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Top projects",
+        "description": "Per-project coding time (WakaTime durations) with a matching GitHub commit count (commits whose repo ends with /{project}). When a date/from/to filter is given, both the coding time and the commit count are scoped to that window (commits by committed_at). Supports limit (default 10, max 50).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+              "example": "2025-02-17"
+            },
+            "required": false,
+            "description": "Single day (YYYY-MM-DD). Overrides from/to.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range start, inclusive (ISO 8601)",
+              "example": "2025-02-01T00:00:00Z"
+            },
+            "required": false,
+            "description": "Range start, inclusive (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Range end, inclusive (ISO 8601)",
+              "example": "2025-02-28T23:59:59Z"
+            },
+            "required": false,
+            "description": "Range end, inclusive (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "project": {
+                            "type": "string"
+                          },
+                          "total_seconds": {
+                            "type": "number"
+                          },
+                          "commits": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "project",
+                          "total_seconds",
+                          "commits"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "project": "rewind",
+                      "total_seconds": 180000,
+                      "commits": 412
+                    },
+                    {
+                      "project": "dotfiles",
+                      "total_seconds": 24000,
+                      "commits": 33
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/attending/events": {
       "get": {
         "operationId": "listAttendedEvents",
@@ -23542,7 +24209,8 @@
                 "running",
                 "watching",
                 "collecting",
-                "attending"
+                "attending",
+                "coding"
               ],
               "description": "Activity domain to filter by",
               "example": "listening"
@@ -26544,6 +27212,112 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AppleMusicAlbumsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/sync/coding": {
+      "post": {
+        "operationId": "adminSyncCoding",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Trigger coding sync",
+        "description": "Runs the coding-domain orchestrator (WakaTime + RescueTime + GitHub) with per-source isolation, then emits the daily feed rollup. Sources with unset credentials are skipped.",
+        "responses": {
+          "200": {
+            "description": "Sync completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/sync/coding/backfill": {
+      "post": {
+        "operationId": "adminSyncCodingBackfill",
+        "x-hidden": true,
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Backfill one coding source in bounded chunks",
+        "description": "Runs one bounded backfill chunk for the given coding source, walking history backward. Re-run with the returned next_cursor until it is null.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodingBackfillBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill chunk completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodingBackfillResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

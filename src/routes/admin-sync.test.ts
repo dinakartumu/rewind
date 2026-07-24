@@ -89,6 +89,192 @@ describe('admin-sync endpoints', () => {
     });
   });
 
+  describe('POST /v1/admin/sync/coding', () => {
+    it('requires admin auth', async () => {
+      const res = await SELF.fetch('http://localhost/v1/admin/sync/coding', {
+        method: 'POST',
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('completes cleanly when no sources are configured (all skipped)', async () => {
+      // The test worker env has no WAKATIME/RESCUETIME/GITHUB credentials, so
+      // syncCoding skips every source and still returns completed.
+      const res = await SELF.fetch('http://localhost/v1/admin/sync/coding', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { status: string; timestamp: string };
+      expect(body.status).toBe('completed');
+      expect(body.timestamp).toBeTruthy();
+    });
+  });
+
+  describe('POST /v1/admin/sync/coding/backfill', () => {
+    it('requires admin auth', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'github' }),
+        }
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects an unknown source with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'gitlab' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a missing source with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('dispatches to the wakatime backfill (surfaces its missing-key error, not a 400)', async () => {
+      // Valid source → passes zod, dispatches to backfillWakatime, which throws
+      // "WAKATIME_API_KEY is not configured" in the unconfigured test env. A 500
+      // (not 400) proves the dispatch reached the source function.
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'wakatime' }),
+        }
+      );
+      expect(res.status).toBe(500);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('WAKATIME_API_KEY');
+    });
+
+    it('dispatches to the github backfill', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'github' }),
+        }
+      );
+      expect(res.status).toBe(500);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('GITHUB_TOKEN');
+    });
+
+    it('rejects a malformed github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'github', cursor: '{not json' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a missing-page github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: 'github',
+            cursor: JSON.stringify({ phase: 'prs' }),
+          }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an unknown-phase github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: 'github',
+            cursor: JSON.stringify({ phase: 'reviews', page: 1 }),
+          }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a malformed wakatime cursor with 400', async () => {
+      // A non-YYYY-MM-DD cursor is a client error (400) and must surface even
+      // when WAKATIME_API_KEY is unset — the cursor is validated first.
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'wakatime', cursor: 'not-a-date' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a malformed rescuetime cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'rescuetime', cursor: '2026/01/01' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /v1/admin/running/recompute', () => {
     it('requires admin auth', async () => {
       const res = await SELF.fetch(

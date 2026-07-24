@@ -231,5 +231,34 @@ describe('feed routes', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('filters by the coding domain', async () => {
+      const db = drizzle(env.DB);
+      await insertFeedItems(db, [
+        {
+          domain: 'coding',
+          eventType: 'daily_rollup',
+          occurredAt: '2026-07-23T23:59:59.000Z',
+          title: 'Coded 3h 46m (TypeScript · rewind)',
+          sourceId: 'coding:day:2026-07-23',
+        },
+        {
+          domain: 'listening',
+          eventType: 'scrobble',
+          occurredAt: '2026-07-23T00:00:00Z',
+          title: 'Song',
+          sourceId: 'coding-filter-other',
+        },
+      ]);
+
+      const res = await SELF.fetch('http://localhost/v1/feed/domain/coding', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].domain).toBe('coding');
+      expect(body.data[0].event_type).toBe('daily_rollup');
+    });
   });
 });

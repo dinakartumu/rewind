@@ -125,6 +125,10 @@ docs/                      -- Project documentation
 | `INSTAPAPER_ACCESS_TOKEN_SECRET` | Reading              | Instapaper OAuth token secret                                               |
 | `ENABLE_INSTAPAPER`              | Reading              | Kill-switch: `"false"` skips Instapaper cron sync + reconciliation          |
 | `FOURSQUARE_ACCESS_TOKEN`        | Places               | Foursquare/Swarm OAuth user token (does not expire)                         |
+| `WAKATIME_API_KEY`               | Coding               | WakaTime API key from wakatime.com/settings/api-key                         |
+| `RESCUETIME_API_KEY`             | Coding               | RescueTime API key from rescuetime.com/anapi/manage                         |
+| `GITHUB_TOKEN`                   | Coding               | PAT with repo read + read:user for private activity                         |
+| `GITHUB_USERNAME`                | Coding               | GitHub login for API queries                                                |
 | `APPLE_MUSIC_DEVELOPER_TOKEN`    | Images               | Apple Music JWT                                                             |
 | `FANART_TV_API_KEY`              | Images               | Fanart.tv project API key                                                   |
 

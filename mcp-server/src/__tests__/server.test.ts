@@ -315,6 +315,9 @@ const EXPECTED_TOOLS = [
   'get_attended_season',
   'get_attended_event',
   'get_attended_player',
+  'get_coding_stats',
+  'get_recent_coding_activity',
+  'get_coding_languages',
 ];
 
 /** Tools retired in the SQL-first migration — must NOT be registered. */

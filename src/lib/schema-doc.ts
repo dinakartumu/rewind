@@ -47,6 +47,7 @@ export const SCHEMA_DOC: SchemaDoc = {
     "Year-in-review (wrapped) view in query_rewind: call query_rewind with view:'wrapped' and a UNION-ALL that returns labeled highlight rows with columns `section, label, value, image` (image optional, a composed CDN URL or NULL) grouped by `section`. The wrapped card groups rows by section and renders each as a mini panel — a ranked list with covers when the section has images, else a labeled stat. Add a leading `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image` to title the card. Example: `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image UNION ALL SELECT 'Top Artists', ar.name, ar.playcount, 'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || ar.image_key FROM lastfm_artists ar WHERE ar.is_filtered = 0 ORDER BY ar.playcount DESC LIMIT 3` then further UNION ALL blocks for 'Top Films' (watch_history JOIN movies, image = movie poster), 'Miles Run' (`SELECT 'Miles Run', CAST(ROUND(SUM(distance)/1609.34) AS TEXT) || ' miles', SUM(distance), NULL FROM strava_activities WHERE started_at LIKE '2024%'`), 'Places', etc. Each SELECT must project the SAME four columns in the same order; use column aliases only on the first SELECT. Section names are free-form — unknown sections render generically; single-row image-less sections read as a big stat.",
     'Cross-domain join keys: performers.lastfm_artist_id → lastfm_artists.id (concerts ↔ listening); collection_listening_xref links discogs_collection ↔ Last.fm play counts by matched name; trakt_collection.movie_id and watch_history.movie_id → movies.id (physical media ↔ watched films).',
     'Enums are stored as plain text. Notable ones: watch_history.source (plex|letterboxd|manual|trakt), trakt_collection.media_type (bluray|uhd_bluray|hddvd|dvd|digital), reading_items.status (unread|reading|finished), attended_events.category (sports|music|arts).',
+    'Coding domain: wakatime_durations/wakatime_daily_summaries (editor time), rescuetime_activities/rescuetime_daily_summaries (screen time; productivity -2..+2), github_commits/github_pull_requests/github_issues/github_contribution_days (authored activity incl. private repos). Cross-source join: wakatime project names often equal github repo short names (m.repo LIKE "%/" || project).',
   ],
   tables: [
     // ─── Listening (Last.fm + Apple Music) ───────────────────────────
@@ -678,6 +679,151 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('lng', 'real', 'nullable'),
         c('checked_in_at', 'text', 'ISO 8601'),
         c('shout', 'text', 'nullable note posted with the check-in'),
+      ],
+    },
+    // ─── Coding (WakaTime + RescueTime + GitHub) ─────────────────────
+    {
+      name: 'wakatime_durations',
+      purpose:
+        'One row per contiguous stretch of coding activity in one file (WakaTime Durations API), sliced by entity.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('start_time', 'text', 'ISO 8601'),
+        c('duration_seconds', 'real', 'length of the slice in seconds'),
+        c('project', 'text', 'nullable'),
+        c('language', 'text', 'nullable'),
+        c('entity', 'text', 'file path when sliced by entity, nullable'),
+      ],
+    },
+    {
+      name: 'wakatime_daily_summaries',
+      purpose:
+        'Materialized per-day coding-time rollup; rebuilt each sync from wakatime_durations. One row per (user, date).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('date', 'text', 'YYYY-MM-DD'),
+        c('total_seconds', 'real', "that day's total coding time in seconds"),
+        c('top_language', 'text', 'nullable'),
+        c('top_project', 'text', 'nullable'),
+      ],
+    },
+    {
+      name: 'wakatime_daily_languages',
+      purpose:
+        'Materialized per-day, per-language coding time; rebuilt each sync from the WakaTime Summaries API (duration rows are entity-sliced and carry no language). One row per (user, date, language).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('date', 'text', 'YYYY-MM-DD'),
+        c('language', 'text', 'e.g. "TypeScript"'),
+        c(
+          'total_seconds',
+          'real',
+          "that day's time in the language in seconds"
+        ),
+      ],
+    },
+    {
+      name: 'rescuetime_activities',
+      purpose:
+        'One row per (timestamp, activity) 5-minute screen-time bucket from the RescueTime Analytic Data API.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c(
+          'timestamp',
+          'text',
+          'ISO 8601 (RescueTime-local time stored as ISO)'
+        ),
+        c('duration_seconds', 'integer'),
+        c('activity', 'text', 'app or site name, e.g. "VS Code", "github.com"'),
+        c('category', 'text', 'nullable'),
+        c(
+          'productivity',
+          'integer',
+          '-2 (very distracting) .. +2 (very productive)'
+        ),
+      ],
+    },
+    {
+      name: 'rescuetime_daily_summaries',
+      purpose:
+        'Materialized per-day screen-time rollup; rebuilt each sync from rescuetime_activities. One row per (user, date).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('date', 'text', 'YYYY-MM-DD'),
+        c(
+          'total_seconds',
+          'integer',
+          "that day's total tracked time in seconds"
+        ),
+        c(
+          'productivity_pulse',
+          'integer',
+          '0-100 RescueTime pulse; null for days outside the recent API feed window'
+        ),
+        c('very_productive_seconds', 'integer'),
+        c('productive_seconds', 'integer'),
+        c('neutral_seconds', 'integer'),
+        c('distracting_seconds', 'integer'),
+        c('very_distracting_seconds', 'integer'),
+      ],
+    },
+    {
+      name: 'github_contribution_days',
+      purpose:
+        'GitHub contribution calendar; one row per day, includes private contributions. Upserted on (user, date).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('date', 'text', 'YYYY-MM-DD'),
+        c('contribution_count', 'integer'),
+      ],
+    },
+    {
+      name: 'github_commits',
+      purpose:
+        'One row per commit authored by the user, from the authenticated events feed.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('sha', 'text'),
+        c('repo', 'text', 'owner/name'),
+        c('message', 'text'),
+        c('additions', 'integer', 'null when detail fetch was skipped'),
+        c('deletions', 'integer', 'null when detail fetch was skipped'),
+        c('committed_at', 'text', 'ISO 8601'),
+        c('is_private', 'integer', '0/1'),
+        c('url', 'text'),
+      ],
+    },
+    {
+      name: 'github_pull_requests',
+      purpose:
+        'One row per PR authored by the user, from the Search API (full history).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('repo', 'text', 'owner/name'),
+        c('number', 'integer'),
+        c('title', 'text'),
+        c('state', 'text', 'open | closed | merged'),
+        c('created_at_github', 'text', 'ISO 8601'),
+        c('merged_at', 'text', 'ISO 8601, nullable'),
+        c('closed_at', 'text', 'ISO 8601, nullable'),
+        c('is_private', 'integer', '0/1'),
+        c('url', 'text'),
+      ],
+    },
+    {
+      name: 'github_issues',
+      purpose:
+        'One row per issue authored by the user, from the Search API (full history).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('repo', 'text', 'owner/name'),
+        c('number', 'integer'),
+        c('title', 'text'),
+        c('state', 'text', 'open | closed'),
+        c('created_at_github', 'text', 'ISO 8601'),
+        c('closed_at', 'text', 'ISO 8601, nullable'),
+        c('is_private', 'integer', '0/1'),
+        c('url', 'text'),
       ],
     },
     // ─── Geo reference ───────────────────────────────────────────────

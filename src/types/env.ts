@@ -47,6 +47,13 @@ export interface Env {
   // via browser OAuth; sync and cron skip when unset.
   FOURSQUARE_ACCESS_TOKEN?: string;
 
+  // Coding domain (WakaTime + RescueTime + GitHub). All optional —
+  // syncCoding() skips any source whose credentials are unset.
+  WAKATIME_API_KEY?: string;
+  RESCUETIME_API_KEY?: string;
+  GITHUB_TOKEN?: string;
+  GITHUB_USERNAME?: string;
+
   // Google (Calendar + Gmail for the attending domain)
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;

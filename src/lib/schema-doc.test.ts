@@ -23,6 +23,9 @@ import * as strava from '../db/schema/strava.js';
 import * as system from '../db/schema/system.js';
 import * as trakt from '../db/schema/trakt.js';
 import * as watching from '../db/schema/watching.js';
+import * as wakatime from '../db/schema/wakatime.js';
+import * as rescuetime from '../db/schema/rescuetime.js';
+import * as github from '../db/schema/github.js';
 
 const schemaModules = [
   attending,
@@ -36,6 +39,9 @@ const schemaModules = [
   system,
   trakt,
   watching,
+  wakatime,
+  rescuetime,
+  github,
 ];
 
 /** Every physical table name defined across the Drizzle schema modules. */

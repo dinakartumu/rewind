@@ -14,6 +14,7 @@ import collecting from './routes/collecting.js';
 import feed from './routes/feed.js';
 import reading from './routes/reading.js';
 import places from './routes/places.js';
+import coding from './routes/coding.js';
 import attending from './routes/attending.js';
 import search from './routes/search.js';
 import query from './routes/query.js';
@@ -32,6 +33,7 @@ import { syncTraktCollection } from './services/trakt/sync.js';
 import { syncTraktHistory } from './services/trakt/history-sync.js';
 import { syncReading } from './services/instapaper/sync.js';
 import { syncPlaces } from './services/foursquare/sync.js';
+import { syncCoding } from './services/coding/sync.js';
 import { reconcileReadingDeletions } from './services/instapaper/reconcile-deletions.js';
 import { backfillAttending } from './services/attending/backfill.js';
 import {
@@ -96,6 +98,7 @@ const routes = app
   .route('/', collecting)
   .route('/reading', reading)
   .route('/places', places)
+  .route('/coding', coding)
   .route('/attending', attending)
   .route('/feed', feed)
   .route('/search', search)
@@ -151,8 +154,9 @@ export default {
       }
       case '0 * * * *': {
         // Hourly high-frequency feeds. Strava activities, Trakt watch
-        // history, and Foursquare/Swarm check-ins change often enough that
-        // daily / 6-hourly freshness felt stale. Collection-style Trakt data
+        // history, Foursquare/Swarm check-ins, and coding activity
+        // (WakaTime/RescueTime/GitHub) change often enough that daily /
+        // 6-hourly freshness felt stale. Collection-style Trakt data
         // (owned media) stays on the weekly Sunday job.
         const runningRetry = await shouldRetry(db, 'running');
         if (runningRetry.shouldRetry) {
@@ -196,6 +200,21 @@ export default {
             syncPlaces(env).catch((error) =>
               console.log(
                 `[ERROR] Foursquare sync failed: ${error instanceof Error ? error.message : String(error)}`
+              )
+            )
+          );
+        }
+
+        if (
+          env.WAKATIME_API_KEY ||
+          env.RESCUETIME_API_KEY ||
+          env.GITHUB_TOKEN
+        ) {
+          console.log('[SYNC] Coding sync (hourly)');
+          ctx.waitUntil(
+            syncCoding(env).catch((error) =>
+              console.log(
+                `[ERROR] Coding sync failed: ${error instanceof Error ? error.message : String(error)}`
               )
             )
           );

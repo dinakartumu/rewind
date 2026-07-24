@@ -16,6 +16,7 @@ const VALID_DOMAINS = [
   'watching',
   'collecting',
   'attending',
+  'coding',
 ];
 
 const feed = createOpenAPIApp();
@@ -69,6 +70,7 @@ const DomainParamSchema = z.object({
       'watching',
       'collecting',
       'attending',
+      'coding',
     ] as const)
     .openapi({
       description: 'Activity domain to filter by',
