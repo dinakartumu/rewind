@@ -7,7 +7,7 @@ import {
   githubIssues,
 } from '../../db/schema/github.js';
 import { syncRuns } from '../../db/schema/system.js';
-import { GithubClient } from './client.js';
+import { GithubClient, GithubRateLimitError } from './client.js';
 import type { Env } from '../../types/env.js';
 
 /**
@@ -148,13 +148,26 @@ export async function syncGithubIncremental(
     newCommits.push(...freshlyInserted);
 
     // Fetch additions/deletions for at most COMMIT_DETAIL_CAP NEW commits.
+    // A transient stats fetch (500/network blip) must not kill the whole run:
+    // the commit is already inserted, so we log and move on, leaving its
+    // additions/deletions null until a later run. A GithubRateLimitError is
+    // different — the budget is genuinely exhausted, so we rethrow and let the
+    // run fail (and the hourly cron retry after the window reopens).
     for (const c of freshlyInserted.slice(0, COMMIT_DETAIL_CAP)) {
-      const stats = await client.getCommitStats(c.repo, c.sha);
-      if (stats) {
-        await db
-          .update(githubCommits)
-          .set({ additions: stats.additions, deletions: stats.deletions })
-          .where(eq(githubCommits.sha, c.sha));
+      try {
+        const stats = await client.getCommitStats(c.repo, c.sha);
+        if (stats) {
+          await db
+            .update(githubCommits)
+            .set({ additions: stats.additions, deletions: stats.deletions })
+            .where(eq(githubCommits.sha, c.sha));
+        }
+      } catch (err) {
+        if (err instanceof GithubRateLimitError) throw err;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(
+          `[ERROR] GitHub commit stats fetch failed for ${c.sha}: ${msg}`
+        );
       }
     }
 

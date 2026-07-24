@@ -11,6 +11,7 @@ import {
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
 import { syncGithubIncremental, syncGithub } from './sync.js';
+import { GithubRateLimitError } from './client.js';
 import type {
   GithubClient,
   GithubCommitRow,
@@ -34,7 +35,15 @@ function makeKv(initial: Record<string, string> = {}) {
 interface StubOptions {
   contributionDays?: Array<{ date: string; count: number }>;
   recentCommits?: GithubRecentCommitsResult;
-  commitStats?: Record<string, { additions: number; deletions: number } | null>;
+  /**
+   * Per-sha commit-stats behavior. A value throws when it is an Error instance
+   * (models a transient 500 / network blip or an exhausted rate limit); null
+   * models the 404/409 path; an object supplies additions/deletions.
+   */
+  commitStats?: Record<
+    string,
+    { additions: number; deletions: number } | null | Error
+  >;
   prs?: GithubItem[];
   issues?: GithubItem[];
 }
@@ -73,7 +82,13 @@ function makeClient(opts: StubOptions = {}): {
     },
     getCommitStats: async (_repo: string, sha: string) => {
       calls.getCommitStats.push(sha);
-      return opts.commitStats?.[sha] ?? { additions: 1, deletions: 1 };
+      // Distinguish "configured as null" (404 path) from "not configured".
+      if (opts.commitStats && sha in opts.commitStats) {
+        const configured = opts.commitStats[sha];
+        if (configured instanceof Error) throw configured;
+        return configured;
+      }
+      return { additions: 1, deletions: 1 };
     },
     searchAuthored: async (type: 'pr' | 'issue', page = 1) => {
       calls.searchAuthored.push({ type, page });
@@ -297,6 +312,100 @@ describe('syncGithubIncremental', () => {
     await syncGithubIncremental(db, client, kv, USERNAME);
 
     expect(calls.getCommitStats).toEqual(['new-1']);
+  });
+
+  it('tolerates a transient commit-stats failure: other commits still get stats and the PR/issue phase still runs', async () => {
+    const db = createDb(env.DB);
+    const { kv } = makeKv();
+
+    const { client, calls } = makeClient({
+      recentCommits: {
+        commits: [commit('ok-1'), commit('boom'), commit('ok-2')],
+        etag: 'e',
+        notModified: false,
+      },
+      commitStats: {
+        'ok-1': { additions: 5, deletions: 2 },
+        boom: new Error('502 Bad Gateway'),
+        'ok-2': { additions: 3, deletions: 1 },
+      },
+      prs: [pr(1)],
+      issues: [pr(2, { url: 'https://github.com/me/rewind/issues/2' })],
+    });
+
+    // Should NOT throw despite the transient failure on 'boom'.
+    const result = await syncGithubIncremental(db, client, kv, USERNAME);
+
+    // All three shas were attempted (loop continued past the throw).
+    expect(calls.getCommitStats).toEqual(['ok-1', 'boom', 'ok-2']);
+
+    // The two healthy commits got their stats; 'boom' stays null.
+    const rows = await db
+      .select()
+      .from(githubCommits)
+      .orderBy(asc(githubCommits.sha));
+    const bySha = Object.fromEntries(rows.map((r) => [r.sha, r]));
+    expect(bySha['ok-1'].additions).toBe(5);
+    expect(bySha['ok-2'].additions).toBe(3);
+    expect(bySha['boom'].additions).toBeNull();
+
+    // The PR + issue phase still ran.
+    expect(calls.searchAuthored).toEqual([
+      { type: 'pr', page: 1 },
+      { type: 'issue', page: 1 },
+    ]);
+    const prs = await db.select().from(githubPullRequests);
+    const issues = await db.select().from(githubIssues);
+    expect(prs.length).toBe(1);
+    expect(issues.length).toBe(1);
+    expect(result.newCommits.map((c) => c.sha).sort()).toEqual([
+      'boom',
+      'ok-1',
+      'ok-2',
+    ]);
+  });
+
+  it('rethrows a GithubRateLimitError from commit stats — an exhausted budget fails the whole sync', async () => {
+    const db = createDb(env.DB);
+    const { kv } = makeKv();
+
+    const { client } = makeClient({
+      recentCommits: {
+        commits: [commit('rl-1')],
+        etag: 'e',
+        notModified: false,
+      },
+      commitStats: {
+        'rl-1': new GithubRateLimitError('GitHub rate limit exceeded'),
+      },
+    });
+
+    await expect(
+      syncGithubIncremental(db, client, kv, USERNAME)
+    ).rejects.toBeInstanceOf(GithubRateLimitError);
+  });
+
+  it('commit stats returning null (404 path) leaves additions null without incident', async () => {
+    const db = createDb(env.DB);
+    const { kv } = makeKv();
+
+    const { client } = makeClient({
+      recentCommits: {
+        commits: [commit('gone')],
+        etag: 'e',
+        notModified: false,
+      },
+      commitStats: { gone: null },
+    });
+
+    await syncGithubIncremental(db, client, kv, USERNAME);
+
+    const [row] = await db
+      .select()
+      .from(githubCommits)
+      .where(eq(githubCommits.sha, 'gone'));
+    expect(row.additions).toBeNull();
+    expect(row.deletions).toBeNull();
   });
 
   it('304 path: passes the stored etag, skips commit processing entirely, and does not clobber the stored etag', async () => {
