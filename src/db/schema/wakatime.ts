@@ -9,9 +9,16 @@ import {
 
 /**
  * WakaTime duration slices (Durations API, sliced by entity). One row per
- * contiguous stretch of activity in one file/project. The unique
- * (start_time, project, entity) key makes the today+yesterday re-sync
- * idempotent: overlapping fetches deduplicate on conflict.
+ * contiguous stretch of activity in one file/project.
+ *
+ * Idempotency comes from the sync's per-day rebuild, NOT from the unique key:
+ * syncWakatimeDay deletes the day's UTC window and reinserts, so re-running a
+ * day never conflicts. The unique (start_time, project, entity) index is a
+ * tripwire, not a dedup path — the sync never does onConflictDoNothing/Update
+ * on this table, so a conflict here would throw. It exists to catch a bug
+ * where two overlapping delete windows insert the same slice twice (e.g. a
+ * mis-computed dayBounds), surfacing the corruption loudly instead of silently
+ * double-counting time.
  */
 export const wakatimeDurations = sqliteTable(
   'wakatime_durations',

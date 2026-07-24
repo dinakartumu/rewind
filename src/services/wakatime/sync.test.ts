@@ -305,7 +305,8 @@ describe('syncWakatime', () => {
     });
 
     const result = await syncWakatime(wakatimeEnv('waka_test'));
-    expect(result.synced).toBeGreaterThanOrEqual(0);
+    // Both days return empty durations, so nothing is synced.
+    expect(result.synced).toBe(0);
 
     const [run] = await createDb(env.DB)
       .select()
@@ -313,6 +314,20 @@ describe('syncWakatime', () => {
       .where(eq(syncRuns.domain, 'coding'));
     expect(run.syncType).toBe('wakatime');
     expect(run.status).toBe('completed');
+
+    // Day selection is pinned to yesterday + today in UTC. Assert the
+    // metadata's per-day keys are exactly those two dates.
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const expectedDays = [
+      yesterday.toISOString().slice(0, 10),
+      now.toISOString().slice(0, 10),
+    ];
+    const metadata = JSON.parse(run.metadata ?? '{}') as {
+      perDayTotalSeconds: Record<string, number>;
+    };
+    expect(Object.keys(metadata.perDayTotalSeconds)).toEqual(expectedDays);
   });
 
   it('records a failed run and rethrows when the client throws', async () => {

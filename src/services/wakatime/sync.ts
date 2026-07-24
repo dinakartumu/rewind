@@ -46,65 +46,72 @@ export async function syncWakatimeDay(
     client.getSummary(date),
   ]);
 
-  // Rebuild the day's duration rows.
-  await db
-    .delete(wakatimeDurations)
-    .where(
-      and(
-        eq(wakatimeDurations.userId, userId),
-        gte(wakatimeDurations.startTime, start),
-        lt(wakatimeDurations.startTime, end)
-      )
-    );
-
-  for (const d of durations) {
-    await db.insert(wakatimeDurations).values({
-      userId,
-      startTime: d.startTime,
-      durationSeconds: d.durationSeconds,
-      project: d.project,
-      language: d.language,
-      entity: d.entity,
-    });
-  }
-
-  // Rebuild the day's per-language rows from the Summaries API.
-  await db
-    .delete(wakatimeDailyLanguages)
-    .where(
-      and(
-        eq(wakatimeDailyLanguages.userId, userId),
-        eq(wakatimeDailyLanguages.date, date)
-      )
-    );
-
-  for (const lang of summary.languages) {
-    await db.insert(wakatimeDailyLanguages).values({
-      userId,
-      date,
-      language: lang.name,
-      totalSeconds: lang.totalSeconds,
-    });
-  }
-
-  // Upsert the daily summary.
-  await db
-    .insert(wakatimeDailySummaries)
-    .values({
-      userId,
-      date,
-      totalSeconds: summary.totalSeconds,
-      topLanguage: summary.topLanguage,
-      topProject: summary.topProject,
-    })
-    .onConflictDoUpdate({
-      target: [wakatimeDailySummaries.userId, wakatimeDailySummaries.date],
-      set: {
+  // Rebuild the whole day in one db.batch() so it runs as an implicit D1
+  // transaction (all-or-nothing) and in a single round-trip. Order matters:
+  // delete both tables first, then reinsert, then upsert the summary.
+  const statements = [
+    // Clear the day's duration rows (UTC window).
+    db
+      .delete(wakatimeDurations)
+      .where(
+        and(
+          eq(wakatimeDurations.userId, userId),
+          gte(wakatimeDurations.startTime, start),
+          lt(wakatimeDurations.startTime, end)
+        )
+      ),
+    // Clear the day's per-language rows.
+    db
+      .delete(wakatimeDailyLanguages)
+      .where(
+        and(
+          eq(wakatimeDailyLanguages.userId, userId),
+          eq(wakatimeDailyLanguages.date, date)
+        )
+      ),
+    // Reinsert duration rows.
+    ...durations.map((d) =>
+      db.insert(wakatimeDurations).values({
+        userId,
+        startTime: d.startTime,
+        durationSeconds: d.durationSeconds,
+        project: d.project,
+        language: d.language,
+        entity: d.entity,
+      })
+    ),
+    // Reinsert per-language rows from the Summaries API.
+    ...summary.languages.map((lang) =>
+      db.insert(wakatimeDailyLanguages).values({
+        userId,
+        date,
+        language: lang.name,
+        totalSeconds: lang.totalSeconds,
+      })
+    ),
+    // Upsert the daily summary.
+    db
+      .insert(wakatimeDailySummaries)
+      .values({
+        userId,
+        date,
         totalSeconds: summary.totalSeconds,
         topLanguage: summary.topLanguage,
         topProject: summary.topProject,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [wakatimeDailySummaries.userId, wakatimeDailySummaries.date],
+        set: {
+          totalSeconds: summary.totalSeconds,
+          topLanguage: summary.topLanguage,
+          topProject: summary.topProject,
+        },
+      }),
+  ];
+
+  // The two deletes guarantee at least one element, satisfying db.batch's
+  // non-empty-tuple signature.
+  await db.batch(statements as [(typeof statements)[number]]);
 
   return {
     synced: durations.length,

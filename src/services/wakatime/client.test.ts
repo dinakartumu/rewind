@@ -47,6 +47,8 @@ describe('WakatimeClient', () => {
     );
     expect(url).toContain('date=2026-07-23');
     expect(url).toContain('slice_by=entity');
+    // timezone=UTC pins the API day to the UTC delete windows in sync.ts.
+    expect(url).toContain('timezone=UTC');
 
     const headers = (options as RequestInit).headers as Record<string, string>;
     expect(headers['Authorization']).toBe(`Basic ${btoa('waka_test_key')}`);
@@ -83,11 +85,22 @@ describe('WakatimeClient', () => {
       range: { date: '2026-07-23' },
     };
 
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify(summariesResponse([day])))
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify(summariesResponse([day])))
+      );
 
     const summary = await client.getSummary('2026-07-23');
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(
+      'https://wakatime.com/api/v1/users/current/summaries'
+    );
+    expect(url).toContain('start=2026-07-23');
+    expect(url).toContain('end=2026-07-23');
+    // timezone=UTC pins the API day to the UTC delete windows in sync.ts.
+    expect(url).toContain('timezone=UTC');
 
     expect(summary.date).toBe('2026-07-23');
     expect(summary.totalSeconds).toBe(5000);

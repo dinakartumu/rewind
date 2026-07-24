@@ -463,6 +463,8 @@ export async function syncWakatime(
 3. `syncWakatimeDay` delete+reinserts the day's `wakatime_daily_languages` rows from `summary.languages`.
 4. Tests: language rows written and idempotent; day with no languages leaves zero rows.
 
+WakaTime calls pin `timezone=UTC` so API days equal the UTC storage windows; RescueTime deliberately stays account-local (its API has no timezone override).
+
 (Task 12's `GET /languages` reads this table, not `wakatime_durations`.)
 
 **Step 1: Write failing tests** using the workers test env (`setupTestDb()` — copy the setup idiom from `src/services/foursquare/sync.test.ts`), with a stub client object (plain object implementing the two methods). Cases:

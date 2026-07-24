@@ -118,10 +118,22 @@ export class WakatimeClient {
 
   /**
    * Durations for a single day, sliced by entity (see WakatimeDurationRow).
+   *
+   * We pass `timezone=UTC` (WakaTime's documented optional param, defaulting
+   * to the account timezone otherwise) so the API's notion of "this day"
+   * matches the UTC delete windows in sync.ts (dayBounds). Delete-window
+   * agreement is load-bearing: on a non-UTC account, WakaTime would return the
+   * day in account-local time while the sync deletes/reinserts in UTC, so the
+   * boundary-hour slices (the local day's edges that fall in a neighboring UTC
+   * day) would be silently dropped or double-counted.
    * @param date YYYY-MM-DD
    */
   async getDurations(date: string): Promise<WakatimeDurationRow[]> {
-    const params = new URLSearchParams({ date, slice_by: 'entity' });
+    const params = new URLSearchParams({
+      date,
+      slice_by: 'entity',
+      timezone: 'UTC',
+    });
     const data = await this.request<{ data: DurationsApiItem[] }>(
       `/users/current/durations?${params.toString()}`
     );
@@ -136,10 +148,21 @@ export class WakatimeClient {
 
   /**
    * Summary rollup for a single day (start == end).
+   *
+   * We pass `timezone=UTC` (WakaTime's documented optional param, defaulting
+   * to the account timezone otherwise) so the summary's day matches the UTC
+   * delete windows in sync.ts (dayBounds) — the same delete-window agreement
+   * getDurations relies on. Without it, a non-UTC account would total the
+   * account-local day, disagreeing with the UTC-bounded duration rows and the
+   * per-language rows rebuilt from this summary.
    * @param date YYYY-MM-DD
    */
   async getSummary(date: string): Promise<WakatimeSummary> {
-    const params = new URLSearchParams({ start: date, end: date });
+    const params = new URLSearchParams({
+      start: date,
+      end: date,
+      timezone: 'UTC',
+    });
     const data = await this.request<{ data: SummaryApiDay[] }>(
       `/users/current/summaries?${params.toString()}`
     );
