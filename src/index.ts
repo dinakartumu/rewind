@@ -14,6 +14,7 @@ import collecting from './routes/collecting.js';
 import feed from './routes/feed.js';
 import reading from './routes/reading.js';
 import places from './routes/places.js';
+import coding from './routes/coding.js';
 import attending from './routes/attending.js';
 import search from './routes/search.js';
 import query from './routes/query.js';
@@ -97,6 +98,7 @@ const routes = app
   .route('/', collecting)
   .route('/reading', reading)
   .route('/places', places)
+  .route('/coding', coding)
   .route('/attending', attending)
   .route('/feed', feed)
   .route('/search', search)
