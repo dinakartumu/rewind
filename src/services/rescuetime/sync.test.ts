@@ -309,6 +309,52 @@ describe('syncRescuetimeDay', () => {
     expect(result.totalSeconds).toBe(260);
     expect(result.synced).toBe(2);
   });
+
+  it('rebuilds a heavy day (~600 buckets) correctly and idempotently', async () => {
+    // A pathological day: hundreds of 5-minute buckets. This is the shape one
+    // day away from blowing D1's per-batch CPU limit (the same failure wakatime
+    // hit) when the rebuild emitted one INSERT statement per bucket. Chunked
+    // multi-row inserts must handle it, and a second identical run must leave
+    // the row count unchanged (idempotent).
+    const db = createDb(env.DB);
+    const date = '2026-08-10';
+    const BUCKET_COUNT = 600;
+    const acts = Array.from({ length: BUCKET_COUNT }, (_, i) => {
+      // Unique (timestamp, activity) per bucket so none collapse on the unique
+      // index — this exercises the full 600-row rebuild.
+      const minute = String(i % 60).padStart(2, '0');
+      const hour = String(Math.floor(i / 60)).padStart(2, '0');
+      return activity(`2026-08-10T${hour}:${minute}:00.000Z`, 60, 2, {
+        activity: `app-${i}`,
+      });
+    });
+
+    const build = () => makeClient({ [date]: acts }).client;
+
+    const first = await syncRescuetimeDay(db, build(), date);
+    expect(first.synced).toBe(BUCKET_COUNT);
+
+    const countDay = async () => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)` })
+        .from(rescuetimeActivities)
+        .where(sql`substr(timestamp, 1, 10) = ${date}`);
+      return row.n;
+    };
+    expect(await countDay()).toBe(BUCKET_COUNT);
+
+    // Second identical run: delete + reinsert must yield the same count.
+    const second = await syncRescuetimeDay(db, build(), date);
+    expect(second.synced).toBe(BUCKET_COUNT);
+    expect(await countDay()).toBe(BUCKET_COUNT);
+
+    // Summary stays exactly one row.
+    const [summCount] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(rescuetimeDailySummaries)
+      .where(eq(rescuetimeDailySummaries.date, date));
+    expect(summCount.n).toBe(1);
+  });
 });
 
 describe('syncRescuetime', () => {

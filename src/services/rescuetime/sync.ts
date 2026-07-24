@@ -5,6 +5,7 @@ import {
   rescuetimeDailySummaries,
 } from '../../db/schema/rescuetime.js';
 import { syncRuns } from '../../db/schema/system.js';
+import { chunkForInsertValues } from '../../lib/d1-chunk.js';
 import { RescuetimeClient } from './client.js';
 import type { Env } from '../../types/env.js';
 
@@ -139,55 +140,34 @@ export async function syncRescuetimeDay(
   const levels = rollupLevels(activities);
   const pulse = pulseByDate.has(date) ? pulseByDate.get(date)! : null;
 
-  // Rebuild the whole day in one db.batch() so it runs as an implicit D1
-  // transaction (all-or-nothing) and in a single round-trip. Delete the
-  // activity window first, then reinsert, then reconcile the summary. When
-  // there is data, upsert the summary; when the day is empty, DELETE any
-  // stale summary row so it never outlives its activities.
-  const summaryStatements =
-    activities.length > 0
-      ? [
-          db
-            .insert(rescuetimeDailySummaries)
-            .values({
-              userId,
-              date,
-              totalSeconds: levels.totalSeconds,
-              productivityPulse: pulse,
-              veryProductiveSeconds: levels.veryProductive,
-              productiveSeconds: levels.productive,
-              neutralSeconds: levels.neutral,
-              distractingSeconds: levels.distracting,
-              veryDistractingSeconds: levels.veryDistracting,
-            })
-            .onConflictDoUpdate({
-              target: [
-                rescuetimeDailySummaries.userId,
-                rescuetimeDailySummaries.date,
-              ],
-              set: {
-                totalSeconds: levels.totalSeconds,
-                productivityPulse: pulse,
-                veryProductiveSeconds: levels.veryProductive,
-                productiveSeconds: levels.productive,
-                neutralSeconds: levels.neutral,
-                distractingSeconds: levels.distracting,
-                veryDistractingSeconds: levels.veryDistracting,
-              },
-            }),
-        ]
-      : [
-          db
-            .delete(rescuetimeDailySummaries)
-            .where(
-              and(
-                eq(rescuetimeDailySummaries.userId, userId),
-                eq(rescuetimeDailySummaries.date, date)
-              )
-            ),
-        ];
+  // Detail rows go in as MULTI-ROW VALUES inserts, chunked under D1's
+  // parameter cap (chunkForInsertValues). We deliberately do NOT emit one
+  // INSERT statement per bucket: a heavy day can carry many hundreds of
+  // 5-minute buckets, and a db.batch() of hundreds of statements blows D1's
+  // per-batch CPU limit (the "D1 DB exceeded its CPU time limit and was reset"
+  // failure seen deterministically on wakatime's identically-shaped rebuild).
+  //
+  // TRADEOFF: strict single-batch atomicity is no longer possible for huge
+  // days — the rebuild may span multiple batches. We preserve SAFE ORDERING
+  // instead: delete FIRST, then all insert chunks, then the summary
+  // reconciliation LAST. If a mid-rebuild batch fails, the day is left
+  // partially inserted; the next idempotent re-sync (delete + reinsert)
+  // repairs it, so no double-counting or stale data survives a retry.
+  const activityRows = activities.map((a) => ({
+    userId,
+    timestamp: a.timestamp,
+    durationSeconds: a.durationSeconds,
+    activity: a.activity,
+    category: a.category,
+    productivity: a.productivity,
+  }));
+  const activityChunks = [...chunkForInsertValues(activityRows, 6)];
 
-  const statements = [
+  // Primary batch: delete the activity window first, then the FIRST insert
+  // chunk (when present). Keeping the delete + first chunk atomic covers the
+  // common small-day case in a single round-trip. Additional chunks follow in
+  // sequence, preserving delete-before-insert ordering.
+  const primary = [
     db
       .delete(rescuetimeActivities)
       .where(
@@ -197,22 +177,62 @@ export async function syncRescuetimeDay(
           lt(rescuetimeActivities.timestamp, end)
         )
       ),
-    ...activities.map((a) =>
-      db.insert(rescuetimeActivities).values({
-        userId,
-        timestamp: a.timestamp,
-        durationSeconds: a.durationSeconds,
-        activity: a.activity,
-        category: a.category,
-        productivity: a.productivity,
-      })
-    ),
-    ...summaryStatements,
+    ...(activityChunks.length > 0
+      ? [db.insert(rescuetimeActivities).values(activityChunks[0])]
+      : []),
   ];
-
   // The delete guarantees at least one element, satisfying db.batch's
   // non-empty-tuple signature.
-  await db.batch(statements as [(typeof statements)[number]]);
+  await db.batch(primary as [(typeof primary)[number]]);
+
+  // Remaining activity chunks (heavy days only): insert after the delete has
+  // committed, in order.
+  for (const chunk of activityChunks.slice(1)) {
+    await db.insert(rescuetimeActivities).values(chunk);
+  }
+
+  // Reconcile the summary LAST, once the detail rows are in place. When there
+  // is data, upsert the summary; when the day is empty, DELETE any stale
+  // summary row so it never outlives its activities.
+  if (activities.length > 0) {
+    await db
+      .insert(rescuetimeDailySummaries)
+      .values({
+        userId,
+        date,
+        totalSeconds: levels.totalSeconds,
+        productivityPulse: pulse,
+        veryProductiveSeconds: levels.veryProductive,
+        productiveSeconds: levels.productive,
+        neutralSeconds: levels.neutral,
+        distractingSeconds: levels.distracting,
+        veryDistractingSeconds: levels.veryDistracting,
+      })
+      .onConflictDoUpdate({
+        target: [
+          rescuetimeDailySummaries.userId,
+          rescuetimeDailySummaries.date,
+        ],
+        set: {
+          totalSeconds: levels.totalSeconds,
+          productivityPulse: pulse,
+          veryProductiveSeconds: levels.veryProductive,
+          productiveSeconds: levels.productive,
+          neutralSeconds: levels.neutral,
+          distractingSeconds: levels.distracting,
+          veryDistractingSeconds: levels.veryDistracting,
+        },
+      });
+  } else {
+    await db
+      .delete(rescuetimeDailySummaries)
+      .where(
+        and(
+          eq(rescuetimeDailySummaries.userId, userId),
+          eq(rescuetimeDailySummaries.date, date)
+        )
+      );
+  }
 
   return {
     synced: activities.length,

@@ -323,6 +323,74 @@ describe('syncWakatimeDay', () => {
     // synced reflects the de-duplicated count actually persisted.
     expect(result.synced).toBe(2);
   });
+
+  it('rebuilds a heavy day (~600 slices) correctly and idempotently', async () => {
+    // A pathological entity-sliced day: hundreds of duration slices. This is
+    // the shape that blew D1's per-batch CPU limit when the rebuild emitted one
+    // INSERT statement per slice. Chunked multi-row inserts must handle it, and
+    // a second identical run must leave the row count unchanged (idempotent).
+    const db = createDb(env.DB);
+    const date = '2026-08-01';
+    const SLICE_COUNT = 600;
+    const durations = Array.from({ length: SLICE_COUNT }, (_, i) => {
+      // Unique (start_time, project, entity) per slice so none collapse on the
+      // unique index — this exercises the full 600-row rebuild.
+      const minute = String(i % 60).padStart(2, '0');
+      const hour = String(9 + Math.floor(i / 60)).padStart(2, '0');
+      return duration(`2026-08-01T${hour}:${minute}:00.000Z`, 60, {
+        entity: `/src/file-${i}.ts`,
+      });
+    });
+
+    const build = () =>
+      makeClient(
+        { [date]: durations },
+        {
+          [date]: {
+            totalSeconds: SLICE_COUNT * 60,
+            topLanguage: 'TypeScript',
+            topProject: 'rewind',
+            languages: [{ name: 'TypeScript', totalSeconds: SLICE_COUNT * 60 }],
+          },
+        }
+      ).client;
+
+    const first = await syncWakatimeDay(db, build(), date);
+    expect(first.synced).toBe(SLICE_COUNT);
+
+    const { start, end } = {
+      start: '2026-08-01T00:00:00.000Z',
+      end: '2026-08-02T00:00:00.000Z',
+    };
+    const countDay = async () => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)` })
+        .from(wakatimeDurations)
+        .where(
+          sql`${wakatimeDurations.startTime} >= ${start} AND ${wakatimeDurations.startTime} < ${end}`
+        );
+      return row.n;
+    };
+
+    expect(await countDay()).toBe(SLICE_COUNT);
+
+    // Second identical run: delete + reinsert must yield the same count.
+    const second = await syncWakatimeDay(db, build(), date);
+    expect(second.synced).toBe(SLICE_COUNT);
+    expect(await countDay()).toBe(SLICE_COUNT);
+
+    // Summary and language rows are still exactly one each.
+    const [summCount] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(wakatimeDailySummaries)
+      .where(eq(wakatimeDailySummaries.date, date));
+    expect(summCount.n).toBe(1);
+    const [langCount] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(wakatimeDailyLanguages)
+      .where(eq(wakatimeDailyLanguages.date, date));
+    expect(langCount.n).toBe(1);
+  });
 });
 
 describe('backfillWakatime', () => {

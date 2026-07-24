@@ -6,6 +6,7 @@ import {
   wakatimeDailyLanguages,
 } from '../../db/schema/wakatime.js';
 import { syncRuns } from '../../db/schema/system.js';
+import { chunkForInsertValues } from '../../lib/d1-chunk.js';
 import { WakatimeClient, WakatimeHistoryLimitError } from './client.js';
 import type { Env } from '../../types/env.js';
 
@@ -85,10 +86,42 @@ export async function syncWakatimeDay(
   }
   const durations = [...bySlice.values()];
 
-  // Rebuild the whole day in one db.batch() so it runs as an implicit D1
-  // transaction (all-or-nothing) and in a single round-trip. Order matters:
-  // delete both tables first, then reinsert, then upsert the summary.
-  const statements = [
+  // Detail rows go in as MULTI-ROW VALUES inserts, chunked under D1's
+  // parameter cap (chunkForInsertValues). We deliberately do NOT emit one
+  // INSERT statement per slice: a heavy entity-sliced day can carry many
+  // hundreds of slices, and a db.batch() of hundreds of statements blows D1's
+  // per-batch CPU limit (the "D1 DB exceeded its CPU time limit and was reset"
+  // failure seen deterministically during the coding backfill).
+  //
+  // TRADEOFF: strict single-batch atomicity is no longer possible for huge
+  // days — the rebuild may span multiple batches. We preserve SAFE ORDERING
+  // instead: deletes FIRST, then all insert chunks, then the summary/language
+  // reconciliation LAST. If a mid-rebuild batch fails, the day is left
+  // partially inserted; the next idempotent re-sync (delete + reinsert)
+  // repairs it, so no double-counting or stale data survives a retry.
+  const durationRows = durations.map((d) => ({
+    userId,
+    startTime: d.startTime,
+    durationSeconds: d.durationSeconds,
+    project: d.project,
+    language: d.language,
+    entity: d.entity,
+  }));
+  const languageRows = summary.languages.map((lang) => ({
+    userId,
+    date,
+    language: lang.name,
+    totalSeconds: lang.totalSeconds,
+  }));
+
+  const durationChunks = [...chunkForInsertValues(durationRows, 6)];
+  const languageChunks = [...chunkForInsertValues(languageRows, 4)];
+
+  // Primary batch: both deletes first, then the FIRST duration insert chunk
+  // (when present). Keeping the deletes + first chunk atomic covers the common
+  // small-day case in a single round-trip. Additional chunks follow in
+  // sequence, preserving delete-before-insert ordering.
+  const primary = [
     // Clear the day's duration rows (UTC window).
     db
       .delete(wakatimeDurations)
@@ -108,49 +141,42 @@ export async function syncWakatimeDay(
           eq(wakatimeDailyLanguages.date, date)
         )
       ),
-    // Reinsert duration rows.
-    ...durations.map((d) =>
-      db.insert(wakatimeDurations).values({
-        userId,
-        startTime: d.startTime,
-        durationSeconds: d.durationSeconds,
-        project: d.project,
-        language: d.language,
-        entity: d.entity,
-      })
-    ),
-    // Reinsert per-language rows from the Summaries API.
-    ...summary.languages.map((lang) =>
-      db.insert(wakatimeDailyLanguages).values({
-        userId,
-        date,
-        language: lang.name,
-        totalSeconds: lang.totalSeconds,
-      })
-    ),
-    // Upsert the daily summary.
-    db
-      .insert(wakatimeDailySummaries)
-      .values({
-        userId,
-        date,
+    ...(durationChunks.length > 0
+      ? [db.insert(wakatimeDurations).values(durationChunks[0])]
+      : []),
+  ];
+  // The two deletes guarantee at least one element, satisfying db.batch's
+  // non-empty-tuple signature.
+  await db.batch(primary as [(typeof primary)[number]]);
+
+  // Remaining duration chunks (heavy days only): insert after the deletes have
+  // committed, in order.
+  for (const chunk of durationChunks.slice(1)) {
+    await db.insert(wakatimeDurations).values(chunk);
+  }
+
+  // Language rows and the summary upsert go LAST so the day's rollup is only
+  // reconciled once its detail rows are in place.
+  for (const chunk of languageChunks) {
+    await db.insert(wakatimeDailyLanguages).values(chunk);
+  }
+  await db
+    .insert(wakatimeDailySummaries)
+    .values({
+      userId,
+      date,
+      totalSeconds: summary.totalSeconds,
+      topLanguage: summary.topLanguage,
+      topProject: summary.topProject,
+    })
+    .onConflictDoUpdate({
+      target: [wakatimeDailySummaries.userId, wakatimeDailySummaries.date],
+      set: {
         totalSeconds: summary.totalSeconds,
         topLanguage: summary.topLanguage,
         topProject: summary.topProject,
-      })
-      .onConflictDoUpdate({
-        target: [wakatimeDailySummaries.userId, wakatimeDailySummaries.date],
-        set: {
-          totalSeconds: summary.totalSeconds,
-          topLanguage: summary.topLanguage,
-          topProject: summary.topProject,
-        },
-      }),
-  ];
-
-  // The two deletes guarantee at least one element, satisfying db.batch's
-  // non-empty-tuple signature.
-  await db.batch(statements as [(typeof statements)[number]]);
+      },
+    });
 
   return {
     synced: durations.length,
