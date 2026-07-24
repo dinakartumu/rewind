@@ -248,9 +248,14 @@ export function createServer(
       // hosts serve the slippy-map raster tiles, also loaded as <img>, so
       // resourceDomains (img-src) covers all of them. api.mapbox.com is the
       // Mapbox raster-tile host used when a MAPBOX_TOKEN is configured; the OSM
-      // hosts remain as the tokenless fallback.
+      // hosts remain as the tokenless fallback. image.tmdb.org is hotlinked for
+      // movie/show backdrops only: Rewind stores a single R2 asset per entity
+      // (the poster), so `movies.backdrop_path` is a TMDB path we compose
+      // against their CDN. The detail card treats it as decoration and drops
+      // the layer on any load error, so a blocked or dead URL is harmless.
       resourceDomains: [
         'https://cdn.dinakartumu.com',
+        'https://image.tmdb.org',
         'https://api.mapbox.com',
         'https://a.tile.openstreetmap.org',
         'https://b.tile.openstreetmap.org',

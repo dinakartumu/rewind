@@ -15,6 +15,7 @@ import {
   isHexColor,
   isNumericCell,
   looksLikeTimestamp,
+  tmdbBackdropUrl,
   toNumber,
   weekdayNameToIndex,
   type MapConfig,
@@ -2814,11 +2815,194 @@ function StreakView({
 
 // ── ENTITY DETAIL ────────────────────────────────────────────────────
 // A single-row result carrying a CDN cover image + several other fields → a
-// rich single-entity card: the cover large on the left, the primary name/title
-// as a heading, then the remaining columns as a humanized field list. Values
-// are formatted (numbers with separators, timestamps readable), hex colors get
-// a swatch, and any OTHER CDN-image columns render as small thumbs.
-const DETAIL_COVER_PX = 160;
+// poster-forward entity card: the artwork large and UNCROPPED at the top (a
+// movie poster keeps its 2:3 shape, an album cover stays square), the title
+// beneath it, then the fields the eye wants first promoted into quiet lines —
+// the year, the date the thing happened ("Watched Jul 24, 2026"), and a rating
+// drawn as stars. Every remaining non-empty column follows as a labeled field
+// list, so nothing in the result is silently dropped. Values are formatted
+// (years bare, runtimes in minutes, timestamps readable), hex colors get a
+// swatch, other CDN images render as thumbs, and links open in the host.
+const DETAIL_COVER_MAX_W = 240;
+const DETAIL_COVER_MAX_H = 340;
+
+// The hotlinked backdrop sits as a sharp strip across the top of the card and
+// dissolves into the artwork's own dominant colour, which then carries the rest
+// of the card — the phone-app treatment. It's pushed behind the content with
+// z-index:-1 (`isolation: isolate` on the parent keeps that from sliding under
+// the card's own background).
+//
+// The strip is TALLER than the margin above the poster: what you see uncovered
+// is the top band, and the rest of it lives behind the artwork, so the fade to
+// colour happens around the poster rather than at a hard line above it.
+const DETAIL_BACKDROP_H = 340;
+/**
+ * Clear space above the poster — the visible slice of the backdrop. Roughly a
+ * quarter of the card's height at the sizes this card actually renders at.
+ */
+const DETAIL_BACKDROP_BAND = 150;
+
+const DETAIL_BACKDROP_MASK =
+  'linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.9) 30%, rgba(0,0,0,0.45) 62%, transparent 100%)';
+
+const DETAIL_BACKDROP_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: -1,
+  width: '100%',
+  height: DETAIL_BACKDROP_H,
+  objectFit: 'cover',
+  opacity: 0.9,
+  maskImage: DETAIL_BACKDROP_MASK,
+  WebkitMaskImage: DETAIL_BACKDROP_MASK,
+  pointerEvents: 'none',
+};
+
+/**
+ * The colour wash the backdrop dissolves into. Transparent across the top so
+ * the still reads as itself, then the entity's dominant colour from ~the poster
+ * down. Kept at partial alpha: the host owns the text colour, and a fully
+ * saturated panel would fight it in one theme or the other.
+ */
+function detailTintLayer(tint: string): CSSProperties {
+  return {
+    position: 'absolute',
+    inset: 0,
+    zIndex: -1,
+    background: `linear-gradient(to bottom, transparent 0%, ${tint}26 34%, ${tint}4d 62%, ${tint}4d 100%)`,
+    pointerEvents: 'none',
+  };
+}
+
+/** Ratings in Rewind are on a 0–10 scale (Trakt, TMDB, Letterboxd ×2). */
+const DETAIL_RATING_MAX = 10;
+
+/** A column holding a calendar year — shown bare (1969, not 1,969). */
+const YEAR_COL_RE = /(^|_)years?$/i;
+/** A column holding a 0–10 rating we can draw as stars. */
+const RATING_COL_RE = /(^|_)(rating|score)$/i;
+/** A column holding a runtime in whole minutes. */
+const RUNTIME_COL_RE = /(^|_)(runtime|duration_?min(ute)?s?)$/i;
+/** A 0/1 column that reads better as Yes/No than as a number. */
+const FLAG_COL_RE = /^(is|has|was)_|rewatch|_flag$/i;
+/** A six-digit hex color can carry an alpha suffix; #abc cannot. */
+const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Column name → the past-tense verb that fronts the promoted date line
+ * ("watched_at" → "Watched Jul 24, 2026"). A date column that matches nothing
+ * here stays in the field list rather than producing an awkward hero line.
+ */
+const DATE_VERBS: Array<[RegExp, string]> = [
+  [/watch/i, 'Watched'],
+  [/listen|play|scrobbl/i, 'Played'],
+  [/read/i, 'Read'],
+  [/check.?in/i, 'Checked in'],
+  [/releas/i, 'Released'],
+  [/add|collect|acquir/i, 'Added'],
+  [/ran|run|start/i, 'Started'],
+];
+
+function dateVerb(column: string): string | null {
+  for (const [re, verb] of DATE_VERBS) if (re.test(column)) return verb;
+  return null;
+}
+
+/** Null, undefined, or blank — a field with nothing to say is not rendered. */
+function isEmptyCell(v: unknown): boolean {
+  return v === null || v === undefined || (typeof v === 'string' && !v.trim());
+}
+
+/** A plausible calendar year (so a `year` column of 5 stays a plain number). */
+function isYearValue(v: unknown): boolean {
+  const n = toNumber(v);
+  return Number.isInteger(n) && n >= 1000 && n <= 2999;
+}
+
+/** A ratable value: a number inside the 0–10 scale Rewind stores. */
+function isRatingValue(v: unknown): boolean {
+  const n = toNumber(v);
+  return Number.isFinite(n) && n > 0 && n <= DETAIL_RATING_MAX;
+}
+
+/** An http(s) link that isn't Rewind artwork — rendered as an opener. */
+function isLinkCell(v: unknown): v is string {
+  return typeof v === 'string' && /^https?:\/\//.test(v) && !isCdnImageUrl(v);
+}
+
+/** Date-only rendering for the hero line; local-parses bare YYYY-MM-DD. */
+function formatDateOnly(iso: string): string {
+  const d = new Date(/[T ]/.test(iso) ? iso : `${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** Numeric field formatting that respects what the column actually means. */
+function formatDetailNumber(column: string, n: number): string {
+  if (YEAR_COL_RE.test(column) && isYearValue(n)) return String(Math.trunc(n));
+  if (RUNTIME_COL_RE.test(column)) return `${formatNumber(n)} min`;
+  return formatNumber(n);
+}
+
+// A star row. Filled and empty stars share one glyph; a fractional star clips
+// a gold copy over the empty one, so 7.5/10 reads as seven and a half.
+const DETAIL_STAR_PATH =
+  'M9.5 1.5l2.47 5.01 5.53.8-4 3.9.94 5.5-4.94-2.6-4.94 2.6.94-5.5-4-3.9 5.53-.8L9.5 1.5z';
+const DETAIL_STAR_GOLD = '#f5b301';
+
+function DetailStars({ value, max }: { value: number; max: number }) {
+  const clamped = Math.max(0, Math.min(max, value));
+  return (
+    <span
+      style={{ display: 'inline-flex', gap: 2, lineHeight: 0 }}
+      role="img"
+      aria-label={`${formatNumber(clamped)} out of ${max}`}
+    >
+      {Array.from({ length: max }, (_, i) => (
+        <DetailStar key={i} fill={Math.max(0, Math.min(1, clamped - i))} />
+      ))}
+    </span>
+  );
+}
+
+function DetailStar({ fill }: { fill: number }) {
+  const pct = Math.round(fill * 100);
+  return (
+    <span
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        width: 16,
+        height: 16,
+      }}
+    >
+      <svg viewBox="0 0 19 19" width={16} height={16} aria-hidden>
+        <path d={DETAIL_STAR_PATH} fill="currentColor" opacity={0.18} />
+      </svg>
+      {fill > 0 && (
+        <svg
+          viewBox="0 0 19 19"
+          width={16}
+          height={16}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            clipPath: `inset(0 ${100 - pct}% 0 0)`,
+          }}
+          aria-hidden
+        >
+          <path d={DETAIL_STAR_PATH} fill={DETAIL_STAR_GOLD} />
+        </svg>
+      )}
+    </span>
+  );
+}
 
 function DetailView({
   columns,
@@ -2837,68 +3021,165 @@ function DetailView({
   art?: Record<string, string>;
   onOpen?: (url: string) => void;
 }) {
+  const [backdropFailed, setBackdropFailed] = useState<string | null>(null);
   const rawCover = row[imageIndex];
   const coverUrl = typeof rawCover === 'string' ? rawCover : '';
   const coverSrc = (coverUrl && art?.[coverUrl]) || coverUrl;
   const title = displayCell(row[nameIndex]);
 
-  // Field list: every column that is NOT the cover image or the primary name.
+  // Promotion: the cover and the title are already spoken for; year, date, and
+  // rating move up into the hero when a column clearly carries one. Everything
+  // else falls through to the labeled field list below.
+  const promoted = new Set<number>([imageIndex, nameIndex]);
+  const findCol = (pred: (column: string, i: number) => boolean) => {
+    for (let i = 0; i < columns.length; i++) {
+      if (promoted.has(i) || isEmptyCell(row[i])) continue;
+      if (pred(columns[i] ?? '', i)) return i;
+    }
+    return null;
+  };
+
+  const yearIdx = findCol((c, i) => YEAR_COL_RE.test(c) && isYearValue(row[i]));
+  if (yearIdx !== null) promoted.add(yearIdx);
+
+  const dateIdx = findCol(
+    (c, i) =>
+      typeof row[i] === 'string' &&
+      looksLikeTimestamp(row[i] as string) &&
+      dateVerb(c) !== null
+  );
+  if (dateIdx !== null) promoted.add(dateIdx);
+
+  // A personal rating outranks a critics' score for the hero stars; whichever
+  // loses stays visible as a normal field.
+  const ratingIdx =
+    findCol(
+      (c, i) =>
+        /user|my|personal/i.test(c) &&
+        RATING_COL_RE.test(c) &&
+        isRatingValue(row[i])
+    ) ?? findCol((c, i) => RATING_COL_RE.test(c) && isRatingValue(row[i]));
+  if (ratingIdx !== null) promoted.add(ratingIdx);
+
+  // A `backdrop_path` column becomes the still across the top of the card. It's
+  // hotlinked from TMDB (Rewind stores only the poster), so it is treated as
+  // strictly optional: `backdropFailed` drops the layer the moment the fetch
+  // errors — blocked by CSP, 404, offline — leaving the flat card.
+  const backdropIdx = findCol((c, i) => tmdbBackdropUrl(c, row[i]) !== null);
+  if (backdropIdx !== null) promoted.add(backdropIdx);
+  const rawBackdropUrl =
+    backdropIdx === null
+      ? null
+      : tmdbBackdropUrl(columns[backdropIdx] ?? '', row[backdropIdx]);
+  const backdropUrl =
+    rawBackdropUrl && rawBackdropUrl !== backdropFailed ? rawBackdropUrl : null;
+
+  // A dominant/accent hex anywhere in the row is the colour the backdrop
+  // dissolves into — and, with no backdrop, the card's whole wash.
+  const tint = row.find(
+    (v): v is string => typeof v === 'string' && HEX6_RE.test(v)
+  );
+
   const fieldIdx = columns
     .map((_, i) => i)
-    .filter((i) => i !== imageIndex && i !== nameIndex);
+    .filter((i) => !promoted.has(i) && !isEmptyCell(row[i]));
 
   return (
     <div
       style={{
+        position: 'relative',
+        isolation: 'isolate',
+        overflow: 'hidden',
         display: 'flex',
-        gap: 18,
-        alignItems: 'flex-start',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        // The backdrop pushes the artwork down so its top band stays uncovered.
+        padding: `${backdropUrl ? DETAIL_BACKDROP_BAND : 20}px 16px 8px`,
+        borderRadius: 16,
+        background:
+          tint && !backdropUrl
+            ? `radial-gradient(120% 70% at 50% 0%, ${tint}2e, transparent 72%)`
+            : undefined,
       }}
     >
-      <div
-        role={onOpen && coverUrl ? 'button' : undefined}
-        onClick={onOpen && coverUrl ? () => onOpen(coverUrl) : undefined}
+      {backdropUrl && (
+        <img
+          src={backdropUrl}
+          alt=""
+          aria-hidden
+          onError={() => setBackdropFailed(backdropUrl)}
+          style={DETAIL_BACKDROP_STYLE}
+        />
+      )}
+      {backdropUrl && tint && <div style={detailTintLayer(tint)} aria-hidden />}
+      {coverSrc ? (
+        <img
+          src={coverSrc}
+          alt={title}
+          loading="lazy"
+          role={onOpen && coverUrl ? 'button' : undefined}
+          onClick={onOpen && coverUrl ? () => onOpen(coverUrl) : undefined}
+          style={{
+            display: 'block',
+            maxWidth: DETAIL_COVER_MAX_W,
+            maxHeight: DETAIL_COVER_MAX_H,
+            width: 'auto',
+            height: 'auto',
+            borderRadius: 12,
+            boxShadow: '0 16px 36px rgba(0,0,0,0.28)',
+            cursor: onOpen && coverUrl ? 'pointer' : 'default',
+          }}
+        />
+      ) : null}
+      <h2
         style={{
-          width: DETAIL_COVER_PX,
-          height: DETAIL_COVER_PX,
-          borderRadius: 12,
-          overflow: 'hidden',
-          flexShrink: 0,
-          cursor: onOpen && coverUrl ? 'pointer' : 'default',
-          background: 'var(--color-background-secondary, rgba(0,0,0,0.04))',
+          margin: '18px 0 0',
+          fontSize: 24,
+          fontWeight: 700,
+          lineHeight: 1.15,
+          letterSpacing: -0.2,
+          wordBreak: 'break-word',
         }}
       >
-        {coverSrc ? (
-          <img
-            src={coverSrc}
-            alt={title}
-            loading="lazy"
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        {title}
+      </h2>
+      {yearIdx !== null && (
+        <div style={{ marginTop: 6, fontSize: 15, opacity: 0.6 }}>
+          {String(Math.trunc(toNumber(row[yearIdx])))}
+        </div>
+      )}
+      {dateIdx !== null && (
+        <div style={{ marginTop: 3, fontSize: 13, opacity: 0.5 }}>
+          {`${dateVerb(columns[dateIdx] ?? '')} ${formatDateOnly(String(row[dateIdx]))}`}
+        </div>
+      )}
+      {ratingIdx !== null && (
+        <div style={{ marginTop: 12 }}>
+          <DetailStars
+            value={toNumber(row[ratingIdx])}
+            max={DETAIL_RATING_MAX}
           />
-        ) : null}
-      </div>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <h2
-          style={{
-            margin: '2px 0 14px',
-            fontSize: 22,
-            fontWeight: 700,
-            lineHeight: 1.15,
-            wordBreak: 'break-word',
-          }}
-        >
-          {title}
-        </h2>
+        </div>
+      )}
+      {fieldIdx.length > 0 && (
         <dl
           style={{
             display: 'grid',
             gridTemplateColumns: 'max-content 1fr',
             gap: '8px 16px',
-            margin: 0,
+            justifyContent: 'center',
+            textAlign: 'left',
+            margin: '20px 0 0',
+            paddingTop: 16,
+            width: '100%',
+            maxWidth: 460,
+            borderTop:
+              '1px solid var(--color-border-tertiary, rgba(127,127,127,0.2))',
           }}
         >
           {fieldIdx.map((i) => {
+            const column = columns[i] ?? '';
             const raw = row[i];
             const numeric = numericCols.has(i) && isNumericCell(raw);
             let valueNode: ReactNode;
@@ -2940,8 +3221,29 @@ function DetailView({
                   }}
                 />
               );
+            } else if (isLinkCell(raw)) {
+              valueNode = (
+                <a
+                  href={raw}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={
+                    onOpen
+                      ? (e) => {
+                          e.preventDefault();
+                          onOpen(raw);
+                        }
+                      : undefined
+                  }
+                  style={{ color: 'inherit', textDecoration: 'underline' }}
+                >
+                  {displayCell(raw)}
+                </a>
+              );
+            } else if (numeric && FLAG_COL_RE.test(column)) {
+              valueNode = toNumber(raw) ? 'Yes' : 'No';
             } else if (numeric) {
-              valueNode = formatNumber(toNumber(raw));
+              valueNode = formatDetailNumber(column, toNumber(raw));
             } else {
               valueNode = displayCell(raw);
             }
@@ -2957,7 +3259,7 @@ function DetailView({
                     alignSelf: 'center',
                   }}
                 >
-                  {humanizeColumn(columns[i] ?? '')}
+                  {humanizeColumn(column)}
                 </dt>
                 <dd
                   style={{
@@ -2974,7 +3276,7 @@ function DetailView({
             );
           })}
         </dl>
-      </div>
+      )}
     </div>
   );
 }

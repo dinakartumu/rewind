@@ -64,6 +64,32 @@ export function isCdnImageUrl(v: Cell): v is string {
   return typeof v === 'string' && v.startsWith(`${CDN_ORIGIN}/`);
 }
 
+/**
+ * TMDB's public image CDN. Rewind stores exactly ONE R2 asset per entity — the
+ * poster — so a movie/show backdrop has no CDN URL of its own; what we keep is
+ * `movies.backdrop_path`, a TMDB path. The detail card hotlinks it from here as
+ * pure decoration (the host CSP allowlists this origin for the query-result UI).
+ */
+export const TMDB_IMAGE_ORIGIN = 'https://image.tmdb.org';
+
+/** Wide enough to survive a full-bleed blur without banding. */
+const TMDB_BACKDROP_SIZE = 'w1280';
+
+/**
+ * Resolve a backdrop URL from a (column, value) pair. The column has to NAME
+ * itself a backdrop — this is decoration, and silently promoting some other
+ * image column into a full-bleed background would be a nasty surprise. The
+ * value may be a raw TMDB path as stored (`/abc.jpg`) or an already-composed
+ * image.tmdb.org URL. Anything else → null.
+ */
+export function tmdbBackdropUrl(column: string, v: Cell): string | null {
+  if (typeof v !== 'string' || !v.trim()) return null;
+  if (!/backdrop/i.test(column)) return null;
+  if (v.startsWith(`${TMDB_IMAGE_ORIGIN}/`)) return v;
+  if (!/^\/[\w.-]+\.(jpg|jpeg|png|webp)$/i.test(v)) return null;
+  return `${TMDB_IMAGE_ORIGIN}/t/p/${TMDB_BACKDROP_SIZE}${v}`;
+}
+
 /** A 3- or 6-digit hex color string, e.g. "#1a2b3c" or "#abc". */
 export function isHexColor(v: Cell): v is string {
   return typeof v === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
