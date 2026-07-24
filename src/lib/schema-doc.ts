@@ -42,9 +42,9 @@ export const SCHEMA_DOC: SchemaDoc = {
     'Booleans are stored as integers 0/1 (e.g. is_filtered, starred, is_race, attended, notable, rewatch, is_home).',
     'is_filtered = 1 marks Last.fm rows the owner has hidden (junk scrobbles, misattributions). Analytical listening queries should filter `is_filtered = 0` unless you specifically want the raw data. lastfm_scrobbles has no is_filtered column — join through lastfm_tracks to filter.',
     'Rating scales differ by domain: watch_history.user_rating and movies.tmdb_rating / shows.tmdb_rating are 0-10 (real). discogs_collection.rating and discogs_wantlist.rating are 0-5 integers (0 = unrated). reading_items.rating is a small integer (may be null). There is no single global scale.',
-    'Images: the shared `images` table keys on (domain, entity_type, entity_id). The public CDN URL is composed as https://cdn.dinakartumu.com/cdn-cgi/image/<transforms>/<r2_key>, and image_version is appended as a cache-busting query param (?v=<image_version>). Many domain tables also carry a denormalized image_key/poster_path for convenience. dominant_color/accent_color are hex strings; thumbhash is a compact placeholder blob.',
-    "Rendering artwork in query_rewind: SELECT a composed CDN image URL and query_rewind renders it as an inline thumbnail (first 8 distinct URLs, in row order). Copy-paste expression joining the images table: `'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || i.r2_key || '?v=' || i.image_version AS art`. Join path per entity: album art = JOIN images i ON i.domain='listening' AND i.entity_type='albums' AND i.entity_id = CAST(al.id AS TEXT); artist image = entity_type='artists' (entity_id = artist.id); movie poster = i.domain='watching' AND i.entity_type='movies' AND i.entity_id = CAST(m.id AS TEXT); show poster = entity_type='shows'. entity_id is TEXT, so cast the numeric row id. Shortcut: movies/shows/albums also carry a denormalized image_key you can compose the same way without the join when non-null — `'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || m.image_key AS art`. A place/venue icon lives directly on checkins.venue_icon (already a full URL — SELECT it as-is). For a sandboxed Claude artifact whose iframe cannot fetch the CDN, call query_rewind with embed_art:true to also get those matched image URLs back as small base64 WebP data URIs in structuredContent.art (keyed by the original URL) to inline directly in the artifact HTML.",
-    "Year-in-review (wrapped) view in query_rewind: call query_rewind with view:'wrapped' and a UNION-ALL that returns labeled highlight rows with columns `section, label, value, image` (image optional, a composed CDN URL or NULL) grouped by `section`. The wrapped card groups rows by section and renders each as a mini panel — a ranked list with covers when the section has images, else a labeled stat. Add a leading `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image` to title the card. Example: `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image UNION ALL SELECT 'Top Artists', ar.name, ar.playcount, 'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || ar.image_key FROM lastfm_artists ar WHERE ar.is_filtered = 0 ORDER BY ar.playcount DESC LIMIT 3` then further UNION ALL blocks for 'Top Films' (watch_history JOIN movies, image = movie poster), 'Miles Run' (`SELECT 'Miles Run', CAST(ROUND(SUM(distance)/1609.34) AS TEXT) || ' miles', SUM(distance), NULL FROM strava_activities WHERE started_at LIKE '2024%'`), 'Places', etc. Each SELECT must project the SAME four columns in the same order; use column aliases only on the first SELECT. Section names are free-form — unknown sections render generically; single-row image-less sections read as a big stat.",
+    'Images: the shared `images` table is the ONLY source of artwork -- it keys on (domain, entity_type, entity_id) and every image lives there. The public CDN URL is composed as https://cdn.dinakartumu.com/cdn-cgi/image/<transforms>/<r2_key>, and image_version is appended as a cache-busting query param (?v=<image_version>). Domain tables do NOT carry a usable artwork column: movies.poster_path / shows.poster_path are raw TMDB paths against a different host, not R2 keys, and are null for many rows. Always join `images`. dominant_color/accent_color are hex strings; thumbhash is a compact placeholder blob.',
+    "Rendering artwork in query_rewind: SELECT a composed CDN image URL and query_rewind renders it as an inline thumbnail (first 8 distinct URLs, in row order). Copy-paste expression joining the images table: `'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || i.r2_key || '?v=' || i.image_version AS art`. Join path per entity: album art = JOIN images i ON i.domain='listening' AND i.entity_type='albums' AND i.entity_id = CAST(al.id AS TEXT); artist image = entity_type='artists' (entity_id = artist.id); movie poster = i.domain='watching' AND i.entity_type='movies' AND i.entity_id = CAST(m.id AS TEXT); show poster = entity_type='shows'. entity_id is TEXT, so cast the numeric row id. There is no shortcut column — artwork ALWAYS comes from a join against `images`; do not compose a URL from any column on the domain table itself. Note that `'prefix' || NULL` is NULL in SQLite, so a wrong column yields a silently empty art column rather than an error — if art comes back blank, the join is wrong. A place/venue icon lives directly on checkins.venue_icon (already a full URL — SELECT it as-is). For a sandboxed Claude artifact whose iframe cannot fetch the CDN, call query_rewind with embed_art:true to also get those matched image URLs back as small base64 WebP data URIs in structuredContent.art (keyed by the original URL) to inline directly in the artifact HTML.",
+    "Year-in-review (wrapped) view in query_rewind: call query_rewind with view:'wrapped' and a UNION-ALL that returns labeled highlight rows with columns `section, label, value, image` (image optional, a composed CDN URL or NULL) grouped by `section`. The wrapped card groups rows by section and renders each as a mini panel — a ranked list with covers when the section has images, else a labeled stat. Add a leading `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image` to title the card. Example: `SELECT 'Year' AS section, '2024 in review' AS label, NULL AS value, NULL AS image UNION ALL SELECT 'Top Artists', ar.name, ar.playcount, 'https://cdn.dinakartumu.com/cdn-cgi/image/width=120,height=120,fit=cover,format=auto/' || i.r2_key || '?v=' || i.image_version FROM lastfm_artists ar LEFT JOIN images i ON i.domain = 'listening' AND i.entity_type = 'artists' AND i.entity_id = CAST(ar.id AS TEXT) WHERE ar.is_filtered = 0 ORDER BY ar.playcount DESC LIMIT 3` then further UNION ALL blocks for 'Top Films' (watch_history JOIN movies, image = movie poster), 'Miles Run' (`SELECT 'Miles Run', CAST(ROUND(SUM(distance)/1609.34) AS TEXT) || ' miles', SUM(distance), NULL FROM strava_activities WHERE started_at LIKE '2024%'`), 'Places', etc. Each SELECT must project the SAME four columns in the same order; use column aliases only on the first SELECT. Section names are free-form — unknown sections render generically; single-row image-less sections read as a big stat.",
     'Cross-domain join keys: performers.lastfm_artist_id → lastfm_artists.id (concerts ↔ listening); collection_listening_xref links discogs_collection ↔ Last.fm play counts by matched name; trakt_collection.movie_id and watch_history.movie_id → movies.id (physical media ↔ watched films).',
     'Enums are stored as plain text. Notable ones: watch_history.source (plex|letterboxd|manual|trakt), trakt_collection.media_type (bluray|uhd_bluray|hddvd|dvd|digital), reading_items.status (unread|reading|finished), attended_events.category (sports|music|arts).',
     'Coding domain: wakatime_durations/wakatime_daily_summaries (editor time), rescuetime_activities/rescuetime_daily_summaries (screen time; productivity -2..+2), github_commits/github_pull_requests/github_issues/github_contribution_days (authored activity incl. private repos). Cross-source join: wakatime project names often equal github repo short names (m.repo LIKE "%/" || project).',
@@ -70,7 +70,6 @@ export const SCHEMA_DOC: SchemaDoc = {
           'JSON array of similar artists the user also plays'
         ),
         c('apple_music_url', 'text'),
-        c('image_key', 'text'),
         c('created_at', 'text'),
         c('updated_at', 'text'),
       ],
@@ -87,7 +86,6 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('released_year', 'integer', 'nullable, from Apple Music'),
         c('total_tracks', 'integer', 'nullable'),
         c('apple_music_url', 'text'),
-        c('image_key', 'text'),
       ],
       joins: ['artist_id → lastfm_artists.id'],
     },
@@ -353,7 +351,6 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('summary', 'text', 'nullable'),
         c('content_rating', 'text', 'nullable'),
         c('poster_path', 'text', 'TMDB path, nullable'),
-        c('image_key', 'text', 'nullable'),
       ],
       joins: [
         'id ← watch_history.movie_id',
@@ -436,7 +433,6 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('total_seasons', 'integer', 'nullable'),
         c('total_episodes', 'integer', 'nullable'),
         c('poster_path', 'text', 'nullable'),
-        c('image_key', 'text', 'nullable'),
       ],
       joins: ['id ← episodes_watched.show_id'],
     },
@@ -883,7 +879,6 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('latitude', 'real', 'nullable'),
         c('longitude', 'real', 'nullable'),
         c('capacity', 'integer', 'nullable'),
-        c('image_key', 'text', 'nullable'),
       ],
       joins: ['id ← attended_events.venue_id'],
     },
@@ -928,7 +923,6 @@ export const SCHEMA_DOC: SchemaDoc = {
           'integer',
           '→ lastfm_artists.id, nullable (cross-domain link)'
         ),
-        c('image_key', 'text', 'nullable'),
       ],
       joins: [
         'lastfm_artist_id → lastfm_artists.id',
@@ -1041,7 +1035,11 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('occurred_at', 'text', 'ISO 8601'),
         c('title', 'text'),
         c('subtitle', 'text', 'nullable'),
-        c('image_key', 'text', 'nullable'),
+        c(
+          'image_key',
+          'text',
+          'legacy, always NULL -- join `images` for artwork'
+        ),
         c('source_id', 'text', 'id of the underlying domain row'),
         c('metadata', 'text', 'JSON, nullable'),
       ],

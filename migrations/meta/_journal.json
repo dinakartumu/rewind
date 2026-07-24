@@ -148,6 +148,13 @@
       "when": 1784879276457,
       "tag": "0047_wakatime_daily_languages",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1784916282917,
+      "tag": "0048_drop_dead_image_key",
+      "breakpoints": true
     }
   ]
 }

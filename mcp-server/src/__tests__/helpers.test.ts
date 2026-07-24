@@ -5,8 +5,9 @@ import {
   imageBlock,
   withRichResponse,
   withErrorHandling,
+  formatToolError,
 } from '../tools/helpers.js';
-import { RewindClient } from '../client.js';
+import { RewindClient, RewindApiError } from '../client.js';
 
 describe('helpers', () => {
   describe('text()', () => {
@@ -166,6 +167,63 @@ describe('helpers', () => {
       expect((result.content[0] as { text: string }).text).toBe(
         'Error: string error'
       );
+    });
+
+    it('surfaces the API error body, not just the status line', async () => {
+      const result = await withRichResponse(async () => {
+        throw new RewindApiError(
+          400,
+          'Bad Request',
+          JSON.stringify({
+            error: 'mode=hybrid is only supported for domain=reading',
+            status: 400,
+          })
+        );
+      });
+      expect(result.isError).toBe(true);
+      expect((result.content[0] as { text: string }).text).toBe(
+        'Error: Rewind API error: 400 Bad Request -- ' +
+          'mode=hybrid is only supported for domain=reading'
+      );
+    });
+  });
+
+  describe('formatToolError()', () => {
+    it('unwraps the `error` field of a JSON API body', () => {
+      const err = new RewindApiError(
+        404,
+        'Not Found',
+        '{"error":"Movie 999 not found","status":404}'
+      );
+      expect(formatToolError(err)).toBe(
+        'Rewind API error: 404 Not Found -- Movie 999 not found'
+      );
+    });
+
+    it('falls back to the raw body when it is not JSON', () => {
+      const err = new RewindApiError(502, 'Bad Gateway', '<html>nope</html>');
+      expect(formatToolError(err)).toBe(
+        'Rewind API error: 502 Bad Gateway -- <html>nope</html>'
+      );
+    });
+
+    it('keeps the bare status line when the body is empty', () => {
+      const err = new RewindApiError(500, 'Internal Server Error', '');
+      expect(formatToolError(err)).toBe(
+        'Rewind API error: 500 Internal Server Error'
+      );
+    });
+
+    it('truncates an overlong body', () => {
+      const err = new RewindApiError(400, 'Bad Request', 'x'.repeat(1000));
+      const out = formatToolError(err);
+      expect(out.length).toBeLessThan(500);
+      expect(out.endsWith('…')).toBe(true);
+    });
+
+    it('passes plain errors through unchanged', () => {
+      expect(formatToolError(new Error('boom'))).toBe('boom');
+      expect(formatToolError('raw')).toBe('raw');
     });
   });
 

@@ -27,7 +27,6 @@ export const venues = sqliteTable(
     longitude: real('longitude'),
     capacity: integer('capacity'),
     externalIds: text('external_ids'), // JSON: { foursquare, google_place_id, ... }
-    imageKey: text('image_key'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -128,7 +127,6 @@ export const performers = sqliteTable(
       () => lastfmArtists.id
     ),
     externalIds: text('external_ids'), // JSON: { setlist_fm, spotify, apple_music_id, ... }
-    imageKey: text('image_key'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -181,7 +179,6 @@ export const attendedEvents = sqliteTable(
     eventData: text('event_data'), // JSON, type-specific
     notes: text('notes'),
     attended: integer('attended').notNull().default(1),
-    imageKey: text('image_key'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),

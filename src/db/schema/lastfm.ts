@@ -16,7 +16,6 @@ export const lastfmArtists = sqliteTable(
     url: text('url'),
     playcount: integer('playcount').default(0),
     isFiltered: integer('is_filtered').default(0),
-    imageKey: text('image_key'),
     tags: text('tags'), // JSON array of { name, count } after allowlist filtering
     genre: text('genre'), // Primary genre (top allowlisted tag)
     appleMusicId: integer('apple_music_id'),
@@ -64,7 +63,6 @@ export const lastfmAlbums = sqliteTable(
     url: text('url'),
     playcount: integer('playcount').default(0),
     isFiltered: integer('is_filtered').default(0),
-    imageKey: text('image_key'),
     appleMusicId: integer('apple_music_id'),
     appleMusicUrl: text('apple_music_url'),
     itunesEnrichedAt: text('itunes_enriched_at'),
