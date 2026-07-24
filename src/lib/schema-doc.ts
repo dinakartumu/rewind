@@ -708,6 +708,21 @@ export const SCHEMA_DOC: SchemaDoc = {
       ],
     },
     {
+      name: 'wakatime_daily_languages',
+      purpose:
+        'Materialized per-day, per-language coding time; rebuilt each sync from the WakaTime Summaries API (duration rows are entity-sliced and carry no language). One row per (user, date, language).',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('date', 'text', 'YYYY-MM-DD'),
+        c('language', 'text', 'e.g. "TypeScript"'),
+        c(
+          'total_seconds',
+          'real',
+          "that day's time in the language in seconds"
+        ),
+      ],
+    },
+    {
       name: 'rescuetime_activities',
       purpose:
         'One row per (timestamp, activity) 5-minute screen-time bucket from the RescueTime Analytic Data API.',

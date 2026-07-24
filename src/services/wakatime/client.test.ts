@@ -93,6 +93,12 @@ describe('WakatimeClient', () => {
     expect(summary.totalSeconds).toBe(5000);
     expect(summary.topLanguage).toBe('TypeScript');
     expect(summary.topProject).toBe('rewind');
+    // Per-language breakdown drives wakatime_daily_languages; preserves the
+    // full languages[] mapped to { name, totalSeconds }.
+    expect(summary.languages).toEqual([
+      { name: 'TypeScript', totalSeconds: 3000 },
+      { name: 'CSS', totalSeconds: 500 },
+    ]);
   });
 
   it('should return null tops when language/project arrays are empty', async () => {
@@ -112,6 +118,7 @@ describe('WakatimeClient', () => {
     expect(summary.totalSeconds).toBe(0);
     expect(summary.topLanguage).toBeNull();
     expect(summary.topProject).toBeNull();
+    expect(summary.languages).toEqual([]);
   });
 
   it('should return zeroed totals with null tops when summary data is empty', async () => {
@@ -126,6 +133,7 @@ describe('WakatimeClient', () => {
       totalSeconds: 0,
       topLanguage: null,
       topProject: null,
+      languages: [],
     });
   });
 

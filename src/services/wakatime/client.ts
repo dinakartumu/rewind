@@ -39,6 +39,12 @@ export interface WakatimeDurationRow {
   entity: string | null;
 }
 
+/** One per-language total mapped from the summary's `languages[]`. */
+export interface WakatimeLanguageTotal {
+  name: string;
+  totalSeconds: number;
+}
+
 /** Per-day rollup mapped from the WakaTime Summaries API. */
 export interface WakatimeSummary {
   /** YYYY-MM-DD */
@@ -48,6 +54,13 @@ export interface WakatimeSummary {
   topLanguage: string | null;
   /** Highest-total project for the day; null when the day has no data. */
   topProject: string | null;
+  /**
+   * Full per-language breakdown for the day (materialized into
+   * wakatime_daily_languages). Empty when the day has no data. Duration
+   * rows never carry language (entity slice), so this is the sole source of
+   * per-language time.
+   */
+  languages: WakatimeLanguageTotal[];
 }
 
 interface DurationsApiItem {
@@ -136,6 +149,10 @@ export class WakatimeClient {
       totalSeconds: day?.grand_total?.total_seconds ?? 0,
       topLanguage: topBySeconds(day?.languages),
       topProject: topBySeconds(day?.projects),
+      languages: (day?.languages ?? []).map((l) => ({
+        name: l.name,
+        totalSeconds: l.total_seconds,
+      })),
     };
   }
 }

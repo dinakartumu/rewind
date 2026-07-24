@@ -62,3 +62,32 @@ export const wakatimeDailySummaries = sqliteTable(
     index('idx_wakatime_daily_date').on(table.date),
   ]
 );
+
+/**
+ * Materialized per-day, per-language coding time, rebuilt from the WakaTime
+ * Summaries API on every sync (delete + reinsert per day). Duration rows are
+ * entity-sliced and never carry language, so this table is the sole source of
+ * per-language time. Unique per (user, date, language).
+ */
+export const wakatimeDailyLanguages = sqliteTable(
+  'wakatime_daily_languages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id').notNull().default(1),
+    /** YYYY-MM-DD */
+    date: text('date').notNull(),
+    language: text('language').notNull(),
+    totalSeconds: real('total_seconds').notNull(),
+    createdAt: text('created_at')
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex('idx_wakatime_daily_lang_user_date_lang').on(
+      table.userId,
+      table.date,
+      table.language
+    ),
+    index('idx_wakatime_daily_lang_date').on(table.date),
+  ]
+);

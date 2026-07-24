@@ -141,6 +141,13 @@
       "when": 1784877999454,
       "tag": "0046_coding_domain",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1784879276457,
+      "tag": "0047_wakatime_daily_languages",
+      "breakpoints": true
     }
   ]
 }
