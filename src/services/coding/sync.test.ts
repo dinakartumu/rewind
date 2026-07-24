@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from 'vitest';
 import { env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { createDb } from '../../db/client.js';
@@ -70,6 +78,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await clearAll();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('formatDuration', () => {
@@ -155,6 +167,23 @@ describe('buildDailyRollup', () => {
     const item = await buildDailyRollup(db, DAY, 1);
     expect(item).toBeNull();
   });
+
+  it('returns null when only rescuetime data exists (screen time excluded)', async () => {
+    const db = createDb(env.DB);
+    await createDb(env.DB)
+      .insert(rescuetimeDailySummaries)
+      .values({
+        userId: 1,
+        date: DAY,
+        totalSeconds: 6 * 3600,
+        productivityPulse: 70,
+        productiveSeconds: 4 * 3600,
+        neutralSeconds: 3600,
+        distractingSeconds: 3600,
+      });
+    const item = await buildDailyRollup(db, DAY, 1);
+    expect(item).toBeNull();
+  });
 });
 
 describe('syncCoding feed write', () => {
@@ -171,7 +200,6 @@ describe('syncCoding feed write', () => {
       syncRescuetime: vi.fn(),
       syncGithub: vi.fn(),
     });
-    vi.useRealTimers();
 
     const rows = await db
       .select()
@@ -195,13 +223,58 @@ describe('syncCoding feed write', () => {
     };
     await syncCoding({ DB: env.DB } as unknown as Env, 1, deps);
     await syncCoding({ DB: env.DB } as unknown as Env, 1, deps);
-    vi.useRealTimers();
 
     const rows = await db
       .select()
       .from(activityFeed)
       .where(eq(activityFeed.sourceId, 'coding:day:2026-07-23'));
     expect(rows).toHaveLength(1);
+  });
+
+  it('updates the rollup title in place as late wakatime data lands', async () => {
+    const db = createDb(env.DB);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-24T08:00:00.000Z'));
+
+    const deps = {
+      syncWakatime: vi.fn(),
+      syncRescuetime: vi.fn(),
+      syncGithub: vi.fn(),
+    };
+
+    // First sync: WakaTime reports 1h so far.
+    await seedWakatime('2026-07-23', 3600, 'TypeScript', 'rewind');
+    await syncCoding({ DB: env.DB } as unknown as Env, 1, deps);
+
+    const firstRows = await db
+      .select()
+      .from(activityFeed)
+      .where(eq(activityFeed.sourceId, 'coding:day:2026-07-23'));
+    expect(firstRows).toHaveLength(1);
+    const firstTitle = firstRows[0].title;
+    const firstOccurredAt = firstRows[0].occurredAt;
+    expect(firstTitle).toBe('Coded 1h 0m (TypeScript · rewind)');
+
+    // WakaTime corrects yesterday's number upward (late-landing data).
+    await db.delete(wakatimeDailySummaries);
+    await seedWakatime(
+      '2026-07-23',
+      4 * 3600 + 12 * 60,
+      'TypeScript',
+      'rewind'
+    );
+
+    // Second sync: same single row now carries the corrected title.
+    await syncCoding({ DB: env.DB } as unknown as Env, 1, deps);
+
+    const secondRows = await db
+      .select()
+      .from(activityFeed)
+      .where(eq(activityFeed.sourceId, 'coding:day:2026-07-23'));
+    expect(secondRows).toHaveLength(1);
+    expect(secondRows[0].title).toBe('Coded 4h 12m (TypeScript · rewind)');
+    // occurred_at is left untouched by the in-place update.
+    expect(secondRows[0].occurredAt).toBe(firstOccurredAt);
   });
 });
 

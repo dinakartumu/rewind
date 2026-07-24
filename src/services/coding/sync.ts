@@ -2,6 +2,7 @@ import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { createDb, type Database } from '../../db/client.js';
 import { wakatimeDailySummaries } from '../../db/schema/wakatime.js';
 import { githubCommits } from '../../db/schema/github.js';
+import { activityFeed } from '../../db/schema/system.js';
 import { afterSync, type FeedItem } from '../../lib/after-sync.js';
 import { syncWakatime as realSyncWakatime } from '../wakatime/sync.js';
 import { syncRescuetime as realSyncRescuetime } from '../rescuetime/sync.js';
@@ -102,7 +103,9 @@ export async function buildDailyRollup(
 
   const segments: string[] = [];
 
-  if (wakaRow && wakaRow.totalSeconds > 0) {
+  // Require at least a full minute of coding time; formatDuration floors to
+  // whole minutes, so anything under 60s would render a misleading "Coded 0m".
+  if (wakaRow && wakaRow.totalSeconds >= 60) {
     const context = [wakaRow.topLanguage, wakaRow.topProject]
       .filter((v): v is string => Boolean(v))
       .join(' · ');
@@ -134,9 +137,8 @@ export async function buildDailyRollup(
  * credentials are unset) sequentially, each in its own try/catch so one
  * failure logs `[ERROR]` and does not block the others — the source entrypoint
  * has already recorded its own failed sync_runs row. After the sources, emits
- * the daily feed rollup for YESTERDAY (UTC) so the feed row is written once,
- * with final numbers; afterSync's insertFeedItems dedups by sourceId on
- * re-runs.
+ * the daily feed rollup for YESTERDAY (UTC), inserting the row on first run and
+ * updating it in place on later runs so the title corrects as late data lands.
  *
  * `deps` is injectable for tests; production uses the real source entrypoints.
  */
@@ -180,7 +182,9 @@ export async function syncCoding(
     }
   }
 
-  // Roll up YESTERDAY (UTC): the day is over, so its numbers are final.
+  // Roll up YESTERDAY (UTC). Commit counts are final once the day is over, but
+  // WakaTime keeps correcting yesterday's totals for a while after midnight —
+  // so we update the feed row in place rather than freezing the first insert.
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
@@ -188,7 +192,28 @@ export async function syncCoding(
 
   const db = createDb(env.DB);
   const item = await buildDailyRollup(db, date, userId);
-  if (item) {
+  if (!item) return;
+
+  // afterSync's insertFeedItems dedups by sourceId, so it can only create the
+  // row, never refresh it. If the row already exists, update its title in place
+  // (leaving occurred_at untouched) so late-landing WakaTime data is reflected.
+  const [existing] = await db
+    .select({ id: activityFeed.id })
+    .from(activityFeed)
+    .where(
+      and(
+        eq(activityFeed.domain, 'coding'),
+        eq(activityFeed.sourceId, item.sourceId)
+      )
+    );
+
+  if (existing) {
+    await db
+      .update(activityFeed)
+      .set({ title: item.title })
+      .where(eq(activityFeed.id, existing.id));
+    console.log(`[SYNC] Coding rollup updated for ${date}: ${item.title}`);
+  } else {
     await afterSync(db, { domain: 'coding', feedItems: [item] });
     console.log(`[SYNC] Coding rollup written for ${date}: ${item.title}`);
   }

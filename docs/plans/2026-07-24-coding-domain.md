@@ -613,9 +613,10 @@ Commit inserts skip non-distinct push-event commits (rebase re-pushes); other-au
 /** Runs all configured sources with per-source isolation (one failure
  *  logs [ERROR] + its own failed sync_runs row via the source entrypoint,
  *  and does not block the others). Sources with unset credentials are
- *  skipped silently. After the sources, emits the feed rollup for
- *  YESTERDAY (UTC) — yesterday only, so the feed row is written once per
- *  day with final numbers; insertFeedItems dedups by sourceId on re-runs. */
+ *  skipped with a [SYNC] log line. After the sources, emits the feed rollup
+ *  for YESTERDAY (UTC) — insert-then-update-in-place; the title corrects as
+ *  late WakaTime data lands (insertFeedItems dedups by sourceId, so re-runs
+ *  update the existing row's title rather than inserting a duplicate). */
 export async function syncCoding(env: Env, userId = 1): Promise<void>;
 
 /** Builds the rollup title from that day's summary tables + commit count:
