@@ -61,6 +61,7 @@ const MDX_FILES = [
   'reference/mcp-tools/watching.mdx',
   'reference/mcp-tools/reading.mdx',
   'reference/mcp-tools/attending.mdx',
+  'reference/mcp-tools/coding.mdx',
   'reference/mcp-tools/cross-domain.mdx',
   'domains/listening.mdx',
   'domains/running.mdx',

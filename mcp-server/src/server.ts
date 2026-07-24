@@ -12,6 +12,7 @@ import { registerWatchingTools } from './tools/watching.js';
 import { registerReadingTools } from './tools/reading.js';
 import { registerCrossDomainTools } from './tools/cross-domain.js';
 import { registerAttendingTools } from './tools/attending.js';
+import { registerCodingTools } from './tools/coding.js';
 import { healthOutputSchema } from './tools/schemas/system.js';
 import { registerResources } from './resources.js';
 import { registerUiResource } from './resources/ui.js';
@@ -180,6 +181,7 @@ export function createServer(
   registerReadingTools(server, client);
   registerCrossDomainTools(server, client);
   registerAttendingTools(server, client);
+  registerCodingTools(server, client);
 
   // Register resources and prompts
   registerResources(server, client);

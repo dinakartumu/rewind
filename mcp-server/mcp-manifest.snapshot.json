@@ -2244,6 +2244,154 @@
       }
     },
     {
+      "name": "get_coding_languages",
+      "description": "Get per-language coding time over an optional date range (from WakaTime), each with its percent of the range total. Use for \"what languages do I code in most\", \"language breakdown this year\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10,
+            "description": "Number of languages to return (max 50)"
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string"
+                },
+                "total_seconds": {
+                  "type": "number"
+                },
+                "percent": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "language",
+                "total_seconds",
+                "percent"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_coding_stats",
+      "description": "Aggregate coding statistics over an optional date range: total coding time and active days (WakaTime), commit / PR / issue counts (GitHub), and a screen-time breakdown by productivity level (RescueTime). Use for \"how much did I code\", \"how many commits this month\", or \"where does my screen time go\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coding_seconds": {
+            "type": "number"
+          },
+          "coding_days": {
+            "type": "number"
+          },
+          "commits": {
+            "type": "number"
+          },
+          "prs": {
+            "type": "number"
+          },
+          "issues": {
+            "type": "number"
+          },
+          "screen_time": {
+            "type": "object",
+            "properties": {
+              "total_seconds": {
+                "type": "number"
+              },
+              "very_productive_seconds": {
+                "type": "number"
+              },
+              "productive_seconds": {
+                "type": "number"
+              },
+              "neutral_seconds": {
+                "type": "number"
+              },
+              "distracting_seconds": {
+                "type": "number"
+              },
+              "very_distracting_seconds": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total_seconds",
+              "very_productive_seconds",
+              "productive_seconds",
+              "neutral_seconds",
+              "distracting_seconds",
+              "very_distracting_seconds"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "coding_seconds",
+          "coding_days",
+          "commits",
+          "prs",
+          "issues",
+          "screen_time"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_health",
       "description": "Check the health and sync status of the Rewind API. Returns API status and last sync times for each data domain.",
       "inputSchema": {
@@ -2465,6 +2613,115 @@
           "is_playing",
           "track",
           "scrobbled_at"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_recent_coding_activity",
+      "description": "Get a merged timeline of recent GitHub commits, pull requests, and issues (newest first), plus a today object with coding seconds (WakaTime) and productivity pulse (RescueTime) for the current UTC date. Each item renders as a markdown link to its GitHub URL. Use for \"what have I been working on\", \"recent commits\", or \"my open PRs\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20,
+            "description": "Number of activity items to return (max 50)"
+          },
+          "page": {
+            "type": "number",
+            "minimum": 1,
+            "default": 1,
+            "description": "Page number for pagination"
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional: filter to a specific date (YYYY-MM-DD)"
+          },
+          "from": {
+            "type": "string",
+            "description": "Optional: start of date range (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Optional: end of date range (ISO 8601)"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "commit",
+                    "pr",
+                    "issue"
+                  ]
+                },
+                "repo": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "occurred_at": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "repo",
+                "title",
+                "occurred_at",
+                "state",
+                "url"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "today": {
+            "type": "object",
+            "properties": {
+              "coding_seconds": {
+                "type": "number"
+              },
+              "productivity_pulse": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "coding_seconds",
+              "productivity_pulse"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "items",
+          "today"
         ],
         "additionalProperties": true,
         "$schema": "http://json-schema.org/draft-07/schema#"
