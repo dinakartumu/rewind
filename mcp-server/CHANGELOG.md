@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.12.0...mcp-server-v0.12.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **mcp:** stop 400s on reading-only search modes, drop dead image_key ([#8](https://github.com/dinakartumu/rewind/issues/8)) ([5b4adfc](https://github.com/dinakartumu/rewind/commit/5b4adfc72601915fc53ba3902060f32ed6f1e567))
+
 ## [0.12.0](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.11.0...mcp-server-v0.12.0) (2026-07-24)
 
 
