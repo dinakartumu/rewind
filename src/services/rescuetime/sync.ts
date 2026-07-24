@@ -110,7 +110,17 @@ export async function syncRescuetimeDay(
   userId = 1
 ): Promise<RescuetimeDaySyncResult> {
   const { start, end } = dayBounds(date);
-  const activities = await client.getActivities(date);
+  const rawActivities = await client.getActivities(date);
+
+  // The Analytic Data API can return rows colliding on (timestamp, activity) —
+  // inserting both would violate the unique index and abort the batch. Dedup on
+  // the unique key, keeping the LAST occurrence, so the rollup and the persisted
+  // rows agree (no double-counting a bucket that appears twice).
+  const bySlot = new Map<string, (typeof rawActivities)[number]>();
+  for (const a of rawActivities) {
+    bySlot.set(`${a.timestamp} ${a.activity}`, a);
+  }
+  const activities = [...bySlot.values()];
   const levels = rollupLevels(activities);
   const pulse = pulseByDate.has(date) ? pulseByDate.get(date)! : null;
 

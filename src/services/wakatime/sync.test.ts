@@ -284,6 +284,40 @@ describe('syncWakatimeDay', () => {
     expect(langs[0].language).toBe('Go');
     expect(langs[0].totalSeconds).toBe(120);
   });
+
+  it('dedups duration slices that share (start_time, project, entity), keeping the last', async () => {
+    // The WakaTime Durations API can return multiple slices whose rounded
+    // start_time collides on the same (project, entity) — this must not blow
+    // up the batch insert on the unique index. Last occurrence wins.
+    const db = createDb(env.DB);
+    const date = '2026-07-28';
+    const { client } = makeClient(
+      {
+        [date]: [
+          duration('2026-07-28T09:00:00.000Z', 100, { entity: '/src/a.ts' }),
+          duration('2026-07-28T09:00:00.000Z', 250, { entity: '/src/a.ts' }),
+          duration('2026-07-28T10:00:00.000Z', 60, { entity: '/src/b.ts' }),
+        ],
+      },
+      { [date]: { totalSeconds: 310 } }
+    );
+
+    const result = await syncWakatimeDay(db, client, date);
+
+    const rows = await db
+      .select()
+      .from(wakatimeDurations)
+      .where(eq(wakatimeDurations.startTime, '2026-07-28T09:00:00.000Z'))
+      .orderBy(asc(wakatimeDurations.startTime));
+    // Only one row for the colliding key, carrying the last slice's duration.
+    expect(rows).toHaveLength(1);
+    expect(rows[0].durationSeconds).toBe(250);
+
+    const all = await db.select().from(wakatimeDurations);
+    expect(all).toHaveLength(2);
+    // synced reflects the de-duplicated count actually persisted.
+    expect(result.synced).toBe(2);
+  });
 });
 
 describe('backfillWakatime', () => {

@@ -275,6 +275,39 @@ describe('syncRescuetimeDay', () => {
     expect(bRows).toHaveLength(1);
     expect(bRows[0].timestamp).toBe('2026-08-02T00:05:00.000Z');
   });
+
+  it('dedups activity rows that share (timestamp, activity), keeping the last', async () => {
+    // The Analytic Data API can return rows colliding on (timestamp, activity)
+    // — inserting both would violate the unique index and abort the batch.
+    // Dedup on the unique key, keeping the last occurrence.
+    const db = createDb(env.DB);
+    const date = '2026-08-05';
+    const { client } = makeClient({
+      [date]: [
+        activity('2026-08-05T09:00:00.000Z', 100, 2, { activity: 'VS Code' }),
+        activity('2026-08-05T09:00:00.000Z', 200, 2, { activity: 'VS Code' }),
+        activity('2026-08-05T09:05:00.000Z', 60, 1, { activity: 'Chrome' }),
+      ],
+    });
+
+    const result = await syncRescuetimeDay(db, client, date);
+
+    const rows = await db
+      .select()
+      .from(rescuetimeActivities)
+      .where(eq(rescuetimeActivities.timestamp, '2026-08-05T09:00:00.000Z'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].durationSeconds).toBe(200);
+
+    const all = await db
+      .select()
+      .from(rescuetimeActivities)
+      .where(sql`substr(timestamp, 1, 10) = ${date}`);
+    expect(all).toHaveLength(2);
+    // The rollup reflects only the de-duplicated rows (200 + 60), not 100+200+60.
+    expect(result.totalSeconds).toBe(260);
+    expect(result.synced).toBe(2);
+  });
 });
 
 describe('syncRescuetime', () => {
