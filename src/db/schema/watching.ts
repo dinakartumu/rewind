@@ -25,7 +25,6 @@ export const movies = sqliteTable(
     posterPath: text('poster_path'),
     backdropPath: text('backdrop_path'),
     tmdbRating: real('tmdb_rating'),
-    imageKey: text('image_key'),
     createdAt: text('created_at')
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -148,7 +147,6 @@ export const shows = sqliteTable(
     backdropPath: text('backdrop_path'),
     contentRating: text('content_rating'),
     tmdbRating: real('tmdb_rating'),
-    imageKey: text('image_key'),
     totalSeasons: integer('total_seasons'),
     totalEpisodes: integer('total_episodes'),
     createdAt: text('created_at')

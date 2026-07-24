@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { RewindClient } from '../client.js';
+import { RewindApiError, type RewindClient } from '../client.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -164,6 +164,37 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 // ─── Response wrappers ───────────────────────────────────────────────
 
+/** Max characters of an API error body to echo back to the model. */
+const ERROR_BODY_MAX = 400;
+
+/**
+ * Render a thrown error as the text the model sees.
+ *
+ * For a RewindApiError the status line alone ("Rewind API error: 400 Bad
+ * Request") is useless -- the API puts the actionable reason in the response
+ * body (e.g. `mode=hybrid is only supported for domain=reading`). Without it
+ * the model cannot tell a bad-argument 400 from an outage and has nothing to
+ * correct on a retry, so append the body whenever there is one.
+ */
+export function formatToolError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!(error instanceof RewindApiError) || !error.body) return message;
+
+  // The API returns `{ "error": "...", "status": 400 }`; fall back to the raw
+  // body for non-JSON responses (HTML error pages, proxy errors).
+  let detail = error.body.trim();
+  try {
+    const parsed = JSON.parse(detail) as { error?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error) detail = parsed.error;
+  } catch {
+    // Not JSON -- keep the raw body.
+  }
+  if (!detail) return message;
+  if (detail.length > ERROR_BODY_MAX)
+    detail = detail.slice(0, ERROR_BODY_MAX - 1) + '…';
+  return `${message} -- ${detail}`;
+}
+
 /**
  * Wrap a tool handler that returns only text.
  * Returns { content, isError: true } on failure.
@@ -175,9 +206,8 @@ export async function withErrorHandling(
     const textValue = await fn();
     return { content: [text(textValue)] };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     return {
-      content: [text(`Error: ${message}`)],
+      content: [text(`Error: ${formatToolError(error)}`)],
       isError: true,
     };
   }
@@ -199,9 +229,8 @@ export async function withRichResponse<S = unknown>(
   try {
     return await fn();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     return {
-      content: [text(`Error: ${message}`)],
+      content: [text(`Error: ${formatToolError(error)}`)],
       isError: true,
     };
   }

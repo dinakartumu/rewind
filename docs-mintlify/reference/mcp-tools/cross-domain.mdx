@@ -25,7 +25,7 @@ Number of results to return Defaults to `10`.
 </ParamField>
 
 <ParamField path="mode" type="string">
-Ranking mode. keyword = FTS (default). semantic = cosine-similarity over article embeddings (reading only). hybrid = FTS + semantic via reciprocal rank fusion (reading only). One of: `keyword`, `semantic`, `hybrid`.
+Ranking mode. keyword = FTS (default), the only mode valid outside the reading domain. semantic = cosine-similarity over article embeddings (reading only). hybrid = FTS + semantic via reciprocal rank fusion (reading only). Leave unset unless you are searching saved articles. One of: `keyword`, `semantic`, `hybrid`.
 </ParamField>
 
 <ParamField path="page" type="number">
