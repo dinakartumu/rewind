@@ -188,6 +188,47 @@ describe('syncRescuetimeDay', () => {
     expect(summCount.n).toBe(0);
   });
 
+  it('deletes a stale summary row when a previously-populated day comes back empty', async () => {
+    const db = createDb(env.DB);
+    const date = '2026-07-28';
+
+    // First sync: the day has activity, producing a summary row.
+    await syncRescuetimeDay(
+      db,
+      makeClient({
+        [date]: [activity('2026-07-28T09:00:00.000Z', 300, 2)],
+      }).client,
+      date
+    );
+
+    const [beforeSumm] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(rescuetimeDailySummaries)
+      .where(eq(rescuetimeDailySummaries.date, date));
+    expect(beforeSumm.n).toBe(1);
+
+    // Re-sync: the API now returns no activity for that day.
+    const result = await syncRescuetimeDay(
+      db,
+      makeClient({ [date]: [] }).client,
+      date
+    );
+    expect(result.synced).toBe(0);
+
+    // Both the activity rows and the stale summary row must be gone.
+    const [actCount] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(rescuetimeActivities)
+      .where(sql`substr(timestamp, 1, 10) = ${date}`);
+    expect(actCount.n).toBe(0);
+
+    const [summCount] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(rescuetimeDailySummaries)
+      .where(eq(rescuetimeDailySummaries.date, date));
+    expect(summCount.n).toBe(0);
+  });
+
   it('deletes only the target day rows (timestamp window), leaving other days intact', async () => {
     const db = createDb(env.DB);
     const dayA = '2026-08-01';
@@ -250,7 +291,17 @@ describe('syncRescuetime', () => {
       }
       // Analytic data endpoint — empty rows.
       return new Response(
-        JSON.stringify({ row_headers: [1, 2, 3, 4, 5, 6], rows: [] })
+        JSON.stringify({
+          row_headers: [
+            'Date',
+            'Time Spent (seconds)',
+            'Number of People',
+            'Activity',
+            'Category',
+            'Productivity',
+          ],
+          rows: [],
+        })
       );
     });
 

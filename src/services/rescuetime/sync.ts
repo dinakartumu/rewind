@@ -66,6 +66,11 @@ function rollupLevels(
       case -2:
         sums.veryDistracting += a.durationSeconds;
         break;
+      default:
+        // Out-of-range productivity value: route to neutral so the level
+        // buckets always sum to totalSeconds.
+        sums.neutral += a.durationSeconds;
+        break;
     }
   }
   return sums;
@@ -79,7 +84,9 @@ function rollupLevels(
  *
  * A day with no activity rows writes NO summary row (mirroring the "no feed
  * row for empty days" philosophy): the whole day is rebuilt from scratch, and
- * an empty day contributes nothing.
+ * an empty day contributes nothing. When a previously-populated day comes back
+ * empty, its stale summary row is DELETED so the summary never outlives its
+ * activities.
  *
  * @param date YYYY-MM-DD
  * @param pulseByDate map of date -> productivity pulse (from the feed API);
@@ -99,8 +106,9 @@ export async function syncRescuetimeDay(
 
   // Rebuild the whole day in one db.batch() so it runs as an implicit D1
   // transaction (all-or-nothing) and in a single round-trip. Delete the
-  // activity window first, then reinsert, then (only when there is data)
-  // upsert the summary. An empty day writes NO summary row.
+  // activity window first, then reinsert, then reconcile the summary. When
+  // there is data, upsert the summary; when the day is empty, DELETE any
+  // stale summary row so it never outlives its activities.
   const summaryStatements =
     activities.length > 0
       ? [
@@ -133,7 +141,16 @@ export async function syncRescuetimeDay(
               },
             }),
         ]
-      : [];
+      : [
+          db
+            .delete(rescuetimeDailySummaries)
+            .where(
+              and(
+                eq(rescuetimeDailySummaries.userId, userId),
+                eq(rescuetimeDailySummaries.date, date)
+              )
+            ),
+        ];
 
   const statements = [
     db
@@ -211,6 +228,8 @@ export async function syncRescuetime(
       summaries.map((s) => [s.date, s.productivityPulse])
     );
 
+    // Day selection is UTC-based; tz-ahead accounts see only a morning lag on
+    // "today" and the hourly cron self-heals once the UTC date catches up.
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
