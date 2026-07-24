@@ -592,6 +592,8 @@ export async function syncGithubIncremental(
 export async function syncGithub(env, userId?): Promise<{ synced: number }>;
 ```
 
+Commit inserts skip non-distinct push-event commits (rebase re-pushes); other-author commits inside own pushes are deliberately not filtered (documented tradeoff).
+
 **ETag flow in `syncGithubIncremental`:** read the stored events ETag from KV (`env.REWIND_CACHE.get('coding:github:events:etag')`), pass it to `getRecentCommits(1, etag)`. On `notModified`, skip the commits phase entirely (log `[SYNC] GitHub events unchanged (304), skipping commits`). On a 200, store the new etag back (`put`, no TTL). Contributions + PR/issue search still run every time (they have no conditional support). `syncGithubIncremental` therefore takes `env` (or the KV binding) in addition to db/client — pick the cleaner signature and keep the KV interaction stubbed in tests via a minimal `{ get, put }` fake.
 
 **Tests:** contribution upsert (run twice with changed count → updated, not duplicated); commit insert dedup on sha; commit-detail cap honored (stub counts calls); PR upsert updates state open→merged; sync_runs lifecycle; 304 path skips commit processing and preserves the stored etag; 200 path stores the new etag.

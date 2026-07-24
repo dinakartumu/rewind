@@ -39,8 +39,18 @@ function eventsResponse(): unknown[] {
       repo: { name: 'pat/rewind' },
       payload: {
         commits: [
-          { sha: 'aaa111', message: 'first commit\nbody' },
-          { sha: 'bbb222', message: 'second commit' },
+          {
+            sha: 'aaa111',
+            message: 'first commit\nbody',
+            distinct: true,
+            author: { email: 'pat@example.com' },
+          },
+          {
+            sha: 'bbb222',
+            message: 'second commit',
+            distinct: false,
+            author: { email: 'other@example.com' },
+          },
         ],
       },
     },
@@ -92,10 +102,6 @@ describe('GithubClient', () => {
   beforeEach(() => {
     client = new GithubClient('gh_test_token', 'patuser');
     vi.restoreAllMocks();
-  });
-
-  it('should construct with a token and username', () => {
-    expect(client).toBeDefined();
   });
 
   it('should POST GraphQL with contributionsCollection and login/from/to variables', async () => {
@@ -157,6 +163,31 @@ describe('GithubClient', () => {
     expect(body.variables.to).toBe('2026-07-23T05:00:00Z');
   });
 
+  it('should throw when a 200 GraphQL response carries an errors array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          errors: [{ message: 'Something went wrong' }],
+        }),
+        { status: 200 }
+      )
+    );
+
+    await expect(
+      client.getContributionDays('2026-07-20', '2026-07-23')
+    ).rejects.toThrow('GitHub GraphQL error: Something went wrong');
+  });
+
+  it('should throw when GraphQL returns data.user === null (bad username)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: { user: null } }), { status: 200 })
+    );
+
+    await expect(
+      client.getContributionDays('2026-07-20', '2026-07-23')
+    ).rejects.toThrow('GitHub GraphQL: user not found');
+  });
+
   it('should request events with the right URL + REST headers', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -190,6 +221,8 @@ describe('GithubClient', () => {
       message: 'first commit\nbody',
       committedAt: '2026-07-23T09:00:00Z',
       isPrivate: true,
+      distinct: true,
+      authorEmail: 'pat@example.com',
     });
     expect(commits[1]).toEqual({
       sha: 'bbb222',
@@ -197,7 +230,22 @@ describe('GithubClient', () => {
       message: 'second commit',
       committedAt: '2026-07-23T09:00:00Z',
       isPrivate: true,
+      distinct: false,
+      authorEmail: 'other@example.com',
     });
+  });
+
+  it('should map the distinct flag and author email through PushEvent flattening', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(eventsResponse()))
+    );
+
+    const { commits } = await client.getRecentCommits();
+
+    expect(commits[0].distinct).toBe(true);
+    expect(commits[0].authorEmail).toBe('pat@example.com');
+    expect(commits[1].distinct).toBe(false);
+    expect(commits[1].authorEmail).toBe('other@example.com');
   });
 
   it('should send If-None-Match when an etag is provided', async () => {
@@ -299,6 +347,42 @@ describe('GithubClient', () => {
 
     expect(items[0].state).toBe('closed');
     expect(items[0].mergedAt).toBeNull();
+  });
+
+  it('should throw when repository_url has an unexpected prefix', async () => {
+    const page = {
+      total_count: 1,
+      items: [
+        {
+          repository_url: 'https://example.com/weird/pat/rewind',
+          number: 1,
+          title: 'Weird',
+          state: 'open',
+          created_at: '2026-07-19T10:00:00Z',
+          closed_at: null,
+          html_url: 'https://github.com/pat/rewind/pull/1',
+          pull_request: { merged_at: null },
+        },
+      ],
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(page))
+    );
+
+    await expect(client.searchAuthored('pr')).rejects.toThrow(
+      'unexpected repository_url'
+    );
+  });
+
+  it('should fall back to the passed etag when a 200 has no ETag header', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(eventsResponse()), { status: 200 })
+    );
+
+    const result = await client.getRecentCommits(1, '"stored"');
+
+    expect(result.etag).toBe('"stored"');
+    expect(result.notModified).toBe(false);
   });
 
   it('should throw GithubRateLimitError on 403 with x-ratelimit-remaining 0', async () => {

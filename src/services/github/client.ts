@@ -27,12 +27,24 @@ export interface GithubCommitRow {
   committedAt: string;
   /** event.public === false. */
   isPrivate: boolean;
+  /**
+   * commit.distinct — false for commits re-surfaced by a rebase re-push. The
+   * sync layer skips non-distinct commits so a rebase doesn't re-count history.
+   */
+  distinct: boolean;
+  /** commit.author.email; null when the payload omits it. */
+  authorEmail: string | null;
 }
 
 /** Result of a getRecentCommits call, carrying the conditional-request state. */
 export interface GithubRecentCommitsResult {
   commits: GithubCommitRow[];
-  /** ETag from the response header (for the next If-None-Match); null on 304. */
+  /**
+   * ETag for the next If-None-Match. On a 200 it's the fresh response ETag
+   * (falling back to the passed-in etag when the header is absent, so a stored
+   * etag is never clobbered with null). On a 304 the client echoes the etag it
+   * was sent.
+   */
   etag: string | null;
   /** True when the server returned 304 Not Modified (empty commits). */
   notModified: boolean;
@@ -72,14 +84,16 @@ interface ContributionDayApi {
 }
 
 interface ContributionsGraphQLResponse {
+  errors?: { message?: string }[];
   data?: {
+    // null when the login doesn't resolve (misconfigured GITHUB_USERNAME).
     user?: {
       contributionsCollection?: {
         contributionCalendar?: {
           weeks?: { contributionDays?: ContributionDayApi[] }[];
         };
       };
-    };
+    } | null;
   };
 }
 
@@ -89,7 +103,12 @@ interface EventApiItem {
   created_at?: string;
   repo?: { name?: string };
   payload?: {
-    commits?: { sha?: string; message?: string }[];
+    commits?: {
+      sha?: string;
+      message?: string;
+      distinct?: boolean;
+      author?: { email?: string };
+    }[];
   };
 }
 
@@ -213,6 +232,18 @@ export class GithubClient {
     }
 
     const json = (await response.json()) as ContributionsGraphQLResponse;
+
+    // GraphQL returns 200 even for query errors — the errors array is the only
+    // signal. A null user means the login didn't resolve (bad GITHUB_USERNAME).
+    if (json.errors?.length) {
+      throw new Error(
+        `[ERROR] GitHub GraphQL error: ${json.errors[0].message}`
+      );
+    }
+    if (json.data?.user === null) {
+      throw new Error('[ERROR] GitHub GraphQL: user not found');
+    }
+
     const weeks =
       json.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
       [];
@@ -259,7 +290,9 @@ export class GithubClient {
       );
     }
 
-    const newEtag = response.headers.get('ETag');
+    // Fall back to the passed-in etag when the 200 omits an ETag header, so we
+    // never overwrite a stored etag with null.
+    const newEtag = response.headers.get('ETag') ?? etag ?? null;
     const events = (await response.json()) as EventApiItem[];
     const commits: GithubCommitRow[] = [];
     for (const event of events) {
@@ -267,6 +300,11 @@ export class GithubClient {
       const repo = event.repo?.name ?? '';
       const committedAt = event.created_at ?? '';
       const isPrivate = event.public === false;
+      // Flatten every commit through unfiltered. The sync layer skips
+      // non-distinct commits (rebase re-pushes) and deliberately does NOT
+      // filter by author: a personal account's pushes are overwhelmingly its
+      // own commits, and email matching is unreliable (locally-configured
+      // authorship, noreply aliases, co-authors).
       for (const commit of event.payload?.commits ?? []) {
         if (!commit.sha) continue;
         commits.push({
@@ -275,6 +313,8 @@ export class GithubClient {
           message: commit.message ?? '',
           committedAt,
           isPrivate,
+          distinct: commit.distinct ?? false,
+          authorEmail: commit.author?.email ?? null,
         });
       }
     }
@@ -328,8 +368,8 @@ export class GithubClient {
     type: 'pr' | 'issue',
     page = 1
   ): Promise<GithubSearchResult> {
-    // Space-joined qualifiers; URLSearchParams encodes them as `+`-equivalent
-    // %20/%3A which GitHub's search accepts.
+    // Space-joined qualifiers; URLSearchParams encodes spaces as `+` and the
+    // `:` as %3A, which GitHub's search accepts.
     const q = `author:${this.username} type:${type}`;
     const params = new URLSearchParams({
       q,
@@ -367,7 +407,16 @@ function toIsoDateTime(value: string): string {
   return value.includes('T') ? value : `${value}T00:00:00Z`;
 }
 
+const REPO_URL_PREFIX = 'https://api.github.com/repos/';
+
 /** owner/name from a repository_url like https://api.github.com/repos/owner/name. */
 function extractRepo(repositoryUrl: string): string {
-  return repositoryUrl.replace('https://api.github.com/repos/', '');
+  // Fail loudly on an unexpected shape rather than silently returning the raw
+  // URL as a bogus repo slug.
+  if (!repositoryUrl.startsWith(REPO_URL_PREFIX)) {
+    throw new Error(
+      `[ERROR] GitHub: unexpected repository_url: ${repositoryUrl}`
+    );
+  }
+  return repositoryUrl.slice(REPO_URL_PREFIX.length);
 }
