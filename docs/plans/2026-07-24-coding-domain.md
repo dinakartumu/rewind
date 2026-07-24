@@ -397,7 +397,7 @@ git commit -m "feat(coding): env vars for wakatime, rescuetime, github"
 
 WakaTime API: base `https://wakatime.com/api/v1`, auth header `Authorization: Basic ${btoa(apiKey)}`. Two endpoints:
 
-- `GET /users/current/durations?date=YYYY-MM-DD&slice_by=language` → `{ data: [{ time: <epoch float>, duration: <seconds float>, project: string, language?: string, entity?: string }] }` — verify the exact per-item fields against https://wakatime.com/developers#durations while implementing; keep unknown fields out of the interface.
+- `GET /users/current/durations?date=YYYY-MM-DD&slice_by=entity` → `{ data: [{ time: <epoch float>, duration: <seconds float>, project: string, entity?: string }] }` — sliced by entity, so `language` is always null on duration rows (the API slices by exactly one dimension). Per-language time comes from the Summaries API instead (see Task 4).
 - `GET /users/current/summaries?start=D&end=D` → `{ data: [{ grand_total: { total_seconds }, languages: [{ name, total_seconds }], projects: [{ name, total_seconds }], range: { date } }] }`.
 - 402 Payment Required = past the free-plan history window (backfill stop signal); surface as a typed `WakatimeHistoryLimitError`.
 
@@ -455,6 +455,15 @@ export async function syncWakatime(
 ```
 
 `syncWakatimeDay` deletes `wakatime_durations` rows where `start_time` is within `[dateT00:00:00.000Z, nextDayT00:00:00.000Z)` and `user_id` matches, inserts fetched slices, then upserts `wakatime_daily_summaries` via `.onConflictDoUpdate({ target: [wakatimeDailySummaries.userId, wakatimeDailySummaries.date], set: {...} })` using the summary endpoint's totals. `syncWakatime` mirrors `syncPlaces`'s sync_runs open/complete/fail shape exactly (status `running` → `completed`/`failed`, `metadata` JSON with per-day totals).
+
+**Language data (added after Task 3's slice_by=entity decision):** duration rows never carry language, so per-language time is materialized from the Summaries API:
+
+1. Extend `WakatimeClient.getSummary` to also return `languages: Array<{ name: string; totalSeconds: number }>` (from the summary's `languages[]`); add a client test.
+2. New table `wakatime_daily_languages` in `src/db/schema/wakatime.ts`: `id`, `user_id` default 1, `date` (YYYY-MM-DD), `language` text not null, `total_seconds` real not null, `created_at`; unique index on (user_id, date, language), index on date. Generate the migration and rename it `0047_wakatime_daily_languages.sql` (update the journal tag — see the repo's rename convention established in commit 5e33714). Add its SCHEMA_DOC entry (module already imported in schema-doc.test.ts; the coverage test will force this).
+3. `syncWakatimeDay` delete+reinserts the day's `wakatime_daily_languages` rows from `summary.languages`.
+4. Tests: language rows written and idempotent; day with no languages leaves zero rows.
+
+(Task 12's `GET /languages` reads this table, not `wakatime_durations`.)
 
 **Step 1: Write failing tests** using the workers test env (`setupTestDb()` — copy the setup idiom from `src/services/foursquare/sync.test.ts`), with a stub client object (plain object implementing the two methods). Cases:
 
@@ -690,7 +699,7 @@ Follow `src/routes/places.ts` structurally (createOpenAPIApp, zod schemas with `
 
 1. **`GET /recent`** — cache `short`. Merged timeline of commits + PRs + issues (three selects, merged and sorted desc by their event time, paginated in JS after a per-source `limit` fetch — with `PaginationQuery.merge(DateFilterQuery)`). Response items: `{ type: 'commit' | 'pr' | 'issue', repo, title (message first line for commits), occurred_at, state (null for commits), url }`. Plus a `today` object: `{ coding_seconds, productivity_pulse }` from the two daily-summary tables for the current UTC date (0/null when absent).
 2. **`GET /stats`** — cache `medium`, `DateFilterQuery`. `{ coding_seconds, coding_days, commits, prs, issues, screen_time: { total_seconds, very_productive_seconds, productive_seconds, neutral_seconds, distracting_seconds, very_distracting_seconds } }` — sums over the daily-summary tables + counts over the github tables, all date-scoped (commits/PRs/issues scope on their event-time columns).
-3. **`GET /languages`** — cache `medium`, `DateFilterQuery` + `limit` (default 10, max 50). Groups `wakatime_durations` by language (non-null), `{ data: [{ language, total_seconds, percent }] }`, percent of the non-null-language total, rounded to 1 decimal.
+3. **`GET /languages`** — cache `medium`, `DateFilterQuery` + `limit` (default 10, max 50). Groups `wakatime_daily_languages` by language, `{ data: [{ language, total_seconds, percent }] }`, percent of the range total, rounded to 1 decimal. Note the `date` column is YYYY-MM-DD (not a full ISO timestamp): scope with plain string compares on the first 10 chars of `from`/`to` (`gte(date, from.slice(0,10))` etc.) rather than `buildDateCondition`.
 4. **`GET /projects`** — cache `medium`, `DateFilterQuery` + `limit`. Groups durations by project; for each project also count commits where `github_commits.repo` ends with `/{project}` (SQL `like '%/' || project`), `{ data: [{ project, total_seconds, commits }] }`.
 
 **TDD:** write the route tests first (seed tables directly with drizzle inserts in the test, in the style of `src/routes/places.test.ts` — check it exists first; if the domain-route test idiom differs, copy from `src/routes/reading.test.ts`): empty responses, populated shapes, pagination, date filtering, auth-required (401 without bearer), limit clamping. Then implement until green.
