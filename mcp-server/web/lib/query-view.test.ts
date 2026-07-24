@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { detectView, isHexColor, isCdnImageUrl } from './query-view.js';
+import {
+  detectView,
+  isHexColor,
+  isCdnImageUrl,
+  tmdbBackdropUrl,
+} from './query-view.js';
 import { fixtures } from '../query-result.fixtures.js';
 
 describe('detectView', () => {
@@ -586,5 +591,35 @@ describe('cell classifiers', () => {
   it('recognizes CDN image URLs', () => {
     expect(isCdnImageUrl('https://cdn.dinakartumu.com/x/y.jpg')).toBe(true);
     expect(isCdnImageUrl('https://example.com/x.jpg')).toBe(false);
+  });
+});
+
+describe('tmdbBackdropUrl', () => {
+  it('composes a TMDB URL from a stored backdrop path', () => {
+    expect(tmdbBackdropUrl('backdrop_path', '/abc123.jpg')).toBe(
+      'https://image.tmdb.org/t/p/w1280/abc123.jpg'
+    );
+  });
+
+  it('passes an already-composed TMDB URL through untouched', () => {
+    const url = 'https://image.tmdb.org/t/p/original/abc123.jpg';
+    expect(tmdbBackdropUrl('backdrop', url)).toBe(url);
+  });
+
+  it('requires the column to name itself a backdrop', () => {
+    // A poster path is the same shape — promoting it to a full-bleed
+    // background would be a surprise, so the column name gates it.
+    expect(tmdbBackdropUrl('poster_path', '/abc123.jpg')).toBeNull();
+  });
+
+  it('rejects values that are not image paths or TMDB URLs', () => {
+    expect(tmdbBackdropUrl('backdrop_path', '')).toBeNull();
+    expect(tmdbBackdropUrl('backdrop_path', 'abc123.jpg')).toBeNull();
+    expect(tmdbBackdropUrl('backdrop_path', '/abc123.txt')).toBeNull();
+    expect(
+      tmdbBackdropUrl('backdrop_path', 'https://evil.test/x.jpg')
+    ).toBeNull();
+    expect(tmdbBackdropUrl('backdrop_path', 42)).toBeNull();
+    expect(tmdbBackdropUrl('backdrop_path', null)).toBeNull();
   });
 });

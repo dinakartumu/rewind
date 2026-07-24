@@ -373,6 +373,48 @@ const entityDetail: QueryResultShape = {
 };
 
 /**
+ * The watch-history flavour of the same single-row shape: a movie with a
+ * portrait poster, a year, a watch timestamp, a personal rating, and a handful
+ * of secondary columns (some of them null). Exercises the hero promotions —
+ * bare year, "Watched …" line, star rating — the ambient TMDB backdrop, and
+ * the null-field skipping.
+ */
+const movieDetail: QueryResultShape = {
+  columns: [
+    'poster',
+    'title',
+    'year',
+    'runtime',
+    'tmdb_rating',
+    'watched_at',
+    'source',
+    'user_rating',
+    'rewatch',
+    'backdrop_path',
+    'dominant_color',
+    'review',
+    'review_url',
+  ],
+  rows: [
+    [
+      `${CDN}/watching/movies/1858/original.jpg?v=1`,
+      'Midnight Cowboy',
+      1969,
+      113,
+      7.5,
+      '2026-07-24T18:24:00Z',
+      'trakt',
+      8,
+      0,
+      '/pEdb6DfEBgaXF7S0EHzqnJvTGex.jpg',
+      '#79b3b1',
+      null,
+      null,
+    ],
+  ],
+};
+
+/**
  * A curated year-in-review "wrapped" composite. NOT auto-detected — the model
  * REQUESTS it via `view: 'wrapped'`. The documented input contract is a
  * UNION-ALL across domains producing labeled highlight rows grouped by
@@ -421,6 +463,7 @@ export const fixtures: Record<string, QueryResultShape> = {
   'route-gallery': routeGallery,
   'streak-strip': streakStrip,
   'entity-detail': entityDetail,
+  'movie-detail': movieDetail,
   'year-wrapped': yearWrapped,
   'forced-table': forcedTable,
 };

@@ -461,14 +461,59 @@ describe('DetailView render', () => {
     // Remaining columns render as a labeled field list (humanized labels).
     expect(c.textContent).toContain('Artist');
     expect(c.textContent).toContain('Olivia Rodrigo');
-    expect(c.textContent).toContain('Released Year');
     // Playcount formatted with a thousands separator.
     expect(c.textContent).toContain('4,120');
     // The hex accent renders as a swatch + value.
     expect(c.textContent).toContain('#c8763a');
-    // The cover image column is NOT repeated as a field label.
+    // The cover image column is NOT repeated as a field label — nor is the
+    // year, which is promoted into the hero as a bare (unseparated) 2023.
     const dtLabels = [...c.querySelectorAll('dt')].map((d) => d.textContent);
     expect(dtLabels).not.toContain('Cover');
+    expect(dtLabels).not.toContain('Released Year');
+    expect(c.textContent).toContain('2023');
+    expect(c.textContent).not.toContain('2,023');
+  });
+
+  it('promotes year, watch date, and rating into the hero for a movie row', async () => {
+    const fx = fixtures['movie-detail'];
+    expect(detectView(fx).auto).toBe('detail');
+    const container = await mount(fx);
+    const c = card(container);
+    expect(within(c).getByText('Midnight Cowboy')).toBeTruthy();
+    // Year is bare, not thousands-separated.
+    expect(c.textContent).toContain('1969');
+    expect(c.textContent).not.toContain('1,969');
+    // The watch timestamp becomes a verb-fronted, date-only line. Matched
+    // loosely on the day so the assertion holds in any runner timezone.
+    expect(c.textContent).toMatch(/Watched Jul 2[45], 2026/);
+    // The personal rating renders as stars out of ten, not a bare number.
+    expect(within(c).getByLabelText('8 out of 10')).toBeTruthy();
+    const dtLabels = [...c.querySelectorAll('dt')].map((d) => d.textContent);
+    expect(dtLabels).not.toContain('User Rating');
+    // The critics' score stays in the field list; runtime carries its unit.
+    expect(dtLabels).toContain('Tmdb Rating');
+    expect(c.textContent).toContain('113 min');
+    // A 0/1 flag reads as No, and null columns are dropped entirely.
+    expect(c.textContent).toContain('No');
+    expect(dtLabels).not.toContain('Review');
+    expect(dtLabels).not.toContain('Review Url');
+  });
+
+  it('hotlinks backdrop_path as the ambient layer instead of listing it', async () => {
+    const container = await mount(fixtures['movie-detail']);
+    const c = card(container);
+    const backdrop = [...c.querySelectorAll('img')].find((im) =>
+      im.getAttribute('src')?.startsWith('https://image.tmdb.org/')
+    );
+    expect(backdrop).toBeTruthy();
+    // Decoration, not content: hidden from AT and behind the card body.
+    expect(backdrop!.getAttribute('alt')).toBe('');
+    expect(backdrop!.getAttribute('aria-hidden')).toBe('true');
+    expect(backdrop!.style.zIndex).toBe('-1');
+    // The raw path is consumed by the layer, not repeated as a field.
+    const dtLabels = [...c.querySelectorAll('dt')].map((d) => d.textContent);
+    expect(dtLabels).not.toContain('Backdrop Path');
+    expect(c.textContent).not.toContain('.jpg');
   });
 });
 
