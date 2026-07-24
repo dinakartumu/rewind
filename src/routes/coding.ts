@@ -361,9 +361,29 @@ coding.openapi(recentRoute, async (c) => {
     })),
   ];
 
-  merged.sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+  // Newest first; equal timestamps keep insertion order (commit → pr → issue),
+  // which Array.prototype.sort preserves for a comparator returning 0.
+  merged.sort((a, b) => {
+    if (a.occurred_at === b.occurred_at) return 0;
+    return a.occurred_at < b.occurred_at ? 1 : -1;
+  });
 
-  const total = merged.length;
+  // True total across all three sources (independent of the per-source fetch
+  // depth used above). Three scoped count() queries, summed.
+  const [commitCountRow] = await db
+    .select({ c: count() })
+    .from(githubCommits)
+    .where(and(...commitConds));
+  const [prCountRow] = await db
+    .select({ c: count() })
+    .from(githubPullRequests)
+    .where(and(...prConds));
+  const [issueCountRow] = await db
+    .select({ c: count() })
+    .from(githubIssues)
+    .where(and(...issueConds));
+  const total =
+    (commitCountRow?.c ?? 0) + (prCountRow?.c ?? 0) + (issueCountRow?.c ?? 0);
   const pageItems = merged.slice((page - 1) * limit, page * limit);
 
   // today object from the daily-summary tables for the current UTC date.
@@ -516,7 +536,15 @@ coding.openapi(languagesRoute, async (c) => {
     .orderBy(desc(sql`sum(${wakatimeDailyLanguages.totalSeconds})`))
     .limit(limit);
 
-  const rangeTotal = rows.reduce((sum, r) => sum + r.totalSeconds, 0);
+  // Denominator is the un-limited sum over the same conditions, so percents are
+  // a share of the whole range (not just the shown rows) and can sum to < 100.
+  const [totalRow] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${wakatimeDailyLanguages.totalSeconds}), 0)`,
+    })
+    .from(wakatimeDailyLanguages)
+    .where(and(...conds));
+  const rangeTotal = totalRow?.total ?? 0;
 
   return c.json({
     data: rows.map((r) => ({
@@ -548,10 +576,17 @@ coding.openapi(projectsRoute, async (c) => {
   });
   if (dateCond) conds.push(dateCond);
 
+  // Commit count comes from a correlated subquery inside the grouped select, so
+  // the whole thing is a single D1 query (no per-project N+1 subrequests, which
+  // blow the free-plan subrequest cap). The repo match is `%/<project>` with the
+  // project's own LIKE wildcards (\ % _) escaped via ESCAPE '\'.
+  const escapedProject = sql`replace(replace(replace(${wakatimeDurations.project}, '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
+
   const projectRows = await db
     .select({
       project: wakatimeDurations.project,
       totalSeconds: sql<number>`sum(${wakatimeDurations.durationSeconds})`,
+      commits: sql<number>`(select count(*) from github_commits gc where gc.user_id = 1 and gc.repo like '%/' || ${escapedProject} escape '\\')`,
     })
     .from(wakatimeDurations)
     .where(and(...conds))
@@ -559,25 +594,11 @@ coding.openapi(projectsRoute, async (c) => {
     .orderBy(desc(sql`sum(${wakatimeDurations.durationSeconds})`))
     .limit(limit);
 
-  // For each project, count commits whose repo ends with /{project}.
-  const data = [];
-  for (const row of projectRows) {
-    const project = row.project!;
-    const [commitRow] = await db
-      .select({ c: count() })
-      .from(githubCommits)
-      .where(
-        and(
-          eq(githubCommits.userId, 1),
-          sql`${githubCommits.repo} like '%/' || ${project}`
-        )
-      );
-    data.push({
-      project,
-      total_seconds: row.totalSeconds,
-      commits: commitRow?.c ?? 0,
-    });
-  }
+  const data = projectRows.map((row) => ({
+    project: row.project!,
+    total_seconds: row.totalSeconds,
+    commits: row.commits ?? 0,
+  }));
 
   return c.json({ data });
 });

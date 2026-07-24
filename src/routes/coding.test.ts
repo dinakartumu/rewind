@@ -296,6 +296,57 @@ describe('coding routes', () => {
       expect(body.data).toHaveLength(1);
       expect(body.data[0].occurred_at).toBe('2026-06-01T00:00:00.000Z');
     });
+
+    it('reports the true total when more commits than fetch depth exist', async () => {
+      // Seed 25 commits, page 1 limit 5. The old fetch-depth cap (page*limit=5)
+      // would report total=5; the real total is 25 with 5 pages.
+      for (let i = 0; i < 25; i++) {
+        const day = String(1 + i).padStart(2, '0');
+        await seedCommit({
+          sha: `total-sha-${i}`,
+          committed_at: `2026-03-${day}T12:00:00.000Z`,
+        });
+      }
+      const res = await authFetch('/v1/coding/recent?page=1&limit=5');
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(5);
+      expect(body.pagination.total).toBe(25);
+      expect(body.pagination.total_pages).toBe(5);
+    });
+
+    it('reports a total spanning all three sources', async () => {
+      for (let i = 0; i < 8; i++) {
+        const day = String(1 + i).padStart(2, '0');
+        await seedCommit({
+          sha: `mix-c-${i}`,
+          committed_at: `2026-04-${day}T12:00:00.000Z`,
+        });
+        await seedPr({ created_at_github: `2026-04-${day}T13:00:00.000Z` });
+        await seedIssue({ created_at_github: `2026-04-${day}T14:00:00.000Z` });
+      }
+      // 24 items total, limit 5 -> 5 pages
+      const res = await authFetch('/v1/coding/recent?page=1&limit=5');
+      const body = (await res.json()) as any;
+      expect(body.pagination.total).toBe(24);
+      expect(body.pagination.total_pages).toBe(5);
+    });
+
+    it('breaks equal-timestamp ties in commit, pr, issue insertion order', async () => {
+      const ts = '2026-05-01T00:00:00.000Z';
+      await seedCommit({ sha: 'tie-commit', committed_at: ts });
+      await seedPr({ created_at_github: ts, title: 'Tie PR' });
+      await seedIssue({ created_at_github: ts, title: 'Tie issue' });
+
+      const res = await authFetch('/v1/coding/recent');
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(3);
+      // stable order: commit sources first, then pr, then issue
+      expect(body.data.map((d: any) => d.type)).toEqual([
+        'commit',
+        'pr',
+        'issue',
+      ]);
+    });
   });
 
   // ─── GET /v1/coding/stats ───────────────────────────────────────────
@@ -447,6 +498,45 @@ describe('coding routes', () => {
       const res2 = await authFetch('/v1/coding/languages?limit=999');
       expect(res2.status).toBe(200);
     });
+
+    it('computes percent over the full range total, not just shown rows', async () => {
+      // Seed four languages summing to 10000s, but only show 2. The denominator
+      // must be the un-limited range total (10000), so shown percents sum < 100.
+      await seedWakatimeLanguage({
+        date: '2026-03-10',
+        language: 'TypeScript',
+        total_seconds: 5000,
+      });
+      await seedWakatimeLanguage({
+        date: '2026-03-10',
+        language: 'Python',
+        total_seconds: 3000,
+      });
+      await seedWakatimeLanguage({
+        date: '2026-03-10',
+        language: 'Go',
+        total_seconds: 1500,
+      });
+      await seedWakatimeLanguage({
+        date: '2026-03-10',
+        language: 'Rust',
+        total_seconds: 500,
+      });
+
+      const res = await authFetch('/v1/coding/languages?limit=2');
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(2);
+      expect(body.data[0].language).toBe('TypeScript');
+      expect(body.data[0].percent).toBe(50.0); // 5000 / 10000
+      expect(body.data[1].language).toBe('Python');
+      expect(body.data[1].percent).toBe(30.0); // 3000 / 10000
+      const shownSum = body.data.reduce(
+        (s: number, r: any) => s + r.percent,
+        0
+      );
+      expect(shownSum).toBeCloseTo(80.0, 5);
+      expect(shownSum).toBeLessThan(100);
+    });
   });
 
   // ─── GET /v1/coding/projects ────────────────────────────────────────
@@ -519,6 +609,27 @@ describe('coding routes', () => {
 
       const res2 = await authFetch('/v1/coding/projects?limit=999');
       expect(res2.status).toBe(200);
+    });
+
+    it('escapes LIKE wildcards in the project name when matching repos', async () => {
+      // Project name literally contains an underscore. Without ESCAPE, the '_'
+      // is a single-char wildcard and would match 'octocat/myXapp' etc.
+      await seedWakatimeDuration({
+        project: 'my_app',
+        duration_seconds: 3600,
+        start_time: '2026-03-10T12:00:00.000Z',
+        entity: '/x.ts',
+      });
+      // Exact literal match — should count.
+      await seedCommit({ sha: 'w1', repo: 'octocat/my_app' });
+      // Would be matched by an unescaped '_' wildcard, must NOT count.
+      await seedCommit({ sha: 'w2', repo: 'octocat/myXapp' });
+
+      const res = await authFetch('/v1/coding/projects');
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].project).toBe('my_app');
+      expect(body.data[0].commits).toBe(1);
     });
   });
 });
