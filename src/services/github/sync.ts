@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { createDb, type Database } from '../../db/client.js';
 import {
   githubContributionDays,
@@ -62,11 +63,49 @@ export interface BackfillChunkResult {
  * Phase cursor for the GitHub backfill. The walk proceeds:
  *   contributions (year by year, backward) → prs (page by page) →
  *   issues (page by page) → done (null cursor).
+ *
+ * Validated with a zod discriminated union so a malformed-but-valid-JSON cursor
+ * (missing `page`, unknown `phase`, non-numeric `year`) is rejected up front
+ * rather than looping forever on a NaN/undefined page.
  */
-type GithubBackfillCursor =
-  | { phase: 'contributions'; year: number }
-  | { phase: 'prs'; page: number }
-  | { phase: 'issues'; page: number };
+const GithubBackfillCursorSchema = z.discriminatedUnion('phase', [
+  z.object({ phase: z.literal('contributions'), year: z.number().int() }),
+  z.object({ phase: z.literal('prs'), page: z.number().int() }),
+  z.object({ phase: z.literal('issues'), page: z.number().int() }),
+]);
+
+type GithubBackfillCursor = z.infer<typeof GithubBackfillCursorSchema>;
+
+/**
+ * Thrown when the backfill cursor is malformed (not JSON) or fails schema
+ * validation (missing page, unknown phase, etc.). The admin-sync route maps
+ * this to a 400 (client error — a bad resume token), not a 500.
+ */
+export class GithubBackfillCursorError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GithubBackfillCursorError';
+  }
+}
+
+/** Parse + validate a cursor string into a GithubBackfillCursor, or throw. */
+function parseCursor(cursor: string): GithubBackfillCursor {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(cursor);
+  } catch {
+    throw new GithubBackfillCursorError(
+      `Malformed backfill cursor (not valid JSON): ${cursor}`
+    );
+  }
+  const result = GithubBackfillCursorSchema.safeParse(raw);
+  if (!result.success) {
+    throw new GithubBackfillCursorError(
+      `Invalid backfill cursor: ${result.error.message}`
+    );
+  }
+  return result.data;
+}
 
 /** GitHub Search API hard cap: at most 1000 results (10 pages of 100). */
 const GITHUB_SEARCH_CAP = 1000;
@@ -95,6 +134,13 @@ export async function backfillGithub(
   env: Env,
   cursor?: string
 ): Promise<BackfillChunkResult> {
+  // Validate the cursor FIRST: a bad resume token is a client error (400) and
+  // must surface as GithubBackfillCursorError regardless of credential state,
+  // so it isn't masked by a missing-token 500.
+  const parsed: GithubBackfillCursor = cursor
+    ? parseCursor(cursor)
+    : { phase: 'contributions', year: new Date().getUTCFullYear() };
+
   const token = env.GITHUB_TOKEN;
   if (!token) {
     throw new Error('GITHUB_TOKEN is not configured');
@@ -108,10 +154,6 @@ export async function backfillGithub(
   const db = createDb(env.DB);
   const userId = 1;
 
-  const parsed: GithubBackfillCursor = cursor
-    ? (JSON.parse(cursor) as GithubBackfillCursor)
-    : { phase: 'contributions', year: new Date().getUTCFullYear() };
-
   if (parsed.phase === 'contributions') {
     const { year } = parsed;
     const days = await client.getContributionDays(
@@ -119,6 +161,9 @@ export async function backfillGithub(
       `${year}-12-31`
     );
 
+    // itemsSynced counts only days that carry activity (count > 0). Every day
+    // is still upserted (so a later change to an empty→nonempty day is caught),
+    // but the reported count reflects real contribution days, not calendar days.
     let synced = 0;
     for (const day of days) {
       await db
@@ -128,14 +173,18 @@ export async function backfillGithub(
           target: [githubContributionDays.userId, githubContributionDays.date],
           set: { contributionCount: day.count },
         });
-      synced += 1;
+      if (day.count > 0) synced += 1;
     }
 
-    const hasActivity = days.some((d) => d.count > 0);
-    if (!hasActivity) {
-      // No activity this far back — the contributions history is exhausted.
+    // Walk down to the account-creation year UNCONDITIONALLY. A gap year (all
+    // zero contributions) no longer ends the phase — that would drop older
+    // history across the gap. The phase ends only once we walk below the
+    // account's creation year, where there is genuinely nothing older.
+    const createdAt = await client.getUserCreatedAt();
+    const creationYear = new Date(createdAt).getUTCFullYear();
+    if (year <= creationYear) {
       console.log(
-        `[SYNC] GitHub backfill: year ${year} had no contributions; moving to PRs`
+        `[SYNC] GitHub backfill: reached account-creation year ${creationYear}; moving to PRs`
       );
       return {
         itemsSynced: synced,

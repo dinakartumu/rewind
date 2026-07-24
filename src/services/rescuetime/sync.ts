@@ -215,13 +215,16 @@ function previousDay(date: string): string {
  * recent weeks, so older days simply get a null pulse).
  *
  * The next cursor is the day immediately before the last day fetched — the
- * caller loops until nextCursor is null. Termination (nextCursor null):
- *   - the whole month came back empty (no data that far back), or
- *   - the RescueTime API threw partway through AFTER ≥1 day had already synced
- *     in this chunk, or a cursor was supplied (prior chunks succeeded) — an
- *     out-of-range signal, treated as the end of accessible history.
- * If the VERY FIRST chunk (no cursor) errors before any day synced, the error
- * is rethrown so a genuine outage is not mistaken for "end of history".
+ * caller loops until nextCursor is null. The ONLY natural terminator is an
+ * empty month (no data that far back — the walk has reached the start of, or a
+ * point before, all accessible history).
+ *
+ * All API errors are rethrown, at any point in the walk. Day syncs are
+ * idempotent (delete + reinsert upserts), so a transient failure surfaces as a
+ * route 500 and the operator simply retries the SAME cursor — re-syncing the
+ * already-synced days is harmless. Swallowing a mid-walk error as "end of
+ * history" would silently truncate the backfill on a transient blip, so we do
+ * not do that.
  *
  * @param cursor YYYY-MM-DD next day to fetch; defaults to yesterday (UTC).
  */
@@ -242,7 +245,6 @@ export async function backfillRescuetime(
     summaries.map((s) => [s.date, s.productivityPulse])
   );
 
-  const isFirstChunk = cursor === undefined;
   let day =
     cursor ??
     (() => {
@@ -254,21 +256,11 @@ export async function backfillRescuetime(
   let itemsSynced = 0;
 
   for (let i = 0; i < RESCUETIME_BACKFILL_CHUNK_DAYS; i++) {
-    try {
-      const result = await syncRescuetimeDay(db, client, day, pulseByDate);
-      itemsSynced += result.synced;
-    } catch (err) {
-      // A first-chunk error before any data synced is a real failure: rethrow.
-      if (isFirstChunk && itemsSynced === 0) {
-        throw err;
-      }
-      // Otherwise treat it as an out-of-range signal: terminal.
-      const msg = err instanceof Error ? err.message : String(err);
-      console.log(
-        `[SYNC] RescueTime backfill: API error at ${day} after ${itemsSynced} items; stopping (${msg})`
-      );
-      return { itemsSynced, nextCursor: null };
-    }
+    // Rethrow every error: day syncs are idempotent upserts, so a transient
+    // failure should surface (route 500) and be retried on the same cursor,
+    // never swallowed as "end of history".
+    const result = await syncRescuetimeDay(db, client, day, pulseByDate);
+    itemsSynced += result.synced;
     day = previousDay(day);
   }
 

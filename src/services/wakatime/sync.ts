@@ -151,10 +151,17 @@ function previousDay(date: string): string {
  * The next cursor is the day immediately before the last day fetched — the
  * caller loops, passing it back, until nextCursor is null. The walk terminates
  * (nextCursor null) when:
+ *   - the cursor walks below the account's data floor
+ *     (`getAllTimeSinceToday().startDate`) — there is nothing older to fetch;
+ *     this is the primary terminator and is gap-proof (a multi-week vacation
+ *     no longer looks like the end of history), or
  *   - a WakatimeHistoryLimitError (402) is hit — the free-plan history window
- *     has been walked past; there is nothing older to fetch, or
- *   - the whole chunk of WAKATIME_BACKFILL_CHUNK_DAYS days was empty — no data
- *     that far back, treat it as the end of history.
+ *     has been walked past.
+ *
+ * Empty-chunk termination is used ONLY as a fallback when no floor is available
+ * (a brand-new/empty account whose all_time_since_today carries no start_date).
+ * With a floor present, an empty chunk above the floor keeps walking, so
+ * vacation gaps do not silently truncate the backfill.
  *
  * @param cursor YYYY-MM-DD next day to fetch; defaults to yesterday (UTC).
  */
@@ -169,6 +176,10 @@ export async function backfillWakatime(
   const client = new WakatimeClient(apiKey);
   const db = createDb(env.DB);
 
+  // Account data floor, fetched once per invocation. null = no floor known;
+  // fall back to empty-chunk termination in that case only.
+  const { startDate } = await client.getAllTimeSinceToday();
+
   let day =
     cursor ??
     (() => {
@@ -181,6 +192,16 @@ export async function backfillWakatime(
   let daysFetched = 0;
 
   for (let i = 0; i < WAKATIME_BACKFILL_CHUNK_DAYS; i++) {
+    // With a known floor, terminate once the cursor drops below it rather than
+    // fetching pre-history days (which would return empty and, without the
+    // floor, be mistaken for the end of history after a gap).
+    if (startDate !== null && day < startDate) {
+      console.log(
+        `[SYNC] WakaTime backfill: cursor ${day} passed data floor ${startDate}; stopping`
+      );
+      return { itemsSynced, nextCursor: null };
+    }
+
     try {
       const result = await syncWakatimeDay(db, client, day);
       itemsSynced += result.synced;
@@ -198,10 +219,12 @@ export async function backfillWakatime(
     day = previousDay(day);
   }
 
-  // A fully-empty chunk means we have walked past all available data.
-  if (itemsSynced === 0) {
+  // No floor available: fall back to treating a fully-empty chunk as the end of
+  // history. (With a floor, we never rely on this — the floor check above ends
+  // the walk instead, so vacation gaps keep walking.)
+  if (startDate === null && itemsSynced === 0) {
     console.log(
-      `[SYNC] WakaTime backfill: ${daysFetched} consecutive empty days; stopping`
+      `[SYNC] WakaTime backfill: no data floor and ${daysFetched} consecutive empty days; stopping`
     );
     return { itemsSynced, nextCursor: null };
   }

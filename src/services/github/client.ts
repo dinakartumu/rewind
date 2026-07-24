@@ -143,6 +143,12 @@ const CONTRIBUTIONS_QUERY = `query ($login: String!, $from: DateTime!, $to: Date
   }
 }`;
 
+const CREATED_AT_QUERY = `query ($login: String!) {
+  user(login: $login) {
+    createdAt
+  }
+}`;
+
 export class GithubClient {
   private token: string;
   private username: string;
@@ -193,6 +199,47 @@ export class GithubClient {
   }
 
   /**
+   * Shared GraphQL POST: sends the query + variables, handles rate limiting and
+   * transport errors, and surfaces query-level errors (GraphQL returns 200 even
+   * for those — the `errors` array is the only signal) and a null user (login
+   * didn't resolve → bad GITHUB_USERNAME) as thrown errors.
+   */
+  private async graphql<
+    T extends { errors?: { message?: string }[]; data?: { user?: unknown } },
+  >(query: string, variables: Record<string, unknown>): Promise<T> {
+    const response = await fetch(GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        ...this.headers(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    this.throwIfRateLimited(response);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `[ERROR] GitHub GraphQL error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const json = (await response.json()) as T;
+
+    if (json.errors?.length) {
+      throw new Error(
+        `[ERROR] GitHub GraphQL error: ${json.errors[0].message}`
+      );
+    }
+    if (json.data?.user === null) {
+      throw new Error('[ERROR] GitHub GraphQL: user not found');
+    }
+
+    return json;
+  }
+
+  /**
    * Daily contribution counts for a window (max 1 year per GraphQL query).
    * Uses contributionsCollection → contributionCalendar, which INCLUDES
    * private contributions when the token has read:user scope. Flattens
@@ -206,43 +253,14 @@ export class GithubClient {
     from: string,
     to: string
   ): Promise<Array<{ date: string; count: number }>> {
-    const response = await fetch(GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        ...this.headers(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: CONTRIBUTIONS_QUERY,
-        variables: {
-          login: this.username,
-          from: toIsoDateTime(from),
-          to: toIsoDateTime(to),
-        },
-      }),
-    });
-
-    this.throwIfRateLimited(response);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `[ERROR] GitHub GraphQL error: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
-
-    const json = (await response.json()) as ContributionsGraphQLResponse;
-
-    // GraphQL returns 200 even for query errors — the errors array is the only
-    // signal. A null user means the login didn't resolve (bad GITHUB_USERNAME).
-    if (json.errors?.length) {
-      throw new Error(
-        `[ERROR] GitHub GraphQL error: ${json.errors[0].message}`
-      );
-    }
-    if (json.data?.user === null) {
-      throw new Error('[ERROR] GitHub GraphQL: user not found');
-    }
+    const json = await this.graphql<ContributionsGraphQLResponse>(
+      CONTRIBUTIONS_QUERY,
+      {
+        login: this.username,
+        from: toIsoDateTime(from),
+        to: toIsoDateTime(to),
+      }
+    );
 
     const weeks =
       json.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
@@ -254,6 +272,25 @@ export class GithubClient {
       }
     }
     return days;
+  }
+
+  /**
+   * The account's creation timestamp (ISO 8601) via GraphQL `user.createdAt`.
+   * Used as the contributions-backfill floor: the walk continues down to the
+   * creation year unconditionally, so an intermediate gap year (all-zero
+   * contributions) no longer ends the phase and drop older history.
+   */
+  async getUserCreatedAt(): Promise<string> {
+    const json = await this.graphql<{
+      errors?: { message?: string }[];
+      data?: { user?: { createdAt?: string } | null };
+    }>(CREATED_AT_QUERY, { login: this.username });
+
+    const createdAt = json.data?.user?.createdAt;
+    if (!createdAt) {
+      throw new Error('[ERROR] GitHub GraphQL: createdAt missing');
+    }
+    return createdAt;
   }
 
   /**

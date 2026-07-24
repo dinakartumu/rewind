@@ -26,7 +26,10 @@ import { syncPlaces } from '../services/foursquare/sync.js';
 import { syncCoding } from '../services/coding/sync.js';
 import { backfillWakatime } from '../services/wakatime/sync.js';
 import { backfillRescuetime } from '../services/rescuetime/sync.js';
-import { backfillGithub } from '../services/github/sync.js';
+import {
+  backfillGithub,
+  GithubBackfillCursorError,
+} from '../services/github/sync.js';
 import {
   processReadingImages,
   processWatchingImages,
@@ -939,6 +942,10 @@ adminSync.openapi(syncCodingBackfillRoute, async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    // A bad resume token is a client error (400), not a server fault (500).
+    if (error instanceof GithubBackfillCursorError) {
+      return badRequest(c, error.message) as any;
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.log(`[ERROR] POST /admin/sync/coding/backfill: ${message}`);
     return c.json({ error: message, status: 500 }, 500) as any;

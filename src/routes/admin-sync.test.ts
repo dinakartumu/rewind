@@ -190,6 +190,57 @@ describe('admin-sync endpoints', () => {
       const body = (await res.json()) as { error: string };
       expect(body.error).toContain('GITHUB_TOKEN');
     });
+
+    it('rejects a malformed github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'github', cursor: '{not json' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a missing-page github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: 'github',
+            cursor: JSON.stringify({ phase: 'prs' }),
+          }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an unknown-phase github cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source: 'github',
+            cursor: JSON.stringify({ phase: 'reviews', page: 1 }),
+          }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('POST /v1/admin/running/recompute', () => {

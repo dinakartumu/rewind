@@ -173,4 +173,31 @@ describe('WakatimeClient', () => {
 
     await expect(client.getDurations('2026-07-23')).rejects.toThrow('500');
   });
+
+  it('getAllTimeSinceToday returns the range start date', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: { range: { start_date: '2019-03-14' } },
+        })
+      )
+    );
+
+    const result = await client.getAllTimeSinceToday();
+
+    expect(result).toEqual({ startDate: '2019-03-14' });
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain(
+      'https://wakatime.com/api/v1/users/current/all_time_since_today'
+    );
+  });
+
+  it('getAllTimeSinceToday tolerates an absent start_date (returns null)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: { range: {} } }))
+    );
+
+    const result = await client.getAllTimeSinceToday();
+    expect(result).toEqual({ startDate: null });
+  });
 });

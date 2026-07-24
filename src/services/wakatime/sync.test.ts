@@ -359,10 +359,14 @@ describe('backfillWakatime', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('stops (nextCursor null) after 14 consecutive empty days', async () => {
-    // Every day empty → the whole 14-day chunk is empty → terminal.
+  it('stops (nextCursor null) on an empty chunk when there is NO floor (all_time start_date absent)', async () => {
+    // No floor available (all_time_since_today returns no start_date) → the
+    // empty-chunk fallback terminates the walk.
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
+      if (url.includes('/all_time_since_today')) {
+        return new Response(JSON.stringify({ data: { range: {} } }));
+      }
       if (url.includes('/durations')) {
         return new Response(JSON.stringify({ data: [] }));
       }
@@ -374,7 +378,57 @@ describe('backfillWakatime', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('throws WakatimeHistoryLimitError type is surfaced as terminal not a throw', async () => {
+  it('continues past an empty chunk when the floor is still below the cursor (vacation gap does not truncate)', async () => {
+    // Floor is 2019 (far below the cursor). An entirely-empty 14-day chunk
+    // must NOT terminate: the next cursor advances 14 days earlier.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/all_time_since_today')) {
+        return new Response(
+          JSON.stringify({ data: { range: { start_date: '2019-01-01' } } })
+        );
+      }
+      if (url.includes('/durations')) {
+        return new Response(JSON.stringify({ data: [] }));
+      }
+      return new Response(JSON.stringify({ data: [] }));
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+    // Chunk = 14 days: 2026-06-14 .. 2026-06-01; next cursor = 2026-05-31.
+    expect(result.nextCursor).toBe('2026-05-31');
+  });
+
+  it('terminates (nextCursor null) once the cursor walks below the floor', async () => {
+    // Floor is 2026-06-10; the cursor 2026-06-14 walks below it within the
+    // chunk, so the walk terminates rather than fetching pre-history days.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/all_time_since_today')) {
+        return new Response(
+          JSON.stringify({ data: { range: { start_date: '2026-06-10' } } })
+        );
+      }
+      if (url.includes('/durations')) {
+        const date = new URL(url).searchParams.get('date')!;
+        const epoch = new Date(`${date}T12:00:00.000Z`).getTime() / 1000;
+        return new Response(
+          JSON.stringify({
+            data: [{ time: epoch, duration: 60, project: 'p', entity: '/x' }],
+          })
+        );
+      }
+      return new Response(
+        JSON.stringify({ data: [{ grand_total: { total_seconds: 60 } }] })
+      );
+    });
+
+    const result = await backfillWakatime(wakatimeEnv('waka'), '2026-06-14');
+    expect(result.itemsSynced).toBeGreaterThan(0);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('surfaces a WakatimeHistoryLimitError as terminal (nextCursor null), not a throw', async () => {
     let durationCalls = 0;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);

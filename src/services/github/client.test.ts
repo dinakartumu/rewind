@@ -188,6 +188,52 @@ describe('GithubClient', () => {
     ).rejects.toThrow('GitHub GraphQL: user not found');
   });
 
+  it('getUserCreatedAt returns the account createdAt via GraphQL', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: { user: { createdAt: '2015-06-01T00:00:00Z' } },
+        })
+      )
+    );
+
+    const createdAt = await client.getUserCreatedAt();
+
+    expect(createdAt).toBe('2015-06-01T00:00:00Z');
+    const [url, options] = fetchSpy.mock.calls[0];
+    expect(url).toBe('https://api.github.com/graphql');
+    const init = options as RequestInit;
+    expect(init.method).toBe('POST');
+    const body = JSON.parse(init.body as string) as {
+      query: string;
+      variables: Record<string, unknown>;
+    };
+    expect(body.query).toContain('createdAt');
+    expect(body.variables.login).toBe('patuser');
+  });
+
+  it('getUserCreatedAt throws on a GraphQL errors array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ errors: [{ message: 'boom' }] }), {
+        status: 200,
+      })
+    );
+
+    await expect(client.getUserCreatedAt()).rejects.toThrow(
+      'GitHub GraphQL error: boom'
+    );
+  });
+
+  it('getUserCreatedAt throws when data.user is null (bad username)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: { user: null } }), { status: 200 })
+    );
+
+    await expect(client.getUserCreatedAt()).rejects.toThrow(
+      'GitHub GraphQL: user not found'
+    );
+  });
+
   it('should request events with the right URL + REST headers', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

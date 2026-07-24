@@ -10,7 +10,12 @@ import {
 } from '../../db/schema/github.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
-import { syncGithubIncremental, syncGithub, backfillGithub } from './sync.js';
+import {
+  syncGithubIncremental,
+  syncGithub,
+  backfillGithub,
+  GithubBackfillCursorError,
+} from './sync.js';
 import { GithubRateLimitError } from './client.js';
 import type {
   GithubClient,
@@ -711,9 +716,17 @@ describe('backfillGithub', () => {
   }
 
   it('contributions phase: a non-empty year advances to the previous year', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('graphql')) {
+        const body = String(init?.body ?? '');
+        if (body.includes('createdAt')) {
+          return new Response(
+            JSON.stringify({
+              data: { user: { createdAt: '2015-06-01T00:00:00Z' } },
+            })
+          );
+        }
         return calendarResponse([{ date: '2026-03-01', count: 5 }]);
       }
       return new Response(JSON.stringify({ total_count: 0, items: [] }));
@@ -732,10 +745,19 @@ describe('backfillGithub', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it('contributions phase: an all-zero year advances to the prs phase', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+  it('contributions phase: a year below the account-creation year advances to the prs phase', async () => {
+    // Account created 2016; walking into 2015 is below creation → prs phase.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('graphql')) {
+        const body = String(init?.body ?? '');
+        if (body.includes('createdAt')) {
+          return new Response(
+            JSON.stringify({
+              data: { user: { createdAt: '2016-06-01T00:00:00Z' } },
+            })
+          );
+        }
         return calendarResponse([{ date: '2015-01-01', count: 0 }]);
       }
       return new Response(JSON.stringify({ total_count: 0, items: [] }));
@@ -750,11 +772,19 @@ describe('backfillGithub', () => {
   });
 
   it('defaults the start cursor to the contributions phase for the current UTC year', async () => {
-    let graphqlBody: string | null = null;
+    let calendarBody: string | null = null;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('graphql')) {
-        graphqlBody = String(init?.body ?? '');
+        const body = String(init?.body ?? '');
+        if (body.includes('createdAt')) {
+          return new Response(
+            JSON.stringify({
+              data: { user: { createdAt: '2015-06-01T00:00:00Z' } },
+            })
+          );
+        }
+        calendarBody = body;
         return calendarResponse([{ date: '2026-01-01', count: 1 }]);
       }
       return new Response(JSON.stringify({ total_count: 0, items: [] }));
@@ -763,7 +793,7 @@ describe('backfillGithub', () => {
     await backfillGithub(githubEnv());
 
     const year = new Date().getUTCFullYear();
-    expect(graphqlBody).toContain(`${year}-01-01`);
+    expect(calendarBody).toContain(`${year}-01-01`);
   });
 
   it('prs phase: a partial page (fewer than the cap) advances to the issues phase', async () => {
@@ -851,5 +881,111 @@ describe('backfillGithub', () => {
     expect(result.nextCursor).toBeNull();
     const issues = await createDb(env.DB).select().from(githubIssues);
     expect(issues.length).toBeGreaterThan(0);
+  });
+
+  describe('cursor validation', () => {
+    it('throws GithubBackfillCursorError on malformed JSON', async () => {
+      await expect(
+        backfillGithub(githubEnv(), '{not valid json')
+      ).rejects.toBeInstanceOf(GithubBackfillCursorError);
+    });
+
+    it('throws GithubBackfillCursorError on a missing-page cursor', async () => {
+      await expect(
+        backfillGithub(githubEnv(), JSON.stringify({ phase: 'prs' }))
+      ).rejects.toBeInstanceOf(GithubBackfillCursorError);
+    });
+
+    it('throws GithubBackfillCursorError on an unknown phase', async () => {
+      await expect(
+        backfillGithub(
+          githubEnv(),
+          JSON.stringify({ phase: 'reviews', page: 1 })
+        )
+      ).rejects.toBeInstanceOf(GithubBackfillCursorError);
+    });
+  });
+
+  describe('contributions gap-year handling', () => {
+    /** A GraphQL user(createdAt) Response. */
+    function createdAtResponse(createdAt: string) {
+      return new Response(JSON.stringify({ data: { user: { createdAt } } }));
+    }
+
+    it('a gap (all-zero) year above the account-creation year does NOT terminate the phase', async () => {
+      // Account created 2015; a 2020 gap year must NOT end contributions.
+      let graphqlCall = 0;
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('graphql')) {
+          const body = String(init?.body ?? '');
+          if (body.includes('createdAt')) {
+            return createdAtResponse('2015-06-01T00:00:00Z');
+          }
+          graphqlCall += 1;
+          return calendarResponse([{ date: '2020-01-01', count: 0 }]);
+        }
+        return new Response(JSON.stringify({ total_count: 0, items: [] }));
+      });
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({ phase: 'contributions', year: 2020 })
+      );
+
+      expect(result.nextCursor).toBe(
+        JSON.stringify({ phase: 'contributions', year: 2019 })
+      );
+      void graphqlCall;
+    });
+
+    it('a year below the account-creation year advances to the prs phase', async () => {
+      // Account created 2015; walking into 2014 ends contributions.
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('graphql')) {
+          const body = String(init?.body ?? '');
+          if (body.includes('createdAt')) {
+            return createdAtResponse('2015-06-01T00:00:00Z');
+          }
+          return calendarResponse([{ date: '2014-01-01', count: 0 }]);
+        }
+        return new Response(JSON.stringify({ total_count: 0, items: [] }));
+      });
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({ phase: 'contributions', year: 2014 })
+      );
+
+      expect(result.nextCursor).toBe(JSON.stringify({ phase: 'prs', page: 1 }));
+    });
+
+    it('counts only days with count > 0 toward itemsSynced', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.includes('graphql')) {
+          const body = String(init?.body ?? '');
+          if (body.includes('createdAt')) {
+            return createdAtResponse('2015-06-01T00:00:00Z');
+          }
+          return calendarResponse([
+            { date: '2020-01-01', count: 0 },
+            { date: '2020-01-02', count: 4 },
+            { date: '2020-01-03', count: 0 },
+            { date: '2020-01-04', count: 2 },
+          ]);
+        }
+        return new Response(JSON.stringify({ total_count: 0, items: [] }));
+      });
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({ phase: 'contributions', year: 2020 })
+      );
+
+      // 4 days upserted, but only 2 carry activity → itemsSynced counts those.
+      expect(result.itemsSynced).toBe(2);
+    });
   });
 });

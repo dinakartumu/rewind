@@ -178,6 +178,23 @@ export class WakatimeClient {
       })),
     };
   }
+
+  /**
+   * The earliest date WakaTime holds data for this account, from the All Time
+   * Since Today endpoint's `data.range.start_date` (YYYY-MM-DD). Used as the
+   * backfill floor: the walk terminates when the cursor passes below it, so a
+   * multi-week vacation gap no longer looks like the end of history.
+   *
+   * Returns { startDate: null } when the field is absent (new/empty accounts),
+   * signalling "no floor" — the backfill then falls back to stopping after an
+   * empty chunk.
+   */
+  async getAllTimeSinceToday(): Promise<{ startDate: string | null }> {
+    const data = await this.request<{
+      data?: { range?: { start_date?: string } };
+    }>('/users/current/all_time_since_today');
+    return { startDate: data.data?.range?.start_date ?? null };
+  }
 }
 
 /** Returns the name with the highest total_seconds, or null when empty. */

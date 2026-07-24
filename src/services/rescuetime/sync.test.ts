@@ -464,7 +464,7 @@ describe('backfillRescuetime', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('treats a mid-chunk API error as terminal once some data has synced', async () => {
+  it('rethrows a mid-chunk API error even after some data has synced (day syncs are idempotent; the operator retries the same cursor)', async () => {
     let dataCalls = 0;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -472,20 +472,17 @@ describe('backfillRescuetime', () => {
         return new Response(JSON.stringify([]));
       }
       dataCalls += 1;
-      // First 5 days succeed, then out-of-range error.
+      // First 5 days succeed, then a transient 500 mid-walk.
       if (dataCalls <= 5) {
         const date = new URL(url).searchParams.get('restrict_begin')!;
         return dataResponse(date);
       }
-      return new Response('out of range', { status: 400 });
+      return new Response('server error', { status: 500 });
     });
 
-    const result = await backfillRescuetime(
-      rescuetimeEnv('rescue'),
-      '2026-06-30'
-    );
-    expect(result.itemsSynced).toBeGreaterThan(0);
-    expect(result.nextCursor).toBeNull();
+    await expect(
+      backfillRescuetime(rescuetimeEnv('rescue'), '2026-06-30')
+    ).rejects.toThrow();
   });
 
   it('rethrows when the very first chunk errors with no data synced', async () => {
