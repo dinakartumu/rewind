@@ -1,0 +1,149 @@
+const BASE_URL = 'https://wakatime.com/api/v1';
+
+/**
+ * Thrown on a 402 Payment Required from the WakaTime API, which signals a
+ * request past the free-plan history window (~2 weeks). Backfill treats this
+ * as the stop signal: there is no more accessible history to walk back into.
+ */
+export class WakatimeHistoryLimitError extends Error {
+  constructor(
+    message = 'WakaTime history limit reached (402 Payment Required)'
+  ) {
+    super(message);
+    this.name = 'WakatimeHistoryLimitError';
+  }
+}
+
+/**
+ * One duration slice mapped from the WakaTime Durations API.
+ *
+ * The Durations API slices by a single primary key (`slice_by`). We request
+ * `slice_by=entity` so each row is a contiguous stretch of activity in one
+ * file — carrying both `entity` (file path) and `project`, which matches the
+ * (start_time, project, entity) dedup key of the wakatime_durations table.
+ * WakaTime does NOT include a per-item `language` in the entity slice, so
+ * `language` is always null here; per-day language is captured separately via
+ * `getSummary`'s top_language. (Verified against
+ * https://wakatime.com/developers#durations — slice_by defaults to 'project'
+ * and controls the primary segmentation; only the sliced dimension plus
+ * project/time/duration are reliably present per item.)
+ */
+export interface WakatimeDurationRow {
+  /** ISO 8601 string derived from the item's `time` epoch float. */
+  startTime: string;
+  durationSeconds: number;
+  project: string | null;
+  /** Null on entity-sliced durations; see the interface note above. */
+  language: string | null;
+  /** File path (or domain) for the slice. */
+  entity: string | null;
+}
+
+/** Per-day rollup mapped from the WakaTime Summaries API. */
+export interface WakatimeSummary {
+  /** YYYY-MM-DD */
+  date: string;
+  totalSeconds: number;
+  /** Highest-total language for the day; null when the day has no data. */
+  topLanguage: string | null;
+  /** Highest-total project for the day; null when the day has no data. */
+  topProject: string | null;
+}
+
+interface DurationsApiItem {
+  time: number;
+  duration: number;
+  project?: string;
+  language?: string;
+  entity?: string;
+}
+
+interface SummaryApiNamedTotal {
+  name: string;
+  total_seconds: number;
+}
+
+interface SummaryApiDay {
+  grand_total?: { total_seconds?: number };
+  languages?: SummaryApiNamedTotal[];
+  projects?: SummaryApiNamedTotal[];
+  range?: { date?: string };
+}
+
+export class WakatimeClient {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  private async request<T>(path: string): Promise<T> {
+    const url = `${BASE_URL}${path}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        // WakaTime uses HTTP Basic auth with the API key as the username
+        // (base64 of the raw key). No 429 retry loop: on 429 we throw and let
+        // the hourly cron retry naturally.
+        Authorization: `Basic ${btoa(this.apiKey)}`,
+      },
+    });
+
+    if (response.status === 402) {
+      throw new WakatimeHistoryLimitError();
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `[ERROR] WakaTime API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return (await response.json()) as T;
+  }
+
+  /**
+   * Durations for a single day, sliced by entity (see WakatimeDurationRow).
+   * @param date YYYY-MM-DD
+   */
+  async getDurations(date: string): Promise<WakatimeDurationRow[]> {
+    const params = new URLSearchParams({ date, slice_by: 'entity' });
+    const data = await this.request<{ data: DurationsApiItem[] }>(
+      `/users/current/durations?${params.toString()}`
+    );
+    return (data.data ?? []).map((item) => ({
+      startTime: new Date(item.time * 1000).toISOString(),
+      durationSeconds: item.duration,
+      project: item.project ?? null,
+      language: item.language ?? null,
+      entity: item.entity ?? null,
+    }));
+  }
+
+  /**
+   * Summary rollup for a single day (start == end).
+   * @param date YYYY-MM-DD
+   */
+  async getSummary(date: string): Promise<WakatimeSummary> {
+    const params = new URLSearchParams({ start: date, end: date });
+    const data = await this.request<{ data: SummaryApiDay[] }>(
+      `/users/current/summaries?${params.toString()}`
+    );
+    const day = data.data?.[0];
+    return {
+      date: day?.range?.date ?? date,
+      totalSeconds: day?.grand_total?.total_seconds ?? 0,
+      topLanguage: topBySeconds(day?.languages),
+      topProject: topBySeconds(day?.projects),
+    };
+  }
+}
+
+/** Returns the name with the highest total_seconds, or null when empty. */
+function topBySeconds(items?: SummaryApiNamedTotal[]): string | null {
+  if (!items || items.length === 0) return null;
+  return items.reduce((top, cur) =>
+    cur.total_seconds > top.total_seconds ? cur : top
+  ).name;
+}
