@@ -241,6 +241,38 @@ describe('admin-sync endpoints', () => {
       );
       expect(res.status).toBe(400);
     });
+
+    it('rejects a malformed wakatime cursor with 400', async () => {
+      // A non-YYYY-MM-DD cursor is a client error (400) and must surface even
+      // when WAKATIME_API_KEY is unset — the cursor is validated first.
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'wakatime', cursor: 'not-a-date' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a malformed rescuetime cursor with 400', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/coding/backfill',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ source: 'rescuetime', cursor: '2026/01/01' }),
+        }
+      );
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('POST /v1/admin/running/recompute', () => {

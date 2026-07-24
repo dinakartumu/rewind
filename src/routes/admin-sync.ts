@@ -24,8 +24,14 @@ import { syncTraktHistory } from '../services/trakt/history-sync.js';
 import { syncReading } from '../services/instapaper/sync.js';
 import { syncPlaces } from '../services/foursquare/sync.js';
 import { syncCoding } from '../services/coding/sync.js';
-import { backfillWakatime } from '../services/wakatime/sync.js';
-import { backfillRescuetime } from '../services/rescuetime/sync.js';
+import {
+  backfillWakatime,
+  WakatimeBackfillCursorError,
+} from '../services/wakatime/sync.js';
+import {
+  backfillRescuetime,
+  RescuetimeBackfillCursorError,
+} from '../services/rescuetime/sync.js';
 import {
   backfillGithub,
   GithubBackfillCursorError,
@@ -943,7 +949,11 @@ adminSync.openapi(syncCodingBackfillRoute, async (c) => {
     });
   } catch (error) {
     // A bad resume token is a client error (400), not a server fault (500).
-    if (error instanceof GithubBackfillCursorError) {
+    if (
+      error instanceof GithubBackfillCursorError ||
+      error instanceof WakatimeBackfillCursorError ||
+      error instanceof RescuetimeBackfillCursorError
+    ) {
       return badRequest(c, error.message) as any;
     }
     const message = error instanceof Error ? error.message : String(error);

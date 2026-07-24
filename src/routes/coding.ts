@@ -53,6 +53,37 @@ function buildDateStringCondition(
   return and(...conditions);
 }
 
+/** Next calendar day (UTC) after a YYYY-MM-DD date, as YYYY-MM-DD. */
+function nextDayISO(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Build a raw SQL predicate scoping the correlated `gc.committed_at` column to a
+ * date window, mirroring buildDateCondition's semantics (`date` overrides
+ * from/to; single-day is a half-open [00:00, nextDay 00:00] range). Used inside
+ * the /projects commit-count subquery, where the table is aliased `gc` and a
+ * column-bound Drizzle condition can't be reused. Defaults to `1=1` (no filter).
+ */
+function buildCommittedAtWindow(params: {
+  date?: string;
+  from?: string;
+  to?: string;
+}): SQL {
+  if (params.date) {
+    const dayStart = `${params.date}T00:00:00.000Z`;
+    const dayEnd = `${nextDayISO(params.date)}T00:00:00.000Z`;
+    return sql`(gc.committed_at >= ${dayStart} and gc.committed_at <= ${dayEnd})`;
+  }
+  const parts: SQL[] = [];
+  if (params.from) parts.push(sql`gc.committed_at >= ${params.from}`);
+  if (params.to) parts.push(sql`gc.committed_at <= ${params.to}`);
+  if (parts.length === 0) return sql`1 = 1`;
+  return sql.join(parts, sql` and `);
+}
+
 // ─── Schemas ─────────────────────────────────────────────────────────
 
 const TimelineItemSchema = z.object({
@@ -235,7 +266,7 @@ const projectsRoute = createRoute({
   tags: ['Coding'],
   summary: 'Top projects',
   description:
-    'Per-project coding time (WakaTime durations) with a matching GitHub commit count (commits whose repo ends with /{project}). Supports date filtering and limit (default 10, max 50).',
+    'Per-project coding time (WakaTime durations) with a matching GitHub commit count (commits whose repo ends with /{project}). When a date/from/to filter is given, both the coding time and the commit count are scoped to that window (commits by committed_at). Supports limit (default 10, max 50).',
   request: {
     query: z
       .object({
@@ -582,11 +613,18 @@ coding.openapi(projectsRoute, async (c) => {
   // project's own LIKE wildcards (\ % _) escaped via ESCAPE '\'.
   const escapedProject = sql`replace(replace(replace(${wakatimeDurations.project}, '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
 
+  // Scope the commit count to the same date window as the durations, on
+  // committed_at — mirroring buildDateCondition's semantics (`date` overrides
+  // from/to; single-day is a half-open [00:00, nextDay 00:00] range) so commits
+  // outside the requested range aren't counted against an in-range project.
+  // Rendered against the correlated `gc` alias; defaults to `1=1` (no filter).
+  const commitWindow = buildCommittedAtWindow({ date, from, to });
+
   const projectRows = await db
     .select({
       project: wakatimeDurations.project,
       totalSeconds: sql<number>`sum(${wakatimeDurations.durationSeconds})`,
-      commits: sql<number>`(select count(*) from github_commits gc where gc.user_id = 1 and gc.repo like '%/' || ${escapedProject} escape '\\')`,
+      commits: sql<number>`(select count(*) from github_commits gc where gc.user_id = 1 and ${commitWindow} and gc.repo like '%/' || ${escapedProject} escape '\\')`,
     })
     .from(wakatimeDurations)
     .where(and(...conds))

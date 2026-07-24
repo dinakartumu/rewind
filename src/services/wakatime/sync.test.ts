@@ -9,7 +9,12 @@ import {
 } from '../../db/schema/wakatime.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
-import { syncWakatimeDay, syncWakatime, backfillWakatime } from './sync.js';
+import {
+  syncWakatimeDay,
+  syncWakatime,
+  backfillWakatime,
+  WakatimeBackfillCursorError,
+} from './sync.js';
 import { WakatimeHistoryLimitError } from './client.js';
 import type {
   WakatimeClient,
@@ -328,6 +333,17 @@ describe('backfillWakatime', () => {
   function wakatimeEnv(apiKey?: string): Env {
     return { ...env, WAKATIME_API_KEY: apiKey } as unknown as Env;
   }
+
+  it('throws WakatimeBackfillCursorError on a non-YYYY-MM-DD cursor, before the API-key check', async () => {
+    // Cursor is validated FIRST, so a bad cursor surfaces as a typed 400-mapped
+    // error even when WAKATIME_API_KEY is unset (no missing-key masking).
+    await expect(
+      backfillWakatime(wakatimeEnv(undefined), '2026/06/14')
+    ).rejects.toBeInstanceOf(WakatimeBackfillCursorError);
+    await expect(
+      backfillWakatime(wakatimeEnv(undefined), 'not-a-date')
+    ).rejects.toBeInstanceOf(WakatimeBackfillCursorError);
+  });
 
   it('walks 14 days backward from a cursor and returns the next cursor 14 days earlier', async () => {
     // Every day returns one duration slice (timestamped to that day so the

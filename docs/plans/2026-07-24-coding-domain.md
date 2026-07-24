@@ -760,7 +760,7 @@ Runs LAST, after Tasks 14 and 15.
 
 ### Deliberately NOT in this plan (deferred per design)
 
-Streaks/year-in-review endpoints, GitHub reviews/releases/stars/repo metadata, dedicated MCP tools, search-index items for coding, remote migration + secret provisioning + production backfill (post-merge operator steps).
+Streaks/year-in-review endpoints, GitHub reviews/releases/stars/repo metadata, search-index items for coding, remote migration + secret provisioning + production backfill (post-merge operator steps).
 
 ### Post-merge operator checklist (for the human / later session)
 

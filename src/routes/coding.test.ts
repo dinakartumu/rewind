@@ -611,6 +611,39 @@ describe('coding routes', () => {
       expect(res2.status).toBe(200);
     });
 
+    it('scopes the commit count to the date window, excluding out-of-range commits', async () => {
+      // All durations land in-range so the project shows up. The commit count
+      // must reflect ONLY commits inside the window — a commit before `from`
+      // must not be counted.
+      await seedWakatimeDuration({
+        project: 'rewind',
+        duration_seconds: 3600,
+        start_time: '2026-06-10T12:00:00.000Z',
+        entity: '/a.ts',
+      });
+      // In-range commit (counts).
+      await seedCommit({
+        sha: 'in-range',
+        repo: 'octocat/rewind',
+        committed_at: '2026-06-10T12:00:00.000Z',
+      });
+      // Out-of-range commit, before `from` (must NOT count).
+      await seedCommit({
+        sha: 'out-of-range',
+        repo: 'octocat/rewind',
+        committed_at: '2026-01-01T00:00:00.000Z',
+      });
+
+      const res = await authFetch(
+        '/v1/coding/projects?from=2026-05-01T00:00:00Z&to=2026-07-01T00:00:00Z'
+      );
+      const body = (await res.json()) as any;
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].project).toBe('rewind');
+      // Only the in-range commit is counted.
+      expect(body.data[0].commits).toBe(1);
+    });
+
     it('escapes LIKE wildcards in the project name when matching repos', async () => {
       // Project name literally contains an underscore. Without ESCAPE, the '_'
       // is a single-char wildcard and would match 'octocat/myXapp' etc.

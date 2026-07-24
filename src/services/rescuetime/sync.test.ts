@@ -12,6 +12,7 @@ import {
   syncRescuetimeDay,
   syncRescuetime,
   backfillRescuetime,
+  RescuetimeBackfillCursorError,
 } from './sync.js';
 import type {
   RescuetimeClient,
@@ -404,6 +405,17 @@ describe('backfillRescuetime', () => {
   function rescuetimeEnv(apiKey?: string): Env {
     return { ...env, RESCUETIME_API_KEY: apiKey } as unknown as Env;
   }
+
+  it('throws RescuetimeBackfillCursorError on a non-YYYY-MM-DD cursor, before the API-key check', async () => {
+    // Cursor is validated FIRST, so a bad cursor surfaces as a typed 400-mapped
+    // error even when RESCUETIME_API_KEY is unset (no missing-key masking).
+    await expect(
+      backfillRescuetime(rescuetimeEnv(undefined), '2026/06/30')
+    ).rejects.toBeInstanceOf(RescuetimeBackfillCursorError);
+    await expect(
+      backfillRescuetime(rescuetimeEnv(undefined), 'not-a-date')
+    ).rejects.toBeInstanceOf(RescuetimeBackfillCursorError);
+  });
 
   /** Build an analytic-data Response for a given date with one activity row. */
   function dataResponse(date: string, empty = false): Response {

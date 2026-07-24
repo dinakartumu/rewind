@@ -18,6 +18,21 @@ export interface BackfillChunkResult {
 /** Days fetched per RescueTime backfill invocation (one month). */
 const RESCUETIME_BACKFILL_CHUNK_DAYS = 30;
 
+/**
+ * Thrown when the backfill cursor is malformed (not a YYYY-MM-DD date string).
+ * The admin-sync route maps this to a 400 (client error — a bad resume token),
+ * not a 500.
+ */
+export class RescuetimeBackfillCursorError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RescuetimeBackfillCursorError';
+  }
+}
+
+/** Accepts only calendar dates in YYYY-MM-DD form. */
+const CURSOR_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export interface RescuetimeDaySyncResult {
   synced: number;
   totalSeconds: number;
@@ -242,6 +257,15 @@ export async function backfillRescuetime(
   env: Env,
   cursor?: string
 ): Promise<BackfillChunkResult> {
+  // Validate the cursor FIRST: a bad resume token is a client error (400) and
+  // must surface regardless of credential state, so it isn't masked by a
+  // missing-key 500.
+  if (cursor !== undefined && !CURSOR_DATE_RE.test(cursor)) {
+    throw new RescuetimeBackfillCursorError(
+      `Invalid backfill cursor (expected YYYY-MM-DD): ${cursor}`
+    );
+  }
+
   const apiKey = env.RESCUETIME_API_KEY;
   if (!apiKey) {
     throw new Error('RESCUETIME_API_KEY is not configured');

@@ -136,5 +136,4 @@ duplicates), route tests for the four endpoints.
 
 - Streaks, year-in-review, charts endpoints (wait for data volume).
 - GitHub reviews, releases, stars, repo metadata.
-- Dedicated MCP tools (query_rewind covers ad-hoc queries at launch).
 - WakaTime branch/dependency dimensions; RescueTime document-level detail.
