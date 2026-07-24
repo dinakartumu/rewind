@@ -70,6 +70,7 @@ head_sampling_rate = 1
 ALLOWED_ORIGINS = "localhost:3000"
 PLEX_OWNER_ACCOUNT_TITLE = "dinakartumu"
 LASTFM_USERNAME = "dinakartumu"
+GITHUB_USERNAME = "dinakartumu"
 # Instapaper sync disabled — access token returns 401. Set to "true" or
 # remove (and refresh INSTAPAPER_ACCESS_TOKEN/_SECRET) to re-enable.
 ENABLE_INSTAPAPER = "false"
