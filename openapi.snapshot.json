@@ -20859,7 +20859,7 @@
           "Coding"
         ],
         "summary": "Top projects",
-        "description": "Per-project coding time (WakaTime durations) with a matching GitHub commit count (commits whose repo ends with /{project}). Supports date filtering and limit (default 10, max 50).",
+        "description": "Per-project coding time (WakaTime durations) with a matching GitHub commit count (commits whose repo ends with /{project}). When a date/from/to filter is given, both the coding time and the commit count are scoped to that window (commits by committed_at). Supports limit (default 10, max 50).",
         "parameters": [
           {
             "schema": {
