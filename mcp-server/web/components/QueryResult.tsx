@@ -29,6 +29,12 @@ import {
   routeToPath,
   type Bounds,
 } from '../lib/geo-projection.js';
+import {
+  INTEGRATIONS,
+  integrationFromValue,
+  resolveResultIntegration,
+  type IntegrationKey,
+} from '../lib/brand-colors.js';
 
 /**
  * Generic query-result renderer. Reads a raw SQL result and adapts it into a
@@ -91,6 +97,57 @@ function tabStyle(active: boolean): CSSProperties {
 
 const bodyStyle: CSSProperties = { padding: 16, overflowX: 'auto' };
 
+// ── integration identity ─────────────────────────────────────────────
+/**
+ * Publish the resolved service's mark colour on the card root. `light-dark()`
+ * is the same mechanism card-tokens.ts already uses for text and surfaces, so
+ * the value tracks the host's resolved scheme (and the workbench's manual
+ * toggle) without a media query or a runtime theme sniff. The dark step is the
+ * palette's own dark value, not a lightened flip of the light one.
+ */
+function integrationCardStyle(key: IntegrationKey | null): CSSProperties {
+  if (!key) return cardStyle;
+  const style = INTEGRATIONS[key];
+  return {
+    ...cardStyle,
+    ['--rewind-series' as string]: `light-dark(${style.series}, ${style.seriesDark})`,
+  } as CSSProperties;
+}
+
+/**
+ * A service's real brand colour as a dot beside its name. Safe here in a way
+ * it is not on a chart: one chip at a time, always labelled, so nothing rests
+ * on telling two brand colours apart.
+ */
+function IntegrationChip({ integration }: { integration: IntegrationKey }) {
+  const style = INTEGRATIONS[integration];
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        verticalAlign: 'baseline',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: style.brand,
+          // Near-black brands (GitHub, Instapaper) would vanish on a dark
+          // card; a hairline ring keeps the dot readable on either surface.
+          boxShadow: '0 0 0 1px rgba(127,127,127,0.45)',
+          flexShrink: 0,
+        }}
+      />
+      {style.label}
+    </span>
+  );
+}
+
 const emptyStyle: CSSProperties = {
   padding: 24,
   textAlign: 'center',
@@ -98,9 +155,12 @@ const emptyStyle: CSSProperties = {
   fontSize: 14,
 };
 
-// Chart accent: the host doesn't publish an accent var, so derive one from the
-// primary text color with a fallback that reads on both light + dark cards.
-const ACCENT = 'var(--color-text-primary, #3b82f6)';
+// Chart accent. `--rewind-series` is set on the card root when the whole
+// result belongs to one integration (see brand-colors.ts), so every mark in
+// every view picks up that service's colour without a prop being threaded
+// through twenty components. Unset — a result spanning several services — it
+// falls back to the primary text colour, which reads on both card surfaces.
+const ACCENT = 'var(--rewind-series, var(--color-text-primary, #3b82f6))';
 
 // ── cell formatting ──────────────────────────────────────────────────
 const CELL_MAX = 80;
@@ -233,6 +293,11 @@ function CellContent({
       />
     );
   }
+  // A cell that names a service (`trakt`, `last.fm`) gets its brand dot, so a
+  // mixed-source table stays scannable by colour without the colour ever being
+  // the only signal — the name is right there.
+  const service = integrationFromValue(value);
+  if (service) return <IntegrationChip integration={service} />;
   return <>{displayCell(value)}</>;
 }
 
@@ -3240,6 +3305,10 @@ function DetailView({
                   {displayCell(raw)}
                 </a>
               );
+            } else if (integrationFromValue(raw)) {
+              valueNode = (
+                <IntegrationChip integration={integrationFromValue(raw)!} />
+              );
             } else if (numeric && FLAG_COL_RE.test(column)) {
               valueNode = toNumber(raw) ? 'Yes' : 'No';
             } else if (numeric) {
@@ -3540,6 +3609,13 @@ export function QueryResult({
 
   const detection = useMemo(() => detectView(payload), [payload]);
 
+  // Which service produced these rows, if it's a single one. Drives the card's
+  // series colour and the header chip; null leaves both at the neutral default.
+  const integration = useMemo(
+    () => resolveResultIntegration(columns, rows, payload.integration),
+    [columns, rows, payload.integration]
+  );
+
   // Numeric column set for table right-alignment: a column whose sampled
   // values are mostly numeric.
   const numericCols = useMemo(() => {
@@ -3625,11 +3701,20 @@ export function QueryResult({
   const metricLabel = metricIndex !== null ? columns[metricIndex] : null;
 
   return (
-    <article className={CARD_OUTER_CLASSNAME} style={cardStyle}>
+    <article
+      className={CARD_OUTER_CLASSNAME}
+      style={integrationCardStyle(integration)}
+    >
       <header style={headerStyle}>
         <h1 style={titleStyle}>
           {rows.length} row{rows.length === 1 ? '' : 's'} · {columns.length} col
           {columns.length === 1 ? '' : 's'}
+          {integration ? (
+            <>
+              {' · '}
+              <IntegrationChip integration={integration} />
+            </>
+          ) : null}
         </h1>
         {tabs.length > 1 ? (
           <div style={tabsStyle} role="tablist">
