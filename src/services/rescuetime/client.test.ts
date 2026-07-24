@@ -29,10 +29,6 @@ describe('RescuetimeClient', () => {
     vi.restoreAllMocks();
   });
 
-  it('should construct with an API key', () => {
-    expect(client).toBeDefined();
-  });
-
   it('should request activities with all query params and map positional rows', async () => {
     const row = ['2026-07-23T09:00:00', 280, 1, 'VS Code', 'Editing & IDEs', 2];
 
@@ -75,6 +71,62 @@ describe('RescuetimeClient', () => {
     expect(activities).toEqual([]);
   });
 
+  it('should return an empty array when rows is absent entirely', async () => {
+    // A well-formed response with row_headers but no rows key at all.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          row_headers: [
+            'Date',
+            'Time Spent (seconds)',
+            'Number of People',
+            'Activity',
+            'Category',
+            'Productivity',
+          ],
+        })
+      )
+    );
+
+    const activities = await client.getActivities('2026-07-23');
+
+    expect(activities).toEqual([]);
+  });
+
+  it('should map a null category cell to null', async () => {
+    const row = ['2026-07-23T09:00:00', 280, 1, 'VS Code', null, 2];
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(dataResponse([row])))
+    );
+
+    const activities = await client.getActivities('2026-07-23');
+
+    expect(activities).toHaveLength(1);
+    expect(activities[0].category).toBeNull();
+  });
+
+  it('should throw when row_headers has an unexpected column count', async () => {
+    // A five-column response — the API contract changed; mapping by fixed
+    // index would silently produce garbage, so the client must reject it.
+    const fiveColumnResponse = {
+      row_headers: [
+        'Date',
+        'Time Spent (seconds)',
+        'Activity',
+        'Category',
+        'Productivity',
+      ],
+      rows: [['2026-07-23T09:00:00', 280, 'VS Code', 'Editing & IDEs', 2]],
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(fiveColumnResponse))
+    );
+
+    await expect(client.getActivities('2026-07-23')).rejects.toThrow(
+      'unexpected columns'
+    );
+  });
+
   it('should map daily summary feed to { date, productivityPulse }', async () => {
     const feed = [
       { date: '2026-07-23', productivity_pulse: 71, other_field: 'ignored' },
@@ -100,14 +152,19 @@ describe('RescuetimeClient', () => {
     ]);
   });
 
-  it('should throw an error containing the status on a non-200 response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('Server Error', {
-        status: 500,
-        statusText: 'Internal Server Error',
-      })
+  it('should throw an error containing the status and response body on a non-200 response', async () => {
+    // Fresh Response per call — a Response body can only be read once.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response('Server Error', {
+          status: 500,
+          statusText: 'Internal Server Error',
+        })
     );
 
     await expect(client.getActivities('2026-07-23')).rejects.toThrow('500');
+    await expect(client.getActivities('2026-07-23')).rejects.toThrow(
+      'Server Error'
+    );
   });
 });

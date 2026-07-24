@@ -71,6 +71,8 @@ export class RescuetimeClient {
     const url = `${BASE_URL}${path}`;
     // RescueTime auth is the key as a query param; no headers required. No 429
     // retry loop: on any non-200 we throw and let the hourly cron retry.
+    // SECURITY: the URL must NEVER appear in a thrown error or log — the API
+    // key is a query param, so leaking the URL would leak the credential.
     const response = await fetch(url, {
       headers: { Accept: 'application/json' },
     });
@@ -102,6 +104,14 @@ export class RescuetimeClient {
     const data = await this.request<AnalyticDataResponse>(
       `/data?${params.toString()}`
     );
+    // Validate the column layout before reading rows by fixed index. If
+    // row_headers is present and not the expected 6 columns, the API contract
+    // changed and index-based mapping would silently produce garbage.
+    if (data.row_headers && data.row_headers.length !== 6) {
+      throw new Error(
+        `[ERROR] RescueTime API returned unexpected columns: ${data.row_headers.join(', ')}`
+      );
+    }
     return (data.rows ?? []).map((row) => ({
       // Account-local wall-clock time; append '.000Z' without converting.
       timestamp: `${String(row[COL_DATE])}.000Z`,
