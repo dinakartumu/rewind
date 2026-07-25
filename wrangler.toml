@@ -46,14 +46,27 @@ preview_id = "0c656a4610914eccb67a8b93cf186aa3"
 [triggers]
 crons = [
   "*/15 * * * *",   # Every 15 min: Last.fm scrobble sync
-  "0 * * * *",      # Hourly: Strava activities + Trakt watch history + Foursquare check-ins
+  "0 * * * *",      # Hourly: Strava + Trakt watch history + Foursquare + coding
   "0 3 * * *",      # Daily 3:00 AM: Last.fm top lists + stats
-  "30 3 * * *",     # Daily 3:30 AM: Plex library scan
   "45 3 * * SUN",   # Sunday 3:45 AM: Discogs + Trakt collections
-  "0 */6 * * *",    # Every 6 hours: Letterboxd RSS + Instapaper
-  "0 4 * * *",      # Daily 4:00 AM: Attending (Calendar + Gmail incremental)
-  "0 5 * * SUN",    # Sunday 5:00 AM: Instapaper full deletion reconciliation
 ]
+
+# Removed 2026-07-26 because none of these could ever do work on this instance:
+#
+#   "30 3 * * *"    Plex library scan — PLEX_URL/PLEX_TOKEN are unset, so it
+#                   failed every night (5 consecutive failures in sync_runs).
+#                   Trakt is this instance's watching source.
+#   "0 */6 * * *"   Letterboxd RSS + Instapaper — LETTERBOXD_USERNAME is unset
+#                   and ENABLE_INSTAPAPER is "false", so both branches were
+#                   gated off and the invocation was a no-op.
+#   "0 5 * * SUN"   Instapaper deletion reconciliation — same gate.
+#   "0 4 * * *"     Attending (Calendar + Gmail) — google_tokens is empty, so
+#                   every run failed with "No Google refresh token found".
+#                   attended_events is empty too; nothing was being collected.
+#
+# The `case` handlers in src/index.ts are deliberately left in place: seeding
+# the credential (for attending, scripts/tools/setup-google.ts) and restoring
+# the line here is all it takes to bring any of them back.
 
 # Cloudflare Images (for thumbhash/color extraction)
 [images]
