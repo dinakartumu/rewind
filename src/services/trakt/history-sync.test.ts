@@ -10,6 +10,7 @@ import {
   shows,
   episodesWatched,
 } from '../../db/schema/watching.js';
+import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
 import {
   syncTraktHistory,
@@ -19,6 +20,7 @@ import {
   buildEpisodeFeedItem,
   buildRatingsMap,
   applyMovieRatings,
+  markRunFailed,
   shouldMarkRewatch,
 } from './history-sync.js';
 import type {
@@ -29,6 +31,32 @@ import type {
   TraktRatingItem,
 } from './client.js';
 import type { TmdbClient } from '../watching/tmdb.js';
+
+/**
+ * Wrap a D1 binding so every prepared statement is counted. Each `prepare`
+ * is one round trip to D1, which is the cost that matters inside a Worker
+ * invocation's fixed subrequest budget.
+ */
+function countingD1(binding: D1Database): {
+  d1: D1Database;
+  statements: { count: number };
+} {
+  const statements = { count: 0 };
+  const d1 = new Proxy(binding, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') return value;
+      if (prop === 'prepare') {
+        return (query: string) => {
+          statements.count++;
+          return (value as D1Database['prepare']).call(target, query);
+        };
+      }
+      return value.bind(target);
+    },
+  });
+  return { d1, statements };
+}
 
 describe('syncTraktHistory', () => {
   it('exports the sync entrypoint', () => {
@@ -845,6 +873,93 @@ describe('applyMovieRatings', () => {
       .from(watchHistory)
       .where(eq(watchHistory.traktHistoryId, 5101));
     expect(row.userRating).toBe(9);
+  });
+
+  // Ratings apply on every hourly Trakt run. A per-movie select+update pair
+  // meant a library of a few hundred rated films cost ~1000 sequential D1
+  // round trips an hour to apply nothing, which is what pushed the cron past
+  // its invocation budget. Statement count must scale with distinct rating
+  // values, not with the number of rated movies.
+  it('issues a bounded number of D1 statements regardless of library size', async () => {
+    const db = createDb(env.DB);
+    const ratings: TraktRatingItem[] = [];
+
+    for (let i = 0; i < 40; i++) {
+      const tmdbId = 90000 + i;
+      const [movie] = await db
+        .insert(movies)
+        .values({ title: `Bulk ${i}`, year: 2000 + i, tmdbId })
+        .returning({ id: movies.id });
+      await db.insert(watchHistory).values({
+        movieId: movie.id,
+        watchedAt: '2026-04-01T20:00:00.000Z',
+        source: 'trakt',
+        traktHistoryId: 6000 + i,
+      });
+      // Spread across all ten Trakt rating values.
+      ratings.push(ratingItem(tmdbId, (i % 10) + 1));
+    }
+
+    const { d1, statements } = countingD1(env.DB);
+    const applied = await applyMovieRatings(
+      createDb(d1),
+      makeClient(ratings),
+      1
+    );
+
+    expect(applied).toBe(40);
+    expect(statements.count).toBeLessThanOrEqual(25);
+  });
+});
+
+describe('markRunFailed', () => {
+  beforeAll(async () => {
+    await setupTestDb();
+  });
+
+  it('records the error on the run row', async () => {
+    const db = createDb(env.DB);
+    const [run] = await db
+      .insert(syncRuns)
+      .values({
+        userId: 1,
+        domain: 'watching',
+        syncType: 'trakt_history',
+        status: 'running',
+        startedAt: '2026-07-26T07:00:00.000Z',
+      })
+      .returning({ id: syncRuns.id });
+
+    await markRunFailed(db, run.id, 'Trakt API error 502');
+
+    const [row] = await db
+      .select({ status: syncRuns.status, error: syncRuns.error })
+      .from(syncRuns)
+      .where(eq(syncRuns.id, run.id));
+    expect(row.status).toBe('failed');
+    expect(row.error).toBe('Trakt API error 502');
+  });
+
+  // The bookkeeping write is itself a D1 round trip, so whatever exhausted
+  // the invocation's budget mid-sync takes this write down too. When that
+  // happened the throw escaped the catch block, the row stayed at 'running'
+  // forever, and the real cause was replaced by the bookkeeping error.
+  it('swallows its own write failure so the original error survives', async () => {
+    const brokenD1 = new Proxy(env.DB, {
+      get(target, prop, receiver) {
+        if (prop === 'prepare') {
+          return () => {
+            throw new Error('Too many subrequests');
+          };
+        }
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as D1Database;
+
+    await expect(
+      markRunFailed(createDb(brokenD1), 1, 'original failure')
+    ).resolves.toBeUndefined();
   });
 });
 
