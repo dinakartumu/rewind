@@ -12,6 +12,7 @@ import {
   verifyPlexWebhook,
   handlePlexWebhook,
 } from '../services/plex/webhook.js';
+import { isPlexConfigured } from '../services/plex/sync.js';
 import { TmdbClient } from '../services/watching/tmdb.js';
 import { runPipeline } from '../services/images/pipeline.js';
 
@@ -156,11 +157,21 @@ const plexWebhookRoute = createRoute({
         },
       },
     },
-    ...errorResponses(400, 403),
+    ...errorResponses(400, 403, 503),
   },
 });
 
 webhooks.openapi(plexWebhookRoute, async (c) => {
+  // This route takes no auth, so an instance with no Plex server would
+  // otherwise sit there processing events it can never reconcile against a
+  // library. Refuse before parsing rather than half-handling them.
+  if (!isPlexConfigured(c.env)) {
+    return c.json(
+      { error: 'Plex is not configured on this instance', status: 503 },
+      503
+    ) as any;
+  }
+
   const payload = await parsePlexWebhook(c.req.raw);
 
   if (!payload) {

@@ -58,6 +58,7 @@ const ERROR_DESCRIPTIONS: Record<number, string> = {
   403: 'Forbidden',
   404: 'Not found',
   500: 'Internal server error',
+  503: 'Integration not configured on this instance',
 };
 
 /**
@@ -65,7 +66,7 @@ const ERROR_DESCRIPTIONS: Record<number, string> = {
  * Usage: `...errorResponses(400, 401, 404)` in a route's responses object.
  */
 export function errorResponses(
-  ...codes: Array<400 | 401 | 403 | 404 | 500>
+  ...codes: Array<400 | 401 | 403 | 404 | 500 | 503>
 ): Record<string, object> {
   const responses: Record<string, object> = {};
   for (const code of codes) {

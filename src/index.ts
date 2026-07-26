@@ -26,7 +26,6 @@ import adminAttending from './routes/admin-attending.js';
 import { LastfmClient } from './services/lastfm/client.js';
 import { syncListening } from './services/lastfm/sync.js';
 import { syncRunning } from './services/strava/sync.js';
-import { syncWatching } from './services/plex/sync.js';
 import { syncLetterboxd } from './services/letterboxd/sync.js';
 import { syncCollecting } from './services/discogs/sync.js';
 import { syncTraktCollection } from './services/trakt/sync.js';
@@ -335,28 +334,11 @@ export default {
         );
         break;
       }
-      case '30 3 * * *': {
-        const watchingRetry = await shouldRetry(db, 'watching');
-        if (watchingRetry.shouldRetry) {
-          console.log(
-            `[SYNC] Retrying failed watching sync (${watchingRetry.consecutiveFailures} consecutive failures)`
-          );
-        }
-        console.log('[SYNC] Plex library scan');
-        ctx.waitUntil(
-          (async () => {
-            try {
-              await syncWatching(db, env);
-              await processWatchingImages(db, env);
-            } catch (error) {
-              console.log(
-                `[ERROR] Plex sync failed: ${error instanceof Error ? error.message : String(error)}`
-              );
-            }
-          })()
-        );
-        break;
-      }
+      // The '30 3 * * *' Plex library scan lived here until issue #17. Its
+      // trigger came out of wrangler.toml on 2026-07-26 because this instance
+      // has no Plex server, leaving the branch unreachable. Plex syncs on
+      // demand via POST /v1/admin/sync/watching?source=plex, which no-ops
+      // until PLEX_URL/PLEX_TOKEN are set.
       case '45 3 * * 0': {
         const collectingRetry = await shouldRetry(db, 'collecting');
         if (collectingRetry.shouldRetry) {

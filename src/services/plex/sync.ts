@@ -452,7 +452,26 @@ export async function computeWatchStats(db: Database): Promise<void> {
 }
 
 /**
+ * True when this instance has a Plex server to talk to. Wrangler leaves unset
+ * secrets undefined at runtime whatever the Env type claims, so both vars are
+ * checked for presence rather than trusted from the type.
+ */
+export function isPlexConfigured(env: {
+  PLEX_URL?: string;
+  PLEX_TOKEN?: string;
+}): boolean {
+  return Boolean(env.PLEX_URL && env.PLEX_TOKEN);
+}
+
+/**
  * Main sync orchestrator for Plex watching domain.
+ *
+ * Plex is optional: an instance whose watching data comes from Trakt or
+ * Letterboxd never sets PLEX_URL/PLEX_TOKEN. Skip before recording a sync run
+ * so an unconfigured integration leaves no failure trail — this used to fall
+ * through to PlexApiClient and die on `undefined.replace`, which read as a
+ * code defect rather than absent configuration (issue #17). The image
+ * pipeline guards its Plex source the same way.
  */
 export async function syncWatching(
   db: Database,
@@ -463,6 +482,13 @@ export async function syncWatching(
   },
   options: { maxNewItems?: number } = {}
 ): Promise<{ moviesSynced: number; showsSynced: number }> {
+  if (!isPlexConfigured(env)) {
+    console.log(
+      '[SYNC] Plex not configured (PLEX_URL/PLEX_TOKEN unset), skipping library scan'
+    );
+    return { moviesSynced: 0, showsSynced: 0 };
+  }
+
   const startedAt = new Date().toISOString();
 
   // Record sync start

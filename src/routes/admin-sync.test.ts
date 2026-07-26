@@ -89,6 +89,35 @@ describe('admin-sync endpoints', () => {
     });
   });
 
+  // Plex is optional: this instance's watching data comes from Trakt and
+  // PLEX_URL/PLEX_TOKEN are unset, which used to crash the scanner on
+  // `undefined.replace` and return a 500. See issue #17.
+  describe('POST /v1/admin/sync/watching', () => {
+    it('skips cleanly when Plex is explicitly requested but unconfigured', async () => {
+      const res = await SELF.fetch(
+        'http://localhost/v1/admin/sync/watching?source=plex',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        }
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.source).toBe('plex');
+      expect(body.movies_synced).toBe(0);
+      expect(body.shows_synced).toBe(0);
+    });
+
+    it('defaults to trakt, not the unused plex source', async () => {
+      const res = await SELF.fetch('http://localhost/v1/admin/sync/watching', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      const body = (await res.json()) as any;
+      expect(body.source).not.toBe('plex');
+    });
+  });
+
   describe('POST /v1/admin/sync/coding', () => {
     it('requires admin auth', async () => {
       const res = await SELF.fetch('http://localhost/v1/admin/sync/coding', {

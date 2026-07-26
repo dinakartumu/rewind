@@ -101,11 +101,14 @@ const RunningSyncQuery = z.object({
 });
 
 const WatchingSyncQuery = z.object({
+  // Trakt is the default watching source. Plex stays selectable but is only
+  // live on instances that set PLEX_URL/PLEX_TOKEN; it defaulted here until
+  // issue #17, where an unconfigured Plex made a bare trigger 500.
   source: z
     .enum(['plex', 'letterboxd', 'trakt'])
     .optional()
-    .default('plex')
-    .openapi({ example: 'plex' }),
+    .default('trakt')
+    .openapi({ example: 'trakt' }),
   full: z.enum(['true', 'false', '1', '0']).optional().openapi({
     description:
       'Trakt only: ignore the incremental cursor and re-walk the full watch history. Idempotent (traktHistoryId dedup); the escape hatch for watches back-dated in Trakt to before an already-advanced cursor.',
