@@ -21,6 +21,7 @@ import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import { cleanArtistName } from '../images/sources/utils.js';
 import { resolveGenre } from './genres.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 // Exported so the album-attribution-repair test suite can assert the
 // MBID-first lookup behavior — anchors the canonical Various Artists
@@ -216,14 +217,7 @@ async function failSyncRun(
   runId: number,
   error: string
 ): Promise<void> {
-  await db
-    .update(syncRuns)
-    .set({
-      status: 'failed',
-      completedAt: new Date().toISOString(),
-      error,
-    })
-    .where(eq(syncRuns.id, runId));
+  await markRunFailed(db, runId, error);
 }
 
 /**
