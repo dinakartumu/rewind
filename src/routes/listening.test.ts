@@ -9,11 +9,13 @@ import {
   lastfmScrobbles,
   lastfmYearlyStats,
 } from '../db/schema/lastfm.js';
+// Static, not `await import()` — see the note in watching.test.ts: resolving a
+// route module inside a timed test races the testTimeout on a slow runner.
+import listeningRoutes from './listening.js';
 
 describe('listening routes', () => {
-  it('module can be imported', async () => {
-    const mod = await import('./listening.js');
-    expect(mod.default).toBeDefined();
+  it('module can be imported', () => {
+    expect(listeningRoutes).toBeDefined();
   });
 
   describe('GET /v1/listening/top/artists?include_sparklines=true', () => {
