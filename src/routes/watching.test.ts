@@ -1,4 +1,11 @@
 import { describe, it, expect } from 'vitest';
+// Imported statically rather than with `await import()` inside the test.
+// Resolving this module's graph costs ~12.7s on a 2-core CI runner — against a
+// 15s testTimeout — so as a dynamic import it sat 2s from failing and tipped
+// over under load, blocking deploys. Collection has no per-test timeout, and a
+// module that fails to import fails the whole file, which is a clearer signal
+// than a timeout anyway.
+import watchingRoutes from './watching.js';
 
 describe('watching routes', () => {
   it('has correct endpoint structure', () => {
@@ -41,9 +48,8 @@ describe('watching routes', () => {
 // ─── 4.7.7 — TV Show endpoint tests ──────────────────────────────────
 
 describe('TV show endpoints', () => {
-  it('module can be imported', async () => {
-    const mod = await import('./watching.js');
-    expect(mod.default).toBeDefined();
+  it('module can be imported', () => {
+    expect(watchingRoutes).toBeDefined();
   });
 
   it('show list response shape matches pagination convention', () => {

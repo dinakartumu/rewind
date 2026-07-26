@@ -16,7 +16,14 @@ export default defineWorkersConfig(async () => {
 
   return {
     test: {
-      testTimeout: 15000,
+      // 15s was too tight for the 2-core CI runner: resolving a route module's
+      // graph there measured 12.7s (vs ~0.5s locally), so a single slow test
+      // could exceed the budget and fail a green build — which happened, and
+      // blocked a deploy. The imports that caused it are now static, but the
+      // integration tests still fetch through a real Worker + D1 under heavy
+      // parallelism, so keep genuine headroom. Still short enough to catch a
+      // real hang.
+      testTimeout: 30000,
       exclude: ['**/node_modules/**', '**/.claude/**', 'mcp-server/**'],
       poolOptions: {
         workers: {

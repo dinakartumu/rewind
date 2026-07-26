@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { ResolveMovieParams } from './resolve-movie.js';
+// Static, not `await import()` — see the note in watching.test.ts: resolving a
+// module inside a timed test races the testTimeout on a slow runner.
+import { resolveMovie } from './resolve-movie.js';
 
 describe('resolveMovie', () => {
-  it('exports resolveMovie function', async () => {
-    const mod = await import('./resolve-movie.js');
-    expect(mod.resolveMovie).toBeDefined();
-    expect(typeof mod.resolveMovie).toBe('function');
+  it('exports resolveMovie function', () => {
+    expect(resolveMovie).toBeDefined();
+    expect(typeof resolveMovie).toBe('function');
   });
 
   it('exports ResolveMovieParams type with expected shape', () => {
