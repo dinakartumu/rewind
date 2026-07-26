@@ -17,28 +17,52 @@ export class GithubRateLimitError extends Error {
   }
 }
 
-/** One flattened commit from a PushEvent in the events feed. */
-export interface GithubCommitRow {
-  sha: string;
+/**
+ * One push from the events feed.
+ *
+ * IMPORTANT: PushEvent payloads no longer carry a `commits` array. GitHub
+ * trimmed the payload down to `before`/`head`/`push_id`/`ref`/`repository_id`
+ * (verified across the authenticated feed, the public feed, and the global
+ * firehose). Commits are therefore resolved in a second step — see
+ * getPushCommits — rather than read straight off the event.
+ */
+export interface GithubPushRow {
   /** owner/name, from the event's repo.name. */
   repo: string;
-  message: string;
-  /** The parent event's created_at (individual commits carry no timestamp). */
-  committedAt: string;
+  /** Ref tip before the push; NULL_SHA when the push created the branch. */
+  before: string;
+  /** Ref tip after the push. */
+  head: string;
+  ref: string;
   /** event.public === false. */
   isPrivate: boolean;
-  /**
-   * commit.distinct — false for commits re-surfaced by a rebase re-push. The
-   * sync layer skips non-distinct commits so a rebase doesn't re-count history.
-   */
-  distinct: boolean;
-  /** commit.author.email; null when the payload omits it. */
-  authorEmail: string | null;
+  /** The event's created_at — a fallback timestamp only. */
+  pushedAt: string;
 }
 
-/** Result of a getRecentCommits call, carrying the conditional-request state. */
-export interface GithubRecentCommitsResult {
-  commits: GithubCommitRow[];
+/** One commit, resolved from the compare API or a repo's commit list. */
+export interface GithubCommitRow {
+  sha: string;
+  /** owner/name. */
+  repo: string;
+  message: string;
+  /** The commit's own author date — not the enclosing push's timestamp. */
+  committedAt: string;
+  isPrivate: boolean;
+  /** author.login; null when the commit email maps to no GitHub account. */
+  authorLogin: string | null;
+}
+
+/** One repo from the authenticated user's repo list. */
+export interface GithubRepoRow {
+  /** owner/name. */
+  fullName: string;
+  isPrivate: boolean;
+}
+
+/** Result of a getRecentPushes call, carrying the conditional-request state. */
+export interface GithubRecentPushesResult {
+  pushes: GithubPushRow[];
   /**
    * ETag for the next If-None-Match. On a 200 it's the fresh response ETag
    * (falling back to the passed-in etag when the header is absent, so a stored
@@ -46,9 +70,12 @@ export interface GithubRecentCommitsResult {
    * was sent.
    */
   etag: string | null;
-  /** True when the server returned 304 Not Modified (empty commits). */
+  /** True when the server returned 304 Not Modified (empty pushes). */
   notModified: boolean;
 }
+
+/** The all-zero SHA GitHub sends as `before` when a push creates a branch. */
+export const NULL_SHA = '0000000000000000000000000000000000000000';
 
 /** One mapped item from the Search issues/PRs API. */
 export interface GithubItem {
@@ -103,13 +130,30 @@ interface EventApiItem {
   created_at?: string;
   repo?: { name?: string };
   payload?: {
-    commits?: {
-      sha?: string;
-      message?: string;
-      distinct?: boolean;
-      author?: { email?: string };
-    }[];
+    before?: string;
+    head?: string;
+    ref?: string;
   };
+}
+
+/** A commit object as returned by the compare, list-commits, and get-commit APIs. */
+interface CommitApiItem {
+  sha?: string;
+  author?: { login?: string } | null;
+  commit?: {
+    message?: string;
+    author?: { date?: string } | null;
+    committer?: { date?: string } | null;
+  };
+}
+
+interface CompareApiResponse {
+  commits?: CommitApiItem[];
+}
+
+interface RepoApiItem {
+  full_name?: string;
+  private?: boolean;
 }
 
 interface SearchApiItem {
@@ -295,17 +339,18 @@ export class GithubClient {
 
   /**
    * One page of the user's recent events (30/page, ~300 back). PushEvents are
-   * flattened to commit rows; all other event types are ignored.
+   * mapped to push descriptors; all other event types are ignored. Resolving a
+   * push to its commits is a separate call — see getPushCommits.
    *
    * Conditional requests: pass the last-seen `etag` to send If-None-Match. A
-   * 304 does NOT count against the rate limit — on 304 we return empty commits
+   * 304 does NOT count against the rate limit — on 304 we return empty pushes
    * and notModified: true. On a 200 the fresh ETag header is captured for the
    * next call.
    */
-  async getRecentCommits(
+  async getRecentPushes(
     page = 1,
     etag?: string
-  ): Promise<GithubRecentCommitsResult> {
+  ): Promise<GithubRecentPushesResult> {
     const headers = this.headers();
     if (etag) headers['If-None-Match'] = etag;
 
@@ -317,7 +362,7 @@ export class GithubClient {
     this.throwIfRateLimited(response);
 
     if (response.status === 304) {
-      return { commits: [], etag: etag ?? null, notModified: true };
+      return { pushes: [], etag: etag ?? null, notModified: true };
     }
 
     if (!response.ok) {
@@ -331,32 +376,172 @@ export class GithubClient {
     // never overwrite a stored etag with null.
     const newEtag = response.headers.get('ETag') ?? etag ?? null;
     const events = (await response.json()) as EventApiItem[];
-    const commits: GithubCommitRow[] = [];
+    const pushes: GithubPushRow[] = [];
     for (const event of events) {
       if (event.type !== 'PushEvent') continue;
-      const repo = event.repo?.name ?? '';
-      const committedAt = event.created_at ?? '';
-      const isPrivate = event.public === false;
-      // Flatten every commit through unfiltered. The sync layer skips
-      // non-distinct commits (rebase re-pushes) and deliberately does NOT
-      // filter by author: a personal account's pushes are overwhelmingly its
-      // own commits, and email matching is unreliable (locally-configured
-      // authorship, noreply aliases, co-authors).
-      for (const commit of event.payload?.commits ?? []) {
-        if (!commit.sha) continue;
-        commits.push({
-          sha: commit.sha,
-          repo,
-          message: commit.message ?? '',
-          committedAt,
-          isPrivate,
-          distinct: commit.distinct ?? false,
-          authorEmail: commit.author?.email ?? null,
-        });
+      const repo = event.repo?.name;
+      const head = event.payload?.head;
+      // Without a repo and a head SHA there is nothing to resolve against.
+      if (!repo || !head) continue;
+      pushes.push({
+        repo,
+        before: event.payload?.before ?? NULL_SHA,
+        head,
+        ref: event.payload?.ref ?? '',
+        isPrivate: event.public === false,
+        pushedAt: event.created_at ?? '',
+      });
+    }
+
+    return { pushes, etag: newEtag, notModified: false };
+  }
+
+  /** Maps a raw commit object onto a GithubCommitRow. */
+  private mapCommit(
+    item: CommitApiItem,
+    repo: string,
+    isPrivate: boolean,
+    fallbackDate: string
+  ): GithubCommitRow | null {
+    if (!item.sha) return null;
+    return {
+      sha: item.sha,
+      repo,
+      message: item.commit?.message ?? '',
+      committedAt:
+        item.commit?.author?.date ??
+        item.commit?.committer?.date ??
+        fallbackDate,
+      isPrivate,
+      authorLogin: item.author?.login ?? null,
+    };
+  }
+
+  /**
+   * The commits introduced by one push, via the compare API
+   * (`before...head`). This is the only way to recover commit SHAs and
+   * messages now that PushEvent payloads omit them.
+   *
+   * Two cases yield no comparison and fall back to fetching `head` alone: a
+   * push that CREATED the branch (`before` is the null SHA, nothing to compare
+   * against) and a `before` that no longer resolves (force-pushed and
+   * garbage-collected, 404/409). Both undercount a multi-commit push — head is
+   * the one commit we can still name — and the commits backfill sweeps up
+   * whatever the incremental pass misses.
+   *
+   * Returns [] rather than throwing when even `head` is unreachable, so one bad
+   * push never fails the whole sync.
+   */
+  async getPushCommits(push: GithubPushRow): Promise<GithubCommitRow[]> {
+    if (push.before && push.before !== NULL_SHA) {
+      const response = await fetch(
+        `${BASE_URL}/repos/${push.repo}/compare/${push.before}...${push.head}`,
+        { headers: this.headers() }
+      );
+      this.throwIfRateLimited(response);
+
+      if (response.ok) {
+        const data = (await response.json()) as CompareApiResponse;
+        return (data.commits ?? [])
+          .map((c) =>
+            this.mapCommit(c, push.repo, push.isPrivate, push.pushedAt)
+          )
+          .filter((c): c is GithubCommitRow => c !== null);
+      }
+
+      // 404/409: unreachable base (force-push, GC, empty repo). Fall through
+      // to the head-only path. Anything else is a real failure.
+      if (response.status !== 404 && response.status !== 409) {
+        const errorText = await response.text();
+        throw new Error(
+          `[ERROR] GitHub API error: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
     }
 
-    return { commits, etag: newEtag, notModified: false };
+    const response = await fetch(
+      `${BASE_URL}/repos/${push.repo}/commits/${push.head}`,
+      { headers: this.headers() }
+    );
+    this.throwIfRateLimited(response);
+
+    if (response.status === 404 || response.status === 409) return [];
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `[ERROR] GitHub API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = (await response.json()) as CommitApiItem;
+    const mapped = this.mapCommit(
+      data,
+      push.repo,
+      push.isPrivate,
+      push.pushedAt
+    );
+    return mapped ? [mapped] : [];
+  }
+
+  /**
+   * One page of repos the user owns or can read (100/page), sorted by
+   * full_name ascending. The sort matters: it is stable across the lifetime of
+   * a backfill, whereas `pushed` reshuffles pages as repos receive commits
+   * mid-walk and would silently skip repos.
+   */
+  async listRepos(page = 1): Promise<GithubRepoRow[]> {
+    const params = new URLSearchParams({
+      affiliation: 'owner,collaborator,organization_member',
+      sort: 'full_name',
+      direction: 'asc',
+      per_page: '100',
+      page: String(page),
+    });
+    const data = await this.request<RepoApiItem[]>(
+      `/user/repos?${params.toString()}`
+    );
+    return data
+      .filter((r): r is RepoApiItem & { full_name: string } =>
+        Boolean(r.full_name)
+      )
+      .map((r) => ({ fullName: r.full_name, isPrivate: r.private === true }));
+  }
+
+  /**
+   * One page of a repo's commits authored by the user (100/page), newest
+   * first. `author` filters server-side by login or commit email, which is why
+   * the backfill does not need the incremental path's author screening.
+   *
+   * Returns [] on 404 (repo gone / no access) and 409 (empty repo) so one bad
+   * repo never halts the walk.
+   */
+  async listRepoCommits(
+    repo: GithubRepoRow,
+    page = 1
+  ): Promise<GithubCommitRow[]> {
+    const params = new URLSearchParams({
+      author: this.username,
+      per_page: '100',
+      page: String(page),
+    });
+    const response = await fetch(
+      `${BASE_URL}/repos/${repo.fullName}/commits?${params.toString()}`,
+      { headers: this.headers() }
+    );
+    this.throwIfRateLimited(response);
+
+    if (response.status === 404 || response.status === 409) return [];
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `[ERROR] GitHub API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = (await response.json()) as CommitApiItem[];
+    return data
+      .map((c) => this.mapCommit(c, repo.fullName, repo.isPrivate, ''))
+      .filter((c): c is GithubCommitRow => c !== null && c.committedAt !== '');
   }
 
   /**

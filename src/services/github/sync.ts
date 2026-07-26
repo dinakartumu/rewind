@@ -9,6 +9,7 @@ import {
 } from '../../db/schema/github.js';
 import { syncRuns } from '../../db/schema/system.js';
 import { GithubClient, GithubRateLimitError } from './client.js';
+import type { GithubCommitRow, GithubRepoRow } from './client.js';
 import type { Env } from '../../types/env.js';
 
 /**
@@ -62,7 +63,8 @@ export interface BackfillChunkResult {
 /**
  * Phase cursor for the GitHub backfill. The walk proceeds:
  *   contributions (year by year, backward) → prs (page by page) →
- *   issues (page by page) → done (null cursor).
+ *   issues (page by page) → commits (repo by repo, page by page) →
+ *   done (null cursor).
  *
  * Validated with a zod discriminated union so a malformed-but-valid-JSON cursor
  * (missing `page`, unknown `phase`, non-numeric `year`) is rejected up front
@@ -72,6 +74,15 @@ const GithubBackfillCursorSchema = z.discriminatedUnion('phase', [
   z.object({ phase: z.literal('contributions'), year: z.number().int() }),
   z.object({ phase: z.literal('prs'), page: z.number().int() }),
   z.object({ phase: z.literal('issues'), page: z.number().int() }),
+  z.object({
+    phase: z.literal('commits'),
+    /** Which page of the repo list (100/page). */
+    repoPage: z.number().int(),
+    /** Index of the repo WITHIN that page. */
+    repoIdx: z.number().int(),
+    /** Which page of that repo's commits. */
+    commitPage: z.number().int(),
+  }),
 ]);
 
 type GithubBackfillCursor = z.infer<typeof GithubBackfillCursorSchema>;
@@ -111,6 +122,10 @@ function parseCursor(cursor: string): GithubBackfillCursor {
 const GITHUB_SEARCH_CAP = 1000;
 const GITHUB_SEARCH_PER_PAGE = 100;
 
+/** Page sizes for the commits backfill walk. */
+const GITHUB_REPOS_PER_PAGE = 100;
+const GITHUB_COMMITS_PER_PAGE = 100;
+
 /**
  * One phase-step of the GitHub backfill. Advances exactly ONE unit of work per
  * invocation (one contribution year, or one PR/issue search page) and returns
@@ -120,6 +135,14 @@ const GITHUB_SEARCH_PER_PAGE = 100;
  * upserts on (user, date). A year whose days are all empty/zero means we've
  * walked past the account's first activity → advance to the prs phase.
  * Otherwise the next cursor is the previous year.
+ *
+ * Commits: walks every repo the user owns or can read, paging that repo's
+ * commits filtered to `author:<username>`. The cursor carries (repoPage,
+ * repoIdx, commitPage); the repo list page is re-fetched each chunk so the walk
+ * stays stateless and resumable, which costs one extra request per chunk and
+ * relies on listRepos' stable full_name ordering. This is the ONLY path that
+ * recovers private-repo commit history — the events feed reaches back roughly
+ * 90 days and 300 events.
  *
  * PRs / issues: fetches one Search page (100/page). The phase is done when the
  * page is the last one — either the results are exhausted (`page * 100 >=
@@ -199,6 +222,77 @@ export async function backfillGithub(
         year: year - 1,
       }),
     };
+  }
+
+  if (parsed.phase === 'commits') {
+    const { repoPage, repoIdx, commitPage } = parsed;
+    const repos = await client.listRepos(repoPage);
+
+    // Walked off the end of the repo list entirely.
+    if (repos.length === 0) {
+      console.log('[SYNC] GitHub backfill: commits complete');
+      return { itemsSynced: 0, nextCursor: null };
+    }
+
+    // Walked off the end of THIS page. A short page is the last page, so
+    // there is nothing beyond it; otherwise advance to the next repo page.
+    if (repoIdx >= repos.length) {
+      if (repos.length < GITHUB_REPOS_PER_PAGE) {
+        console.log('[SYNC] GitHub backfill: commits complete');
+        return { itemsSynced: 0, nextCursor: null };
+      }
+      return {
+        itemsSynced: 0,
+        nextCursor: JSON.stringify({
+          phase: 'commits',
+          repoPage: repoPage + 1,
+          repoIdx: 0,
+          commitPage: 1,
+        }),
+      };
+    }
+
+    const repo: GithubRepoRow = repos[repoIdx];
+    const commits = await client.listRepoCommits(repo, commitPage);
+
+    // Count only truly-new rows: re-running the backfill over already-stored
+    // history must not inflate itemsSynced.
+    let synced = 0;
+    for (const c of commits) {
+      const insertResult = await db
+        .insert(githubCommits)
+        .values({
+          userId,
+          sha: c.sha,
+          repo: c.repo,
+          message: c.message,
+          committedAt: c.committedAt,
+          isPrivate: c.isPrivate ? 1 : 0,
+          url: `https://github.com/${c.repo}/commit/${c.sha}`,
+        })
+        .onConflictDoNothing();
+      if (insertResult.meta.changes > 0) synced += 1;
+    }
+
+    // additions/deletions stay null here by design: a per-commit stats fetch
+    // across every repo's full history would burn the rate limit for a detail
+    // the backfill does not need. Only the incremental path fills them in.
+    const moreInRepo = commits.length === GITHUB_COMMITS_PER_PAGE;
+    const nextCursor = moreInRepo
+      ? JSON.stringify({
+          phase: 'commits',
+          repoPage,
+          repoIdx,
+          commitPage: commitPage + 1,
+        })
+      : JSON.stringify({
+          phase: 'commits',
+          repoPage,
+          repoIdx: repoIdx + 1,
+          commitPage: 1,
+        });
+
+    return { itemsSynced: synced, nextCursor };
   }
 
   // PRs and issues share the same paginated Search shape; branch only on the
@@ -283,7 +377,12 @@ export async function backfillGithub(
       : JSON.stringify({ phase: 'prs', page: page + 1 });
   } else {
     nextCursor = phaseDone
-      ? null
+      ? JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 0,
+          commitPage: 1,
+        })
       : JSON.stringify({ phase: 'issues', page: page + 1 });
   }
 
@@ -297,13 +396,12 @@ export async function backfillGithub(
  *    calendar, upserted on (user, date) since recent counts keep changing.
  * 2. Commits — the first events-feed page, guarded by a conditional request
  *    (If-None-Match with the stored ETag). A 304 skips the whole commit phase
- *    (and does not touch the stored etag). Otherwise: non-distinct commits
- *    (rebase re-pushes) are dropped, the rest are inserted onConflictDoNothing
- *    on sha (meta.changes counts truly-new rows), additions/deletions are
- *    fetched for at most COMMIT_DETAIL_CAP NEW commits, and the fresh etag is
- *    stored (only when non-null).
- *    Note: other-author commits inside the user's own pushes are deliberately
- *    NOT filtered (author-email matching is unreliable; documented tradeoff).
+ *    (and does not touch the stored etag). Otherwise each PushEvent is resolved
+ *    to its commits through the compare API (the payload no longer carries
+ *    them), commits authored by someone else are dropped, and the rest are
+ *    inserted onConflictDoNothing on sha (meta.changes counts truly-new rows).
+ *    additions/deletions are fetched for at most COMMIT_DETAIL_CAP NEW commits,
+ *    and the fresh etag is stored (only when non-null).
  * 3. PRs + issues — the first search page each, upserted on (repo, number)
  *    since state / mergedAt / closedAt change over time.
  */
@@ -314,11 +412,6 @@ export async function syncGithubIncremental(
   username: string,
   userId = 1
 ): Promise<GithubIncrementalResult> {
-  // The client already carries the username (baked in at construction); it is
-  // also part of this signature per the domain contract so callers reason
-  // about "whose activity" without inspecting the client. Referenced here to
-  // keep that intent explicit.
-  void username;
   let synced = 0;
   const newCommits: GithubNewCommit[] = [];
 
@@ -347,17 +440,28 @@ export async function syncGithubIncremental(
 
   // ── 2. Commits (conditional on the events-feed ETag) ──────────────────
   const storedEtag = (await kv.get(EVENTS_ETAG_KEY)) ?? undefined;
-  const events = await client.getRecentCommits(1, storedEtag);
+  const events = await client.getRecentPushes(1, storedEtag);
 
   if (events.notModified) {
     console.log('[SYNC] GitHub events unchanged (304), skipping commits');
   } else {
-    // Rebase re-pushes re-surface old commits with distinct === false; drop
-    // them so a rebase doesn't re-count history.
-    const distinctCommits = events.commits.filter((c) => c.distinct);
+    // PushEvent payloads no longer carry commits, so each push costs one
+    // compare call to resolve (<= 30 per run, well inside the hourly budget).
+    // Commits attributed to someone else — a teammate's work carried along in
+    // one of our pushes — are dropped. An unresolvable author (null login, an
+    // email GitHub maps to no account) is kept: on a personal account it is far
+    // more often our own commit under a stale email than a stranger's.
+    const resolved: GithubCommitRow[] = [];
+    for (const push of events.pushes) {
+      const pushCommits = await client.getPushCommits(push);
+      for (const c of pushCommits) {
+        if (c.authorLogin !== null && c.authorLogin !== username) continue;
+        resolved.push(c);
+      }
+    }
 
     const freshlyInserted: GithubNewCommit[] = [];
-    for (const c of distinctCommits) {
+    for (const c of resolved) {
       const insertResult = await db
         .insert(githubCommits)
         .values({
