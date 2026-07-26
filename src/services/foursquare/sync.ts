@@ -7,6 +7,7 @@ import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import type { Env } from '../../types/env.js';
 import { reconcileCheckinIcons } from './category-icons.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 const PAGE_SIZE = 250;
 const DEFAULT_MAX_PAGES = 8;
@@ -267,14 +268,7 @@ export async function syncPlaces(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.log(`[ERROR] Foursquare sync failed: ${errorMsg}`);
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, run.id));
+    await markRunFailed(db, run.id, errorMsg);
     throw err;
   }
 }

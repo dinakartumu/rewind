@@ -12,6 +12,7 @@ import { enrichCandidate, type CanonicalEvent } from './enrich.js';
 import { loadCanonicalEvent } from './load.js';
 import { parseCalendarDescriptionTickets } from './parse-calendar-description.js';
 import type { ParsedReservation } from './parse-jsonld.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 // Backfill pipeline. Five stages, each idempotent:
 //
@@ -121,14 +122,11 @@ export async function backfillAttending(
     return await runPipeline(db, env, options, result, syncRunId);
   } catch (err) {
     if (syncRunId !== null) {
-      await db
-        .update(syncRuns)
-        .set({
-          status: 'failed',
-          completedAt: new Date().toISOString(),
-          error: err instanceof Error ? err.message : String(err),
-        })
-        .where(eq(syncRuns.id, syncRunId));
+      await markRunFailed(
+        db,
+        syncRunId,
+        err instanceof Error ? err.message : String(err)
+      );
     }
     throw err;
   }

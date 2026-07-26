@@ -10,7 +10,6 @@ import {
   shows,
   episodesWatched,
 } from '../../db/schema/watching.js';
-import { syncRuns } from '../../db/schema/system.js';
 import { setupTestDb } from '../../test-helpers.js';
 import {
   syncTraktHistory,
@@ -20,7 +19,6 @@ import {
   buildEpisodeFeedItem,
   buildRatingsMap,
   applyMovieRatings,
-  markRunFailed,
   shouldMarkRewatch,
 } from './history-sync.js';
 import type {
@@ -909,57 +907,6 @@ describe('applyMovieRatings', () => {
 
     expect(applied).toBe(40);
     expect(statements.count).toBeLessThanOrEqual(25);
-  });
-});
-
-describe('markRunFailed', () => {
-  beforeAll(async () => {
-    await setupTestDb();
-  });
-
-  it('records the error on the run row', async () => {
-    const db = createDb(env.DB);
-    const [run] = await db
-      .insert(syncRuns)
-      .values({
-        userId: 1,
-        domain: 'watching',
-        syncType: 'trakt_history',
-        status: 'running',
-        startedAt: '2026-07-26T07:00:00.000Z',
-      })
-      .returning({ id: syncRuns.id });
-
-    await markRunFailed(db, run.id, 'Trakt API error 502');
-
-    const [row] = await db
-      .select({ status: syncRuns.status, error: syncRuns.error })
-      .from(syncRuns)
-      .where(eq(syncRuns.id, run.id));
-    expect(row.status).toBe('failed');
-    expect(row.error).toBe('Trakt API error 502');
-  });
-
-  // The bookkeeping write is itself a D1 round trip, so whatever exhausted
-  // the invocation's budget mid-sync takes this write down too. When that
-  // happened the throw escaped the catch block, the row stayed at 'running'
-  // forever, and the real cause was replaced by the bookkeeping error.
-  it('swallows its own write failure so the original error survives', async () => {
-    const brokenD1 = new Proxy(env.DB, {
-      get(target, prop, receiver) {
-        if (prop === 'prepare') {
-          return () => {
-            throw new Error('Too many subrequests');
-          };
-        }
-        const value = Reflect.get(target, prop, receiver);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    }) as D1Database;
-
-    await expect(
-      markRunFailed(createDb(brokenD1), 1, 'original failure')
-    ).resolves.toBeUndefined();
   });
 });
 

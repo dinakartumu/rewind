@@ -11,6 +11,7 @@ import { syncRuns } from '../../db/schema/system.js';
 import { GithubClient, GithubRateLimitError } from './client.js';
 import type { GithubCommitRow, GithubRepoRow } from './client.js';
 import type { Env } from '../../types/env.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 /**
  * Per-run cap on commit-detail (additions/deletions) fetches. Keeps hourly
@@ -641,14 +642,7 @@ export async function syncGithub(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.log(`[ERROR] GitHub sync failed: ${errorMsg}`);
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, run.id));
+    await markRunFailed(db, run.id, errorMsg);
     throw err;
   }
 }

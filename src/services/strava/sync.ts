@@ -17,6 +17,7 @@ import {
   geocodeStravaActivities,
 } from '../geo/reverse-geocode.js';
 import { chunkForInsertValues } from '../../lib/d1-chunk.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import {
   transformActivity,
@@ -231,15 +232,7 @@ export async function syncRunning(
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.log(`[ERROR] Running sync failed: ${errorMessage}`);
 
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        itemsSynced,
-        error: errorMessage,
-      })
-      .where(eq(syncRuns.id, syncRun.id));
+    await markRunFailed(db, syncRun.id, errorMessage, { itemsSynced });
 
     throw error;
   }

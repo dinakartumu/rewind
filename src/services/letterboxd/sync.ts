@@ -8,6 +8,7 @@ import { computeWatchStats } from '../plex/sync.js';
 import { fetchLetterboxdFeed, type LetterboxdEntry } from './client.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 /**
  * Resolve a movie from a Letterboxd entry using the unified resolution function.
@@ -241,14 +242,7 @@ export async function syncLetterboxd(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMessage,
-      })
-      .where(eq(syncRuns.id, syncRun.id));
+    await markRunFailed(db, syncRun.id, errorMessage);
 
     console.log(`[ERROR] Letterboxd sync failed: ${errorMessage}`);
     throw error;
