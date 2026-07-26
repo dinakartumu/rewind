@@ -12754,6 +12754,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Integration not configured on this instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -26759,8 +26769,8 @@
                 "letterboxd",
                 "trakt"
               ],
-              "default": "plex",
-              "example": "plex"
+              "default": "trakt",
+              "example": "trakt"
             },
             "required": false,
             "name": "source",

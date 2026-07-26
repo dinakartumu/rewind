@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { env } from 'cloudflare:test';
+import { eq } from 'drizzle-orm';
+import { createDb } from '../../db/client.js';
+import { syncRuns } from '../../db/schema/system.js';
+import { setupTestDb } from '../../test-helpers.js';
 import { syncWatching, computeWatchStats } from './sync.js';
 
 describe('syncWatching', () => {
@@ -8,6 +13,58 @@ describe('syncWatching', () => {
 
   it('exports computeWatchStats function', () => {
     expect(typeof computeWatchStats).toBe('function');
+  });
+});
+
+// PlexApiClient normalised the base URL before checking it existed, so an
+// unset PLEX_URL surfaced as "Cannot read properties of undefined (reading
+// 'replace')" -- an opaque TypeError that read as a code defect rather than
+// an unconfigured integration. See issue #17.
+describe('syncWatching without Plex configured', () => {
+  const unconfigured = { PLEX_URL: '', PLEX_TOKEN: '', TMDB_API_KEY: 'tmdb' };
+
+  beforeAll(async () => {
+    await setupTestDb();
+  });
+
+  it('skips cleanly instead of throwing when PLEX_URL is unset', async () => {
+    const db = createDb(env.DB);
+    const result = await syncWatching(db, unconfigured);
+    expect(result).toEqual({ moviesSynced: 0, showsSynced: 0 });
+  });
+
+  // Wrangler leaves an unset secret undefined at runtime regardless of what
+  // the Env type claims, which is the exact shape that produced the
+  // production TypeError.
+  it('skips cleanly when PLEX_URL is undefined rather than empty', async () => {
+    const db = createDb(env.DB);
+    const result = await syncWatching(db, {
+      PLEX_URL: undefined as unknown as string,
+      PLEX_TOKEN: undefined as unknown as string,
+      TMDB_API_KEY: 'tmdb',
+    });
+    expect(result).toEqual({ moviesSynced: 0, showsSynced: 0 });
+  });
+
+  it('records no sync run when it skips', async () => {
+    const db = createDb(env.DB);
+    await syncWatching(db, unconfigured);
+
+    const runs = await db
+      .select({ id: syncRuns.id })
+      .from(syncRuns)
+      .where(eq(syncRuns.syncType, 'plex_library'));
+    expect(runs).toHaveLength(0);
+  });
+
+  it('skips when PLEX_TOKEN is unset but the URL is present', async () => {
+    const db = createDb(env.DB);
+    const result = await syncWatching(db, {
+      PLEX_URL: 'https://plex.example.com',
+      PLEX_TOKEN: '',
+      TMDB_API_KEY: 'tmdb',
+    });
+    expect(result).toEqual({ moviesSynced: 0, showsSynced: 0 });
   });
 });
 
