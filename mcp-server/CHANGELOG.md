@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.12.1...mcp-server-v0.13.0) (2026-07-26)
+
+
+### Features
+
+* **mcp:** colour query cards by the integration they came from ([#12](https://github.com/dinakartumu/rewind/issues/12)) ([3f9e773](https://github.com/dinakartumu/rewind/commit/3f9e773ec28412ca4b2bc0659d54745841d3bdee))
+* **mcp:** poster-forward entity detail card with TMDB backdrop ([#10](https://github.com/dinakartumu/rewind/issues/10)) ([bbc789d](https://github.com/dinakartumu/rewind/commit/bbc789daab33be094264a36e34ce446502bc36ef))
+
 ## [0.12.1](https://github.com/dinakartumu/rewind/compare/mcp-server-v0.12.0...mcp-server-v0.12.1) (2026-07-24)
 
 
