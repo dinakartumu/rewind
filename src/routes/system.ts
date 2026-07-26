@@ -31,6 +31,27 @@ const HealthResponse = z
   })
   .openapi('HealthResponse');
 
+// A Worker invocation that gets killed mid-sync never runs the catch block
+// that would mark its sync_runs row 'failed', so the row sits at 'running'
+// forever. Nothing legitimate outlives a Worker invocation, so any run still
+// 'running' past this cutoff is dead and gets reported as 'stale'.
+const STALE_RUN_MS = 15 * 60 * 1000;
+
+/**
+ * True when a sync run's recorded status can no longer be trusted: it claims
+ * to be in progress but started longer ago than a Worker invocation can live.
+ */
+export function isStaleRun(
+  status: string | null | undefined,
+  startedAt: string | null | undefined,
+  now = Date.now()
+): boolean {
+  if (status !== 'running' || !startedAt) return false;
+  const started = new Date(startedAt).getTime();
+  if (Number.isNaN(started)) return false;
+  return now - started > STALE_RUN_MS;
+}
+
 const SyncDomainStatus = z.object({
   last_sync: z.string().datetime().nullable(),
   status: z.string().openapi({ example: 'completed' }),
@@ -197,10 +218,15 @@ system.openapi(syncHealthRoute, async (c) => {
       Date.now() - 24 * 60 * 60 * 1000
     ).toISOString();
 
+    const staleCutoff = new Date(Date.now() - STALE_RUN_MS).toISOString();
+
+    // Stale runs count as failures: a cron that dies without bookkeeping is
+    // just as broken as one that reports an error, and only counting 'failed'
+    // let a wholly dead domain sit at error_rate 0.
     const [stats] = await db
       .select({
         total: sql<number>`count(*)`,
-        failed: sql<number>`sum(case when ${syncRuns.status} = 'failed' then 1 else 0 end)`,
+        failed: sql<number>`sum(case when ${syncRuns.status} = 'failed' or (${syncRuns.status} = 'running' and ${syncRuns.startedAt} < ${staleCutoff}) then 1 else 0 end)`,
       })
       .from(syncRuns)
       .where(
@@ -225,13 +251,19 @@ system.openapi(syncHealthRoute, async (c) => {
     const failed = stats?.failed ?? 0;
     const errorRate = total > 0 ? failed / total : 0;
 
+    const stale = isStaleRun(latest?.status, latest?.startedAt);
+
     domains[domain] = {
       last_sync: latest?.completedAt ?? latest?.startedAt ?? null,
-      status: latest?.status ?? 'never',
+      status: stale ? 'stale' : (latest?.status ?? 'never'),
       sync_type: latest?.syncType ?? 'unknown',
       items_synced: latest?.itemsSynced ?? null,
       duration_ms: durationMs,
-      error: latest?.status === 'failed' ? (latest?.error ?? null) : null,
+      error: stale
+        ? `Sync run started ${latest?.startedAt} and never completed`
+        : latest?.status === 'failed'
+          ? (latest?.error ?? null)
+          : null,
       error_rate: Math.round(errorRate * 100) / 100,
     };
   }

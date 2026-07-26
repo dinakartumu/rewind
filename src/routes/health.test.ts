@@ -104,5 +104,44 @@ describe('health/sync endpoint', () => {
       expect(body.domains.running.error_rate).toBeGreaterThan(0);
       expect(body.domains.running.error_rate).toBeLessThanOrEqual(1);
     });
+
+    // A killed Worker invocation leaves its sync_runs row at 'running'
+    // forever: the catch block that would mark it 'failed' never gets to
+    // run. Reporting that verbatim hides a dead cron behind a status that
+    // reads as healthy-in-progress, which is how the Trakt watch-history
+    // sync stayed broken for eleven hours unnoticed.
+    it('reports a run stuck in "running" past the cutoff as stale', async () => {
+      const db = drizzle(env.DB);
+      await db.insert(syncRuns).values({
+        userId: 1,
+        domain: 'reading',
+        syncType: 'bookmarks',
+        status: 'running',
+        startedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      });
+
+      const res = await SELF.fetch('http://localhost/v1/health/sync');
+      const body = (await res.json()) as any;
+      expect(body.domains.reading.status).toBe('stale');
+      expect(body.domains.reading.error).toMatch(/never completed/i);
+      expect(body.domains.reading.error_rate).toBeGreaterThan(0);
+    });
+
+    it('leaves a recently started run reported as running', async () => {
+      const db = drizzle(env.DB);
+      await db.insert(syncRuns).values({
+        userId: 1,
+        domain: 'coding',
+        syncType: 'wakatime',
+        status: 'running',
+        startedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+      });
+
+      const res = await SELF.fetch('http://localhost/v1/health/sync');
+      const body = (await res.json()) as any;
+      expect(body.domains.coding.status).toBe('running');
+      expect(body.domains.coding.error).toBeNull();
+      expect(body.domains.coding.error_rate).toBe(0);
+    });
   });
 });

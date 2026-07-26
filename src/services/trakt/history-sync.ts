@@ -13,6 +13,7 @@ import { TmdbClient } from '../watching/tmdb.js';
 import { resolveMovie } from '../watching/resolve-movie.js';
 import { computeWatchStats } from '../plex/sync.js';
 import { afterSync } from '../../lib/after-sync.js';
+import { chunkForSelectIn } from '../../lib/d1-chunk.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import type { Env } from '../../types/env.js';
 
@@ -476,6 +477,13 @@ export function buildRatingsMap(
  * `IS NOT` predicate is SQLite's null-safe inequality, so rows whose
  * rating is NULL or stale get updated and already-correct rows are
  * left alone — repeat runs apply nothing.
+ *
+ * This runs on every hourly Trakt sync and almost always applies zero
+ * changes, so its cost has to stay flat as the rated library grows. Work is
+ * batched two ways: tmdbId lookups go out in D1-sized chunks, and the
+ * updates are grouped by rating value. Trakt ratings are 1-10, so a library
+ * of any size collapses to at most ten update statements instead of the
+ * two-round-trips-per-movie walk this replaced.
  */
 export async function applyMovieRatings(
   db: Database,
@@ -485,31 +493,87 @@ export async function applyMovieRatings(
   const ratings = buildRatingsMap(await client.getMovieRatings());
   if (ratings.size === 0) return 0;
 
-  let applied = 0;
-  for (const [tmdbId, rating] of ratings) {
-    const [movie] = await db
-      .select({ id: movies.id })
+  // Resolve tmdbId -> local movie id in bulk, bucketing by rating value.
+  const movieIdsByRating = new Map<number, number[]>();
+  for (const chunk of chunkForSelectIn([...ratings.keys()])) {
+    const rows = await db
+      .select({ id: movies.id, tmdbId: movies.tmdbId })
       .from(movies)
-      .where(eq(movies.tmdbId, tmdbId))
-      .limit(1);
-    if (!movie) continue;
+      .where(inArray(movies.tmdbId, chunk));
+    for (const row of rows) {
+      if (row.tmdbId === null) continue;
+      const rating = ratings.get(row.tmdbId);
+      if (rating === undefined) continue;
+      const bucket = movieIdsByRating.get(rating);
+      if (bucket) bucket.push(row.id);
+      else movieIdsByRating.set(rating, [row.id]);
+    }
+  }
 
-    const result = await db
-      .update(watchHistory)
-      .set({ userRating: rating })
-      .where(
-        and(
-          eq(watchHistory.userId, userId),
-          eq(watchHistory.movieId, movie.id),
-          eq(watchHistory.source, 'trakt'),
-          sql`${watchHistory.userRating} IS NOT ${rating}`
-        )
+  let applied = 0;
+  for (const [rating, movieIds] of movieIdsByRating) {
+    // Reserve three parameters for the user_id, source, and rating binds
+    // that ride alongside the movie_id IN-list.
+    for (const chunk of chunkForSelectIn(movieIds, 3)) {
+      const pending = and(
+        eq(watchHistory.userId, userId),
+        eq(watchHistory.source, 'trakt'),
+        inArray(watchHistory.movieId, chunk),
+        sql`${watchHistory.userRating} IS NOT ${rating}`
       );
-    if (result.meta.changes > 0) applied++;
+
+      // Count movies, not rows: a movie can have several watch rows, and the
+      // documented return value is per-movie. `meta.changes` counts rows, so
+      // the affected movies have to be read before the update lands.
+      const changing = await db
+        .selectDistinct({ movieId: watchHistory.movieId })
+        .from(watchHistory)
+        .where(pending);
+      if (changing.length === 0) continue;
+
+      await db.update(watchHistory).set({ userRating: rating }).where(pending);
+      applied += changing.length;
+    }
   }
 
   console.log(`[SYNC] Applied ${applied} Trakt movie ratings`);
   return applied;
+}
+
+/**
+ * Mark a sync run failed, never throwing.
+ *
+ * This is a D1 write inside a failure path, which means whatever killed the
+ * sync — an exhausted subrequest budget, a D1 outage — is likely to take
+ * this write down too. Letting that secondary error escape swapped the real
+ * cause for a misleading one and left the row stuck at 'running', so a dead
+ * cron reported as healthy-in-progress. Log and move on instead; a run left
+ * at 'running' past a Worker's lifetime is reported as stale by
+ * `GET /v1/health/sync`.
+ */
+export async function markRunFailed(
+  db: Database,
+  runId: number,
+  errorMsg: string
+): Promise<void> {
+  try {
+    await db
+      .update(syncRuns)
+      .set({
+        status: 'failed',
+        completedAt: new Date().toISOString(),
+        error: errorMsg,
+      })
+      .where(eq(syncRuns.id, runId));
+  } catch (bookkeepingError) {
+    const message =
+      bookkeepingError instanceof Error
+        ? bookkeepingError.message
+        : String(bookkeepingError);
+    console.log(
+      `[ERROR] Could not mark sync run ${runId} failed: ${message} (original error: ${errorMsg})`
+    );
+  }
 }
 
 /**
@@ -594,14 +658,7 @@ export async function syncTraktHistory(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.log(`[ERROR] Trakt history sync failed: ${errorMsg}`);
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, run.id));
+    await markRunFailed(db, run.id, errorMsg);
     throw err;
   }
 }
