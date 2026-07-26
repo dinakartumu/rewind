@@ -88,6 +88,16 @@ export const DENIED_TABLES: readonly string[] = [
   'sqlite_temp_schema',
   'd1_migrations',
   '_cf_KV',
+  // FTS5 index + its shadow tables. Undocumented (so the allow-list already
+  // excludes them), but they were the tables actually reachable through the
+  // comma-join bypass in #25 — named here so the redundant layer covers them
+  // too, and so the error is precise rather than a generic allow-list miss.
+  'search_index',
+  'search_index_config',
+  'search_index_content',
+  'search_index_data',
+  'search_index_docsize',
+  'search_index_idx',
   // Defensive: block any table ending in `_tokens` even if a new provider is
   // added later without updating this list. Handled separately in the scan so
   // the exact-name allow-substring test still passes; kept here for docs.
@@ -104,6 +114,27 @@ export const DENIED_TABLES: readonly string[] = [
  * which is caught separately (first-keyword check + the dedicated REPLACE-INTO
  * scan below) without breaking legitimate `replace()` calls.
  */
+/**
+ * Builtins whose whole purpose is to allocate. `randomblob(1e9)` is a gigabyte
+ * per row, and the LIMIT wrapper does not save us — it caps rows returned,
+ * while the allocation happens on the way to producing them. Nothing in a
+ * personal data archive has a legitimate use for either.
+ *
+ * `load_extension` is refused by D1 at the engine layer today
+ * (`D1_ERROR: not authorized`), but the guard should not depend on a platform
+ * behaviour it does not control.
+ */
+const DENY_FUNCTIONS = ['randomblob', 'zeroblob', 'load_extension'] as const;
+
+/**
+ * Ceiling on FROM/JOIN targets in a single query. A cross join of n tables is
+ * O(rows^n): four references to a 1,800-row table is 10^13 row combinations,
+ * which the row LIMIT cannot help with because an aggregate must materialise
+ * before the limit applies. Ten is far above any real cross-domain analytics
+ * join and far below anything that could hurt.
+ */
+export const MAX_TABLE_REFS = 10;
+
 const DENY_TOKENS = [
   'ATTACH',
   'DETACH',
@@ -420,19 +451,112 @@ function extractCteNames(sql: string): Set<string> {
  * A table-valued function (`FROM foo(...)`) still yields `foo`, which then
  * fails the allow-list (e.g. `pragma_table_info` is already blocked upstream).
  */
+/** A table token: dotted/quoted identifier forms. */
+const TABLE_TOKEN_SRC =
+  '"[^"]+"(?:\\.[^\\s,()]+)?|\\[[^\\]]+\\](?:\\.[^\\s,()]+)?|`[^`]+`(?:\\.[^\\s,()]+)?|[A-Za-z_][A-Za-z0-9_."[\\]`]*';
+
+/**
+ * Words that end a FROM table list. Needed to tell an alias (`FROM movies m`)
+ * from the next clause (`FROM movies WHERE …`) — both are a bare word after a
+ * table token.
+ */
+const CLAUSE_KEYWORDS = new Set([
+  'where',
+  'group',
+  'order',
+  'limit',
+  'having',
+  'union',
+  'intersect',
+  'except',
+  'join',
+  'inner',
+  'left',
+  'right',
+  'full',
+  'cross',
+  'natural',
+  'on',
+  'using',
+  'window',
+  'offset',
+]);
+
+/** Index just past the `(` … `)` group starting at `open`, or -1 if unbalanced. */
+function skipBalancedParens(sql: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === '(') depth++;
+    else if (sql[i] === ')' && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * Extract every table a query reads from.
+ *
+ * This walks the *whole* comma-separated FROM list, not just the token
+ * immediately after the keyword. Matching only the first one meant
+ * `SELECT * FROM movies, search_index` never presented `search_index` to the
+ * allow-list gate at all — an undocumented table read through a control that
+ * promises the opposite (issue #25).
+ *
+ * It fails CLOSED: a list item that cannot be parsed is returned as
+ * `ok: false` so the caller rejects the query. Silently skipping what we
+ * cannot read is exactly what turned a parsing limitation into an
+ * access-control hole; an unparseable FROM item must never mean "no table
+ * here".
+ */
 function extractTableRefs(sql: string): TableRef[] {
   const refs: TableRef[] = [];
-  // FROM/JOIN, then optional whitespace, then a table token that is NOT an
-  // opening paren (subquery). The token allows dotted/quoted identifiers.
-  const re =
-    /\b(?:FROM|JOIN)\s+("[^"]+"(?:\.[^\s,()]+)?|\[[^\]]+\](?:\.[^\s,()]+)?|`[^`]+`(?:\.[^\s,()]+)?|[A-Za-z_][A-Za-z0-9_."[\]`]*)/gi;
+  const re = new RegExp(`\\b(FROM|JOIN)\\s+`, 'gi');
   let match: RegExpExecArray | null;
+
   while ((match = re.exec(sql)) !== null) {
-    const token = match[1];
-    // Skip a subquery/paren source that slipped through (shouldn't, but safe).
-    if (token.startsWith('(')) continue;
-    refs.push(parseTableToken(token));
+    const isFrom = match[1].toUpperCase() === 'FROM';
+    let pos = re.lastIndex;
+
+    // Each iteration consumes one table-list item, then looks for a comma.
+    for (;;) {
+      const rest = sql.slice(pos);
+
+      if (rest.startsWith('(')) {
+        // A subquery/derived table is not a base table, but the list may
+        // continue after it — skip the group rather than abandoning the walk.
+        const after = skipBalancedParens(sql, pos);
+        if (after === -1) {
+          refs.push({ name: '', ok: false, raw: rest.slice(0, 40) });
+          break;
+        }
+        pos = after;
+      } else {
+        const tok = new RegExp(`^(${TABLE_TOKEN_SRC})`).exec(rest);
+        if (!tok || tok[1].length === 0) {
+          refs.push({ name: '', ok: false, raw: rest.slice(0, 40) });
+          break;
+        }
+        refs.push(parseTableToken(tok[1]));
+        pos += tok[1].length;
+      }
+
+      // Optional alias, with or without AS. A clause keyword here is the end
+      // of the list, not an alias.
+      const alias = /^\s+(?:(?:AS)\s+)?([A-Za-z_][A-Za-z0-9_]*)/i.exec(
+        sql.slice(pos)
+      );
+      if (alias && !CLAUSE_KEYWORDS.has(alias[1].toLowerCase())) {
+        pos += alias[0].length;
+      }
+
+      // Only FROM takes a comma-separated list; JOIN takes exactly one table.
+      const comma = isFrom ? /^\s*,\s*/.exec(sql.slice(pos)) : null;
+      if (!comma) break;
+      pos += comma[0].length;
+    }
+
+    re.lastIndex = pos;
   }
+
   return refs;
 }
 
@@ -523,6 +647,26 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
     }
   }
 
+  // 5a. Cost controls. Everything above bounds what a query may READ; these
+  //      bound what it may CONSUME. All run on the string-blanked SQL so a
+  //      literal like 'recursive descent' is not mistaken for the keyword.
+  if (/\bWITH\s+RECURSIVE\b/i.test(codeOnly)) {
+    return {
+      ok: false,
+      error:
+        'Recursive CTEs are not allowed: a non-terminating recursion cannot be bounded by the row limit and will exhaust the Worker.',
+    };
+  }
+
+  for (const fn of DENY_FUNCTIONS) {
+    if (hasWord(codeOnly.toLowerCase(), fn)) {
+      return {
+        ok: false,
+        error: `Disallowed function: ${fn}. It has no read-only use and can exhaust memory or load native code.`,
+      };
+    }
+  }
+
   // 5b. REPLACE is not in DENY_TOKENS (it collides with the `replace()` scalar
   //     function, which is common and legitimate). The only side-effecting
   //     form is a statement: `REPLACE INTO …` or a statement-initial REPLACE.
@@ -576,6 +720,16 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
   //    isn't treated as a table reference.
   const cteNames = extractCteNames(codeOnly);
   const refs = extractTableRefs(codeOnly);
+
+  // Bound the cross-product before validating individual names: the cost of a
+  // cartesian blow-up does not depend on which allowed tables are involved.
+  if (refs.length > MAX_TABLE_REFS) {
+    return {
+      ok: false,
+      error: `Too many table references (${refs.length}, max ${MAX_TABLE_REFS}). Large cross joins cannot be bounded by the row limit.`,
+    };
+  }
+
   for (const ref of refs) {
     if (!ref.ok) {
       return {
