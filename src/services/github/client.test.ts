@@ -29,7 +29,15 @@ function contributionsResponse(): Record<string, unknown> {
   };
 }
 
-/** Events feed: one PushEvent (2 commits), one WatchEvent to ignore. */
+/**
+ * Events feed: one PushEvent, one WatchEvent to ignore.
+ *
+ * This mirrors the payload GitHub ACTUALLY returns today — `before`, `head`,
+ * `push_id`, `ref`, `repository_id` and nothing else. The `commits` array that
+ * older versions of this fixture carried was removed from the live API; keeping
+ * it here is what let the commits phase silently ingest nothing for months
+ * while the suite stayed green. Do not reintroduce it.
+ */
 function eventsResponse(): unknown[] {
   return [
     {
@@ -38,20 +46,11 @@ function eventsResponse(): unknown[] {
       created_at: '2026-07-23T09:00:00Z',
       repo: { name: 'pat/rewind' },
       payload: {
-        commits: [
-          {
-            sha: 'aaa111',
-            message: 'first commit\nbody',
-            distinct: true,
-            author: { email: 'pat@example.com' },
-          },
-          {
-            sha: 'bbb222',
-            message: 'second commit',
-            distinct: false,
-            author: { email: 'other@example.com' },
-          },
-        ],
+        repository_id: 886581285,
+        push_id: 38164499178,
+        ref: 'refs/heads/main',
+        head: 'bbb222',
+        before: 'aaa000',
       },
     },
     {
@@ -62,6 +61,32 @@ function eventsResponse(): unknown[] {
       payload: {},
     },
   ];
+}
+
+/** Compare API response for aaa000...bbb222 — two commits by two authors. */
+function compareResponse(): Record<string, unknown> {
+  return {
+    status: 'ahead',
+    ahead_by: 2,
+    commits: [
+      {
+        sha: 'aaa111',
+        author: { login: 'patuser' },
+        commit: {
+          message: 'first commit\nbody',
+          author: { date: '2026-07-23T08:55:00Z' },
+        },
+      },
+      {
+        sha: 'bbb222',
+        author: { login: 'teammate' },
+        commit: {
+          message: 'second commit',
+          author: { date: '2026-07-23T08:58:00Z' },
+        },
+      },
+    ],
+  };
 }
 
 /** One search page with a merged PR and an open PR. */
@@ -239,7 +264,7 @@ describe('GithubClient', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify(eventsResponse())));
 
-    await client.getRecentCommits();
+    await client.getRecentPushes();
 
     const [url, options] = fetchSpy.mock.calls[0];
     expect(url).toContain('https://api.github.com/users/patuser/events');
@@ -252,46 +277,139 @@ describe('GithubClient', () => {
     expect(headers['X-GitHub-Api-Version']).toBe('2022-11-28');
   });
 
-  it('should flatten PushEvents to commits and ignore non-push events', async () => {
+  it('should map PushEvents to push descriptors and ignore non-push events', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(eventsResponse()))
     );
 
-    const { commits, notModified } = await client.getRecentCommits(2);
+    const { pushes, notModified } = await client.getRecentPushes(2);
 
     expect(notModified).toBe(false);
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0]).toEqual({
+      repo: 'pat/rewind',
+      before: 'aaa000',
+      head: 'bbb222',
+      ref: 'refs/heads/main',
+      isPrivate: true,
+      pushedAt: '2026-07-23T09:00:00Z',
+    });
+  });
+
+  it('should resolve a push to its commits via the compare API', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify(compareResponse())));
+
+    const commits = await client.getPushCommits({
+      repo: 'pat/rewind',
+      before: 'aaa000',
+      head: 'bbb222',
+      ref: 'refs/heads/main',
+      isPrivate: true,
+      pushedAt: '2026-07-23T09:00:00Z',
+    });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/pat/rewind/compare/aaa000...bbb222'
+    );
     expect(commits).toHaveLength(2);
+    // committedAt comes from the commit's own author date, not the push time.
     expect(commits[0]).toEqual({
       sha: 'aaa111',
       repo: 'pat/rewind',
       message: 'first commit\nbody',
-      committedAt: '2026-07-23T09:00:00Z',
+      committedAt: '2026-07-23T08:55:00Z',
       isPrivate: true,
-      distinct: true,
-      authorEmail: 'pat@example.com',
+      authorLogin: 'patuser',
     });
-    expect(commits[1]).toEqual({
-      sha: 'bbb222',
-      repo: 'pat/rewind',
-      message: 'second commit',
-      committedAt: '2026-07-23T09:00:00Z',
-      isPrivate: true,
-      distinct: false,
-      authorEmail: 'other@example.com',
-    });
+    expect(commits[1].authorLogin).toBe('teammate');
   });
 
-  it('should map the distinct flag and author email through PushEvent flattening', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify(eventsResponse()))
+  it('should fall back to the head commit when the push creates a branch', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          sha: 'bbb222',
+          author: { login: 'patuser' },
+          commit: {
+            message: 'new branch',
+            author: { date: '2026-07-23T08:58:00Z' },
+          },
+        })
+      )
     );
 
-    const { commits } = await client.getRecentCommits();
+    const commits = await client.getPushCommits({
+      repo: 'pat/rewind',
+      before: '0000000000000000000000000000000000000000',
+      head: 'bbb222',
+      ref: 'refs/heads/feature',
+      isPrivate: true,
+      pushedAt: '2026-07-23T09:00:00Z',
+    });
 
-    expect(commits[0].distinct).toBe(true);
-    expect(commits[0].authorEmail).toBe('pat@example.com');
-    expect(commits[1].distinct).toBe(false);
-    expect(commits[1].authorEmail).toBe('other@example.com');
+    // No compare is possible against the null SHA — go straight to the commit.
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.github.com/repos/pat/rewind/commits/bbb222'
+    );
+    expect(commits).toHaveLength(1);
+    expect(commits[0].sha).toBe('bbb222');
+  });
+
+  it('should fall back to the head commit when the compare base was garbage-collected', async () => {
+    // Compare 404s (force-pushed base), then the head commit resolves.
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sha: 'bbb222',
+            author: { login: 'patuser' },
+            commit: {
+              message: 'rewritten',
+              author: { date: '2026-07-23T08:58:00Z' },
+            },
+          })
+        )
+      );
+
+    const commits = await client.getPushCommits({
+      repo: 'pat/rewind',
+      before: 'aaa000',
+      head: 'bbb222',
+      ref: 'refs/heads/main',
+      isPrivate: true,
+      pushedAt: '2026-07-23T09:00:00Z',
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[1][0]).toBe(
+      'https://api.github.com/repos/pat/rewind/commits/bbb222'
+    );
+    expect(commits).toHaveLength(1);
+    expect(commits[0].sha).toBe('bbb222');
+    expect(commits[0].message).toBe('rewritten');
+  });
+
+  it('should return no commits when even the head commit is unreachable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 })
+    );
+
+    const commits = await client.getPushCommits({
+      repo: 'pat/rewind',
+      before: 'aaa000',
+      head: 'bbb222',
+      ref: 'refs/heads/main',
+      isPrivate: true,
+      pushedAt: '2026-07-23T09:00:00Z',
+    });
+
+    expect(commits).toEqual([]);
   });
 
   it('should send If-None-Match when an etag is provided', async () => {
@@ -301,7 +419,7 @@ describe('GithubClient', () => {
       })
     );
 
-    await client.getRecentCommits(1, '"oldtag"');
+    await client.getRecentPushes(1, '"oldtag"');
 
     const headers = (fetchSpy.mock.calls[0][1] as RequestInit)
       .headers as Record<string, string>;
@@ -316,11 +434,11 @@ describe('GithubClient', () => {
       })
     );
 
-    const result = await client.getRecentCommits(1);
+    const result = await client.getRecentPushes(1);
 
     expect(result.etag).toBe('"freshtag"');
     expect(result.notModified).toBe(false);
-    expect(result.commits).toHaveLength(2);
+    expect(result.pushes).toHaveLength(1);
   });
 
   it('should return notModified with empty commits on a 304', async () => {
@@ -331,10 +449,10 @@ describe('GithubClient', () => {
       })
     );
 
-    const result = await client.getRecentCommits(1, '"oldtag"');
+    const result = await client.getRecentPushes(1, '"oldtag"');
 
     expect(result.notModified).toBe(true);
-    expect(result.commits).toEqual([]);
+    expect(result.pushes).toEqual([]);
     expect(result.etag).toBe('"oldtag"');
   });
 
@@ -425,7 +543,7 @@ describe('GithubClient', () => {
       new Response(JSON.stringify(eventsResponse()), { status: 200 })
     );
 
-    const result = await client.getRecentCommits(1, '"stored"');
+    const result = await client.getRecentPushes(1, '"stored"');
 
     expect(result.etag).toBe('"stored"');
     expect(result.notModified).toBe(false);
@@ -455,7 +573,7 @@ describe('GithubClient', () => {
       })
     );
 
-    await expect(client.getRecentCommits()).rejects.toBeInstanceOf(
+    await expect(client.getRecentPushes()).rejects.toBeInstanceOf(
       GithubRateLimitError
     );
   });
@@ -468,7 +586,7 @@ describe('GithubClient', () => {
       })
     );
 
-    await expect(client.getRecentCommits()).rejects.toThrow('500');
+    await expect(client.getRecentPushes()).rejects.toThrow('500');
   });
 
   it('should return commit stats additions/deletions', async () => {

@@ -21,7 +21,7 @@ import type {
   GithubClient,
   GithubCommitRow,
   GithubItem,
-  GithubRecentCommitsResult,
+  GithubPushRow,
 } from './client.js';
 import type { Env } from '../../types/env.js';
 
@@ -37,9 +37,20 @@ function makeKv(initial: Record<string, string> = {}) {
   return { kv, store };
 }
 
+/**
+ * Events-feed state for the stub. `commits` are what the synthetic push
+ * resolves to through getPushCommits — the PushEvent payload itself no longer
+ * carries commits, so the stub models the two-step fetch the real client does.
+ */
+interface StubEvents {
+  commits: GithubCommitRow[];
+  etag: string | null;
+  notModified: boolean;
+}
+
 interface StubOptions {
   contributionDays?: Array<{ date: string; count: number }>;
-  recentCommits?: GithubRecentCommitsResult;
+  recentCommits?: StubEvents;
   /**
    * Per-sha commit-stats behavior. A value throws when it is an Error instance
    * (models a transient 500 / network blip or an exhausted rate limit); null
@@ -55,10 +66,21 @@ interface StubOptions {
 
 interface StubCalls {
   getContributionDays: Array<{ from: string; to: string }>;
-  getRecentCommits: Array<{ page: number; etag?: string }>;
+  getRecentPushes: Array<{ page: number; etag?: string }>;
+  getPushCommits: string[];
   getCommitStats: string[];
   searchAuthored: Array<{ type: 'pr' | 'issue'; page: number }>;
 }
+
+/** The single synthetic push the stub's events feed returns. */
+const STUB_PUSH: GithubPushRow = {
+  repo: 'me/rewind',
+  before: 'base000',
+  head: 'head999',
+  ref: 'refs/heads/main',
+  isPrivate: false,
+  pushedAt: '2026-07-23T10:00:00Z',
+};
 
 function makeClient(opts: StubOptions = {}): {
   client: GithubClient;
@@ -66,7 +88,8 @@ function makeClient(opts: StubOptions = {}): {
 } {
   const calls: StubCalls = {
     getContributionDays: [],
-    getRecentCommits: [],
+    getRecentPushes: [],
+    getPushCommits: [],
     getCommitStats: [],
     searchAuthored: [],
   };
@@ -75,15 +98,24 @@ function makeClient(opts: StubOptions = {}): {
       calls.getContributionDays.push({ from, to });
       return opts.contributionDays ?? [];
     },
-    getRecentCommits: async (page = 1, etag?: string) => {
-      calls.getRecentCommits.push({ page, etag });
-      return (
-        opts.recentCommits ?? {
-          commits: [],
-          etag: null,
-          notModified: false,
-        }
-      );
+    getRecentPushes: async (page = 1, etag?: string) => {
+      calls.getRecentPushes.push({ page, etag });
+      const events = opts.recentCommits ?? {
+        commits: [],
+        etag: null,
+        notModified: false,
+      };
+      return {
+        // No push at all when the feed is unchanged or carries nothing.
+        pushes:
+          events.notModified || events.commits.length === 0 ? [] : [STUB_PUSH],
+        etag: events.etag,
+        notModified: events.notModified,
+      };
+    },
+    getPushCommits: async (push: GithubPushRow) => {
+      calls.getPushCommits.push(push.head);
+      return opts.recentCommits?.commits ?? [];
     },
     getCommitStats: async (_repo: string, sha: string) => {
       calls.getCommitStats.push(sha);
@@ -117,8 +149,7 @@ function commit(
     message: `commit ${sha}`,
     committedAt: '2026-07-23T10:00:00Z',
     isPrivate: false,
-    distinct: true,
-    authorEmail: 'me@example.com',
+    authorLogin: 'me',
     ...overrides,
   };
 }
@@ -236,7 +267,7 @@ describe('syncGithubIncremental', () => {
     expect(rows.map((r) => r.sha)).toEqual(['sha-a', 'sha-b', 'sha-c']);
   });
 
-  it('skips non-distinct commits (rebase re-pushes)', async () => {
+  it('drops commits authored by someone else, keeps ours and unattributed ones', async () => {
     const db = createDb(env.DB);
     const { kv } = makeKv();
 
@@ -245,8 +276,11 @@ describe('syncGithubIncremental', () => {
       makeClient({
         recentCommits: {
           commits: [
-            commit('keep-1', { distinct: true }),
-            commit('drop-1', { distinct: false }),
+            commit('keep-mine', { authorLogin: 'me' }),
+            commit('drop-theirs', { authorLogin: 'teammate' }),
+            // Null login: an email GitHub maps to no account. Kept — on a
+            // personal account that is far more often our own stale email.
+            commit('keep-unattributed', { authorLogin: null }),
           ],
           etag: 'e',
           notModified: false,
@@ -256,9 +290,32 @@ describe('syncGithubIncremental', () => {
       USERNAME
     );
 
-    expect(result.newCommits.map((c) => c.sha)).toEqual(['keep-1']);
+    expect(result.newCommits.map((c) => c.sha)).toEqual([
+      'keep-mine',
+      'keep-unattributed',
+    ]);
     const rows = await db.select().from(githubCommits);
-    expect(rows.map((r) => r.sha)).toEqual(['keep-1']);
+    expect(rows.map((r) => r.sha)).toEqual(['keep-mine', 'keep-unattributed']);
+  });
+
+  it('resolves each push through the compare API rather than the event payload', async () => {
+    const db = createDb(env.DB);
+    const { kv } = makeKv();
+    const { client, calls } = makeClient({
+      recentCommits: {
+        commits: [commit('from-compare')],
+        etag: 'e',
+        notModified: false,
+      },
+    });
+
+    await syncGithubIncremental(db, client, kv, USERNAME);
+
+    // The push must be resolved in a second call; reading commits straight off
+    // the event is what silently ingested nothing for months.
+    expect(calls.getPushCommits).toEqual(['head999']);
+    const rows = await db.select().from(githubCommits);
+    expect(rows.map((r) => r.sha)).toEqual(['from-compare']);
   });
 
   it('honors the commit-detail cap: >25 new commits → only 25 stats fetches, others keep null additions', async () => {
@@ -430,7 +487,7 @@ describe('syncGithubIncremental', () => {
     await syncGithubIncremental(db, client, kv, USERNAME);
 
     // Called with the stored etag.
-    expect(calls.getRecentCommits).toEqual([{ page: 1, etag: 'stored-etag' }]);
+    expect(calls.getRecentPushes).toEqual([{ page: 1, etag: 'stored-etag' }]);
     // No commit-detail fetches, no rows inserted.
     expect(calls.getCommitStats).toHaveLength(0);
     const [total] = await db
@@ -864,7 +921,7 @@ describe('backfillGithub', () => {
     );
   });
 
-  it('issues phase: an exhausted page completes the walk (null cursor)', async () => {
+  it('issues phase: an exhausted page advances to the commits phase', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes('/search/issues')) {
@@ -878,9 +935,194 @@ describe('backfillGithub', () => {
       JSON.stringify({ phase: 'issues', page: 1 })
     );
 
-    expect(result.nextCursor).toBeNull();
+    expect(result.nextCursor).toBe(
+      JSON.stringify({
+        phase: 'commits',
+        repoPage: 1,
+        repoIdx: 0,
+        commitPage: 1,
+      })
+    );
     const issues = await createDb(env.DB).select().from(githubIssues);
     expect(issues.length).toBeGreaterThan(0);
+  });
+
+  describe('commits phase', () => {
+    /** A /user/repos page. */
+    function reposResponse(names: string[], isPrivate = false): Response {
+      return new Response(
+        JSON.stringify(
+          names.map((full_name) => ({ full_name, private: isPrivate }))
+        )
+      );
+    }
+
+    /** A /repos/:repo/commits page of `count` commits. */
+    function commitsResponse(prefix: string, count: number): Response {
+      return new Response(
+        JSON.stringify(
+          Array.from({ length: count }, (_, i) => ({
+            sha: `${prefix}-${String(i).padStart(3, '0')}`,
+            author: { login: 'me' },
+            commit: {
+              message: `commit ${i}`,
+              author: { date: '2020-04-01T10:00:00Z' },
+            },
+          }))
+        )
+      );
+    }
+
+    /** Mocks the repo list and per-repo commit pages. */
+    function mockCommitsWalk(
+      repoPages: Record<number, string[]>,
+      commitPages: Record<string, number>
+    ) {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.includes('/user/repos')) {
+          const page = Number(new URL(url).searchParams.get('page') ?? '1');
+          return reposResponse(repoPages[page] ?? []);
+        }
+        const match = url.match(/\/repos\/(.+?)\/commits\?/);
+        if (match) {
+          const page = Number(new URL(url).searchParams.get('page') ?? '1');
+          const key = `${match[1]}#${page}`;
+          return commitsResponse(
+            match[1].replace('/', '-'),
+            commitPages[key] ?? 0
+          );
+        }
+        return new Response(JSON.stringify([]));
+      });
+    }
+
+    it('inserts a repo page of commits and advances to the next repo', async () => {
+      mockCommitsWalk({ 1: ['me/alpha', 'me/beta'] }, { 'me/alpha#1': 3 });
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 0,
+          commitPage: 1,
+        })
+      );
+
+      expect(result.itemsSynced).toBe(3);
+      // A short page means the repo is exhausted — move to repoIdx 1.
+      expect(result.nextCursor).toBe(
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 1,
+          commitPage: 1,
+        })
+      );
+      const rows = await createDb(env.DB).select().from(githubCommits);
+      expect(rows).toHaveLength(3);
+      expect(rows[0].repo).toBe('me/alpha');
+    });
+
+    it('pages within a repo while the page is full', async () => {
+      mockCommitsWalk({ 1: ['me/alpha'] }, { 'me/alpha#1': 100 });
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 0,
+          commitPage: 1,
+        })
+      );
+
+      expect(result.itemsSynced).toBe(100);
+      expect(result.nextCursor).toBe(
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 0,
+          commitPage: 2,
+        })
+      );
+    });
+
+    it('advances to the next repo page once the current page is consumed', async () => {
+      // 100 repos on page 1 means there may be a page 2 — keep walking.
+      const full = Array.from({ length: 100 }, (_, i) => `me/repo-${i}`);
+      mockCommitsWalk({ 1: full }, {});
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 100,
+          commitPage: 1,
+        })
+      );
+
+      expect(result.nextCursor).toBe(
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 2,
+          repoIdx: 0,
+          commitPage: 1,
+        })
+      );
+    });
+
+    it('completes the walk when a short repo page is consumed', async () => {
+      mockCommitsWalk({ 1: ['me/alpha', 'me/beta'] }, {});
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 1,
+          repoIdx: 2,
+          commitPage: 1,
+        })
+      );
+
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('completes the walk when the repo list runs out', async () => {
+      mockCommitsWalk({}, {});
+
+      const result = await backfillGithub(
+        githubEnv(),
+        JSON.stringify({
+          phase: 'commits',
+          repoPage: 5,
+          repoIdx: 0,
+          commitPage: 1,
+        })
+      );
+
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('counts only truly-new rows, so a re-run does not inflate itemsSynced', async () => {
+      mockCommitsWalk({ 1: ['me/alpha'] }, { 'me/alpha#1': 4 });
+      const cursor = JSON.stringify({
+        phase: 'commits',
+        repoPage: 1,
+        repoIdx: 0,
+        commitPage: 1,
+      });
+
+      const first = await backfillGithub(githubEnv(), cursor);
+      const second = await backfillGithub(githubEnv(), cursor);
+
+      expect(first.itemsSynced).toBe(4);
+      expect(second.itemsSynced).toBe(0);
+      const rows = await createDb(env.DB).select().from(githubCommits);
+      expect(rows).toHaveLength(4);
+    });
   });
 
   describe('cursor validation', () => {
