@@ -49,6 +49,7 @@ export const SCHEMA_DOC: SchemaDoc = {
     'Cross-domain join keys: performers.lastfm_artist_id → lastfm_artists.id (concerts ↔ listening); collection_listening_xref links discogs_collection ↔ Last.fm play counts by matched name; trakt_collection.movie_id and watch_history.movie_id → movies.id (physical media ↔ watched films).',
     'Enums are stored as plain text. Notable ones: watch_history.source (plex|letterboxd|manual|trakt), trakt_collection.media_type (bluray|uhd_bluray|hddvd|dvd|digital), reading_items.status (unread|reading|finished), attended_events.category (sports|music|arts).',
     'Coding domain: wakatime_durations/wakatime_daily_summaries (editor time), rescuetime_activities/rescuetime_daily_summaries (screen time; productivity -2..+2), github_commits/github_pull_requests/github_issues/github_contribution_days (authored activity incl. private repos). Cross-source join: wakatime project names often equal github repo short names (m.repo LIKE "%/" || project).',
+    "Podcast domain (Castro): podcast_shows / podcast_episodes / podcast_play_sessions / podcast_transcripts. Castro publishes no way to resolve an episode UUID to a title, so episode identity is INFERRED and every row carries podcast_episodes.match_confidence — 'pinned' is exact, 'high'/'medium' are duration+date matches, 'low' is a guess that is frequently the wrong episode, 'none' is unidentified. Add `WHERE match_confidence IN ('pinned','high','medium')` whenever a query reports episode titles; show-level and session-level facts are exact regardless and need no such filter. Transcripts cover played episodes only (~1.4k of 6.5k rows) and have advertising stripped out.",
   ],
   tables: [
     // ─── Listening (Last.fm + Apple Music) ───────────────────────────
@@ -1085,6 +1086,175 @@ export const SCHEMA_DOC: SchemaDoc = {
         c('items_synced', 'integer', 'nullable'),
         c('error', 'text', 'nullable'),
         c('retry_count', 'integer'),
+      ],
+    },
+
+    // ─── Podcasts (Castro) ───────────────────────────────────────────
+    {
+      name: 'podcast_shows',
+      purpose:
+        'One row per podcast known to the Castro library, with subscription state and per-show playback preferences.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('castro_public_id', 'text', "Castro's internal show UUID"),
+        c(
+          'itunes_id',
+          'text',
+          'Apple Podcasts collectionId — stable across services, nullable'
+        ),
+        c('feed_url', 'text', 'RSS feed, nullable'),
+        c('website', 'text', 'nullable'),
+        c(
+          'title',
+          'text',
+          'nullable when the show was delisted before it could be resolved'
+        ),
+        c('author', 'text', 'publisher/network, nullable'),
+        c('description', 'text', 'nullable'),
+        c(
+          'artwork_url',
+          'text',
+          "source URL; the CDN copy lives in `images` (domain 'listening')"
+        ),
+        c('categories', 'text', 'JSON array of strings'),
+        c('subscribed', 'integer', '0/1'),
+        c('playback_rate', 'integer', 'nullable'),
+        c('trim_silence', 'integer', '0/1'),
+        c('mono_mix', 'integer', '0/1'),
+        c('enhanced_audio', 'integer', '0/1'),
+        c(
+          'episode_count',
+          'integer',
+          'episodes Castro lists for the show, not episodes played'
+        ),
+        c('episodes_played', 'integer'),
+        c('session_count', 'integer'),
+        c('total_listened_seconds', 'integer'),
+        c('first_played_at', 'text', 'ISO 8601, nullable'),
+        c('last_played_at', 'text', 'ISO 8601, nullable'),
+      ],
+      joins: [
+        'podcast_episodes.show_id → podcast_shows.id',
+        'podcast_play_sessions.show_id → podcast_shows.id',
+      ],
+    },
+    {
+      name: 'podcast_episodes',
+      purpose:
+        'One row per episode the user played, starred, or holds in their library. Episode identity is INFERRED — see match_confidence.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c(
+          'show_id',
+          'integer',
+          '→ podcast_shows.id, nullable when the show is unknown'
+        ),
+        c(
+          'castro_episode_id',
+          'text',
+          "Castro's episode UUID; the only always-present identifier"
+        ),
+        c('title', 'text', 'NULL when match_confidence = none'),
+        c('published_at', 'text', 'YYYY-MM-DD, nullable'),
+        c('duration_seconds', 'integer', 'nullable'),
+        c('audio_url', 'text', 'nullable'),
+        c(
+          'match_confidence',
+          'text',
+          "pinned | high | medium | low | none. IMPORTANT: Castro exposes no way to resolve an episode UUID, so titles are inferred. 'pinned' is exact (Castro's own most-recent-episode record); 'high'/'medium' match on duration + publish date; 'low' is a guess and is often the WRONG episode; 'none' means unidentified. Filter to ('pinned','high','medium') for trustworthy titles."
+        ),
+        c(
+          'match_delta_seconds',
+          'real',
+          'duration gap behind the match, nullable'
+        ),
+        c('starred', 'integer', '0/1 — episodes the user explicitly flagged'),
+        c('unpublished', 'integer', '0/1 — pulled from the feed'),
+        c('resume_position_seconds', 'real', 'nullable'),
+        c('in_library_state', 'text', 'inbox | queue | archived, nullable'),
+        c('times_played', 'integer', '0 for starred-but-never-played episodes'),
+        c('total_listened_seconds', 'integer'),
+        c('completed', 'integer', '0/1, reached ~95% of duration'),
+        c('first_played_at', 'text', 'ISO 8601, nullable'),
+        c('last_played_at', 'text', 'ISO 8601, nullable'),
+        c('language', 'text', 'detected, nullable'),
+        c('has_transcript', 'integer', '0/1'),
+      ],
+      joins: [
+        'podcast_episodes.show_id → podcast_shows.id',
+        'podcast_transcripts.episode_id → podcast_episodes.id',
+        'podcast_play_sessions.episode_id → podcast_episodes.id',
+      ],
+    },
+    {
+      name: 'podcast_play_sessions',
+      purpose:
+        'Every individual listening session — the event-level record behind streaks, on-this-day, and time-of-day analysis.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c(
+          'episode_id',
+          'integer',
+          '→ podcast_episodes.id, nullable if unidentified'
+        ),
+        c('show_id', 'integer', '→ podcast_shows.id, nullable'),
+        c('began_at', 'text', 'ISO 8601 UTC'),
+        c('finished_at', 'text', 'ISO 8601 UTC, nullable'),
+        c(
+          'played_from_seconds',
+          'real',
+          'position in the episode where this session started'
+        ),
+        c('played_to_seconds', 'real'),
+        c('listened_seconds', 'real', 'played_to − played_from'),
+        c('trimmed', 'integer', '0/1 — trim-silence was active'),
+      ],
+      joins: ['podcast_play_sessions.episode_id → podcast_episodes.id'],
+    },
+    {
+      name: 'podcast_transcripts',
+      purpose:
+        'Machine-generated transcript per episode. `text` is full-text searchable with LIKE.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('episode_id', 'integer', '→ podcast_episodes.id, unique'),
+        c('language', 'text'),
+        c(
+          'engine',
+          'text',
+          'parakeet-tdt-0.6b-v2 (English) or whisper-large-v3-turbo'
+        ),
+        c('word_count', 'integer'),
+        c(
+          'text',
+          'text',
+          'ad-stripped transcript. Advertising is dynamically inserted and differs per download, so it is removed rather than stored as content.'
+        ),
+        c('ad_seconds_removed', 'real'),
+        c(
+          'ad_spans',
+          'text',
+          'JSON array of [start, end] second pairs that were cut'
+        ),
+        c('ad_detection_method', 'text', 'repetition-v1'),
+        c('transcribed_at', 'text', 'ISO 8601'),
+      ],
+      joins: ['podcast_transcripts.episode_id → podcast_episodes.id'],
+    },
+    {
+      name: 'podcast_backups',
+      purpose:
+        'Provenance for each imported Castro backup snapshot — which file a row came from and how fresh it is.',
+      columns: [
+        c('id', 'integer', 'PK'),
+        c('filename', 'text'),
+        c('exported_at', 'text', 'ISO 8601, when Castro wrote the snapshot'),
+        c('device_name', 'text', 'nullable'),
+        c('device_model', 'text', 'nullable'),
+        c('show_count', 'integer'),
+        c('episode_count', 'integer'),
+        c('session_count', 'integer'),
+        c('imported_at', 'text', 'ISO 8601'),
       ],
     },
   ],
