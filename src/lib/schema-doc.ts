@@ -1236,7 +1236,7 @@ export const SCHEMA_DOC: SchemaDoc = {
           'text',
           'JSON array of [start, end] second pairs that were cut'
         ),
-        c('ad_detection_method', 'text', 'repetition-v1'),
+        c('ad_detection_method', 'text', 'repetition-v2'),
         c('transcribed_at', 'text', 'ISO 8601'),
       ],
       joins: ['podcast_transcripts.episode_id → podcast_episodes.id'],
