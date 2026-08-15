@@ -21,7 +21,7 @@ jobs:
     name: Build & Verify
     runs-on: ubuntu-latest
     env:
-      REWIND_DOCS_TOKEN: ${{ secrets.REWIND_DOCS_TOKEN }}
+      REWIND_DOCS_SSH_KEY: ${{ secrets.REWIND_DOCS_SSH_KEY }}
     defaults:
       run:
         working-directory: mcp-server
@@ -40,16 +40,24 @@ jobs:
       - run: npm test
 
       # The docs live in a separate private repo served by Pageloop, so the
-      # drift check needs a checkout of it. Skipped when the token is absent
-      # (forks), since the check cannot run without access.
+      # drift check needs a checkout of it. Access is a read-only deploy key
+      # on rewind-docs. Skipped when the secret is absent (forks), since the
+      # check cannot run without access.
       - name: Check out docs repo
         id: docs_checkout
-        if: env.REWIND_DOCS_TOKEN != ''
+        if: env.REWIND_DOCS_SSH_KEY != ''
         working-directory: ${{ github.workspace }}
         run: |
-          git clone --depth 1 \
-            "https://x-access-token:${REWIND_DOCS_TOKEN}@github.com/dinakartumu/rewind-docs.git" \
-            "${RUNNER_TEMP}/rewind-docs"
+          KEY_FILE="$(mktemp)"
+          # Written via printf, not the heredoc-prone echo, so the trailing
+          # newline OpenSSH requires survives.
+          printf '%s\n' "$REWIND_DOCS_SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          GIT_SSH_COMMAND="ssh -i $KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git clone --depth 1 \
+              git@github.com:dinakartumu/rewind-docs.git \
+              "${RUNNER_TEMP}/rewind-docs"
           echo "dir=${RUNNER_TEMP}/rewind-docs" >> "$GITHUB_OUTPUT"
 
       - name: Verify MDX docs reference every registered tool/prompt/resource
