@@ -10,10 +10,10 @@
  *   - An admin API key in REWIND_ADMIN_KEY env var
  *
  * Usage:
- *   REWIND_ADMIN_KEY=rw_admin_... npx tsx scripts/tools/import-manual-attending.ts \
+ *   REWIND_ADMIN_KEY=rw_... npx tsx scripts/tools/import-manual-attending.ts \
  *     scripts/data/manual-attending-uw-2007-2010.json
  *
- *   REWIND_ADMIN_KEY=rw_admin_... npx tsx scripts/tools/import-manual-attending.ts \
+ *   REWIND_ADMIN_KEY=rw_... npx tsx scripts/tools/import-manual-attending.ts \
  *     scripts/data/manual-attending-uw-recent.json --remote
  */
 
