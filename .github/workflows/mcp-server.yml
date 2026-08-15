@@ -105,11 +105,13 @@ jobs:
 
       - run: npm ci
 
-      # The reference pages are generated from the MCP manifest, so they are
-      # regenerated here and pushed rather than hand-maintained in the docs
-      # repo. Needs a write-capable deploy key; the drift check's key is
+      # Two generated artifacts belong to the docs repo but are produced
+      # here: the MCP tool reference (from the manifest) and openapi.json
+      # (which drives the site's API Reference). Both are pushed rather
+      # than hand-maintained, since a hand-copied spec silently goes stale.
+      # Needs a write-capable deploy key; the drift check's key is
       # read-only on purpose.
-      - name: Regenerate and push the MCP tool reference
+      - name: Regenerate and push the docs artifacts
         if: env.REWIND_DOCS_PUBLISH_KEY != ''
         run: |
           KEY_FILE="$(mktemp)"
@@ -123,18 +125,19 @@ jobs:
             "${RUNNER_TEMP}/rewind-docs"
 
           REWIND_DOCS_DIR="${RUNNER_TEMP}/rewind-docs" npm run docs:gen-mcp
+          cp openapi.snapshot.json "${RUNNER_TEMP}/rewind-docs/openapi.json"
 
           cd "${RUNNER_TEMP}/rewind-docs"
           if git diff --quiet; then
-            echo "MCP tool reference already up to date; nothing to publish."
+            echo "Docs artifacts already up to date; nothing to publish."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A reference/mcp-tools
+          git add -A reference/mcp-tools openapi.json
           git commit \
-            -m "docs: regenerate MCP tool reference" \
-            -m "Generated from rewind@${GITHUB_SHA} by scripts/gen-mcp-reference.ts."
+            -m "docs: regenerate MCP tool reference and API spec" \
+            -m "Generated from rewind@${GITHUB_SHA}."
           git push
 
   publish-npm:
