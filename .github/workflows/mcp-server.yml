@@ -7,12 +7,10 @@ on:
     branches: [main]
     paths:
       - 'mcp-server/**'
-      - 'docs-mintlify/**'
   pull_request:
     branches: [main]
     paths:
       - 'mcp-server/**'
-      - 'docs-mintlify/**'
 
 concurrency:
   group: mcp-server-${{ github.ref }}
@@ -22,6 +20,8 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-latest
+    env:
+      REWIND_DOCS_TOKEN: ${{ secrets.REWIND_DOCS_TOKEN }}
     defaults:
       run:
         working-directory: mcp-server
@@ -39,7 +39,23 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      # The docs live in a separate private repo served by Pageloop, so the
+      # drift check needs a checkout of it. Skipped when the token is absent
+      # (forks), since the check cannot run without access.
+      - name: Check out docs repo
+        id: docs_checkout
+        if: env.REWIND_DOCS_TOKEN != ''
+        working-directory: ${{ github.workspace }}
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${REWIND_DOCS_TOKEN}@github.com/dinakartumu/rewind-docs.git" \
+            "${RUNNER_TEMP}/rewind-docs"
+          echo "dir=${RUNNER_TEMP}/rewind-docs" >> "$GITHUB_OUTPUT"
+
       - name: Verify MDX docs reference every registered tool/prompt/resource
+        if: steps.docs_checkout.outputs.dir != ''
+        env:
+          REWIND_DOCS_DIR: ${{ steps.docs_checkout.outputs.dir }}
         run: node scripts/check-docs.mjs
 
       - name: Verify package contents

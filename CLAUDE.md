@@ -80,8 +80,23 @@ mcp-server/                -- MCP server (npm: rewind-mcp-server), separate pack
     client.ts              -- HTTP client for api.rewind.rest
     worker.ts              -- Cloudflare Worker entry (remote transport)
     index.ts               -- CLI entry (stdio transport)
-docs/                      -- Project documentation
+docs/                      -- Internal design notes (not published)
 ```
+
+## Documentation
+
+Reader-facing docs live in a separate private repo,
+[dinakartumu/rewind-docs](https://github.com/dinakartumu/rewind-docs), served by
+Pageloop at docs.rewind.rest. They are deliberately not in this repo: syncing the
+monorepo would publish the internal `docs/` tree. Never connect this repo to
+Pageloop.
+
+Two scripts here write to or read from that repo and take a checkout path via
+`REWIND_DOCS_DIR` (default: a `../rewind-docs` sibling):
+
+- `npm run docs:gen-mcp` regenerates the per-domain MCP tool reference pages.
+- `mcp-server/scripts/check-docs.mjs` fails CI when a registered tool, prompt, or
+  resource URI is undocumented.
 
 ## Key Conventions
 
@@ -98,7 +113,7 @@ docs/                      -- Project documentation
 
 ## Documentation style
 
-- **No parentheticals in user-facing headings.** Reader-facing pages (`README.md`, `docs-mintlify/**`, `docs-site/src/pages/**`, public changelog entries) keep headings clean — never `## Foo (Bar)`. If you need to qualify, use an em-dash (`## Foo — Bar`), a colon (`## Foo: Bar`), or rewrite as a subhead. Internal `docs/` design notes are exempt — they're allowed to use parens for project-tracking shorthand like `## Phase 7 (deferred)`.
+- **No parentheticals in user-facing headings.** Reader-facing pages (`README.md`, the [rewind-docs](https://github.com/dinakartumu/rewind-docs) site, `docs-site/src/pages/**`, public changelog entries) keep headings clean — never `## Foo (Bar)`. If you need to qualify, use an em-dash (`## Foo — Bar`), a colon (`## Foo: Bar`), or rewrite as a subhead. Internal `docs/` design notes are exempt — they're allowed to use parens for project-tracking shorthand like `## Phase 7 (deferred)`.
 
 ## Environment Variables
 
