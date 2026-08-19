@@ -88,6 +88,7 @@ export const DENIED_TABLES: readonly string[] = [
   'sqlite_temp_schema',
   'd1_migrations',
   '_cf_KV',
+  '_cf_METADATA',
   // FTS5 index + its shadow tables. Undocumented (so the allow-list already
   // excludes them), but they were the tables actually reachable through the
   // comma-join bypass in #25 — named here so the redundant layer covers them
@@ -103,17 +104,6 @@ export const DENIED_TABLES: readonly string[] = [
   // the exact-name allow-substring test still passes; kept here for docs.
 ] as const;
 
-/**
- * Keywords that indicate a write, DDL, or side-effecting operation. A match on
- * any of these as a whole word (after comment stripping) rejects the query —
- * this also covers write-bodied CTEs (`WITH x AS (DELETE …)`).
- *
- * `REPLACE` is deliberately absent here: it collides with the very common
- * `replace(str, from, to)` scalar function. The only side-effecting form of
- * REPLACE is a statement (`REPLACE INTO …` / a statement-initial `REPLACE`),
- * which is caught separately (first-keyword check + the dedicated REPLACE-INTO
- * scan below) without breaking legitimate `replace()` calls.
- */
 /**
  * Builtins whose whole purpose is to allocate. `randomblob(1e9)` is a gigabyte
  * per row, and the LIMIT wrapper does not save us — it caps rows returned,
@@ -135,6 +125,25 @@ const DENY_FUNCTIONS = ['randomblob', 'zeroblob', 'load_extension'] as const;
  */
 export const MAX_TABLE_REFS = 10;
 
+/**
+ * Ceiling on subquery nesting the ref walker will descend into. The walk
+ * recurses into derived tables, so this bounds the recursion; past the limit
+ * it fails closed rather than returning a short list the allow-list would
+ * then wave through.
+ */
+export const MAX_SUBQUERY_DEPTH = 25;
+
+/**
+ * Keywords that indicate a write, DDL, or side-effecting operation. A match on
+ * any of these as a whole word (after comment stripping) rejects the query —
+ * this also covers write-bodied CTEs (`WITH x AS (DELETE …)`).
+ *
+ * `REPLACE` is deliberately absent here: it collides with the very common
+ * `replace(str, from, to)` scalar function. The only side-effecting form of
+ * REPLACE is a statement (`REPLACE INTO …` / a statement-initial `REPLACE`),
+ * which is caught separately (first-keyword check + the dedicated REPLACE-INTO
+ * scan below) without breaking legitimate `replace()` calls.
+ */
 const DENY_TOKENS = [
   'ATTACH',
   'DETACH',
@@ -334,6 +343,8 @@ interface TableRef {
   name: string;
   ok: boolean;
   raw: string;
+  /** Why the ref failed to parse, when the default explanation would mislead. */
+  reason?: string;
 }
 
 /**
@@ -439,18 +450,6 @@ function extractCteNames(sql: string): Set<string> {
   return names;
 }
 
-/**
- * Extract every table reference targeted by a FROM or JOIN clause (all join
- * types). Returns the parsed refs. Run on comment-stripped, string-blanked SQL
- * so a table-name-looking token inside a string literal is not treated as a
- * table reference.
- *
- * We match the identifier token immediately following the FROM/JOIN keyword.
- * A subquery source (`FROM (SELECT …)`) has `(` next, not an identifier, so it
- * produces no ref here — the inner SELECT's own FROM/JOIN is matched on its own.
- * A table-valued function (`FROM foo(...)`) still yields `foo`, which then
- * fails the allow-list (e.g. `pragma_table_info` is already blocked upstream).
- */
 /** A table token: dotted/quoted identifier forms. */
 const TABLE_TOKEN_SRC =
   '"[^"]+"(?:\\.[^\\s,()]+)?|\\[[^\\]]+\\](?:\\.[^\\s,()]+)?|`[^`]+`(?:\\.[^\\s,()]+)?|[A-Za-z_][A-Za-z0-9_."[\\]`]*';
@@ -493,7 +492,11 @@ function skipBalancedParens(sql: string, open: number): number {
 }
 
 /**
- * Extract every table a query reads from.
+ * Extract every table a query reads from. Run on comment-stripped,
+ * string-blanked SQL so a table-name-looking token inside a string literal is
+ * not treated as a table reference. A table-valued function (`FROM foo(...)`)
+ * yields `foo`, which then fails the allow-list (e.g. `pragma_table_info` is
+ * already blocked upstream).
  *
  * This walks the *whole* comma-separated FROM list, not just the token
  * immediately after the keyword. Matching only the first one meant
@@ -507,8 +510,23 @@ function skipBalancedParens(sql: string, open: number): number {
  * access-control hole; an unparseable FROM item must never mean "no table
  * here".
  */
-function extractTableRefs(sql: string): TableRef[] {
+function extractTableRefs(sql: string, depth = 0): TableRef[] {
   const refs: TableRef[] = [];
+
+  // Fail closed on absurd nesting rather than risking the stack. Real
+  // analytics queries nest a handful of levels; nothing legitimate is
+  // anywhere near this.
+  if (depth > MAX_SUBQUERY_DEPTH) {
+    return [
+      {
+        name: '',
+        ok: false,
+        raw: sql.slice(0, 40),
+        reason: `Subqueries are nested more than ${MAX_SUBQUERY_DEPTH} deep, past what the guard will read.`,
+      },
+    ];
+  }
+
   const re = new RegExp(`\\b(FROM|JOIN)\\s+`, 'gi');
   let match: RegExpExecArray | null;
 
@@ -521,13 +539,20 @@ function extractTableRefs(sql: string): TableRef[] {
       const rest = sql.slice(pos);
 
       if (rest.startsWith('(')) {
-        // A subquery/derived table is not a base table, but the list may
-        // continue after it — skip the group rather than abandoning the walk.
+        // A derived table is not itself a base table, but it READS base
+        // tables, and the outer walk resumes past the closing paren — so
+        // nothing else will ever look inside it. Recurse: stepping over the
+        // group to find the next list item must not mean leaving its contents
+        // unexamined, which is how `FROM (SELECT * FROM secret) x` slipped the
+        // allow-list entirely.
         const after = skipBalancedParens(sql, pos);
         if (after === -1) {
           refs.push({ name: '', ok: false, raw: rest.slice(0, 40) });
           break;
         }
+        refs.push(
+          ...extractTableRefs(sql.slice(pos + 1, after - 1), depth + 1)
+        );
         pos = after;
       } else {
         const tok = new RegExp(`^(${TABLE_TOKEN_SRC})`).exec(rest);
@@ -734,7 +759,9 @@ export function validateReadOnlySql(input: unknown): SqlGuardResult {
     if (!ref.ok) {
       return {
         ok: false,
-        error: `Disallowed table reference: \`${ref.raw.trim()}\`. Cross-schema/qualified table names are not permitted.`,
+        error: `Disallowed table reference: \`${ref.raw.trim()}\`. ${
+          ref.reason ?? 'Cross-schema/qualified table names are not permitted.'
+        }`,
       };
     }
     if (ALLOWED_TABLES.has(ref.name) || cteNames.has(ref.name)) continue;
