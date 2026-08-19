@@ -8,6 +8,7 @@ import { syncRuns } from '../../db/schema/system.js';
 import { chunkForInsertValues } from '../../lib/d1-chunk.js';
 import { RescuetimeClient } from './client.js';
 import type { Env } from '../../types/env.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 /** Result of one bounded backfill chunk. */
 export interface BackfillChunkResult {
@@ -405,14 +406,7 @@ export async function syncRescuetime(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.log(`[ERROR] RescueTime sync failed: ${errorMsg}`);
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, run.id));
+    await markRunFailed(db, run.id, errorMsg);
     throw err;
   }
 }

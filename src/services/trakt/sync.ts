@@ -11,6 +11,7 @@ import { TmdbClient } from '../watching/tmdb.js';
 import { resolveMovie } from '../watching/resolve-movie.js';
 import type { Env } from '../../types/env.js';
 import { afterSync } from '../../lib/after-sync.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 /**
  * Look up a movie by TMDb ID, or create it with TMDb enrichment if new.
@@ -353,14 +354,7 @@ export async function syncTraktCollection(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.log(`[ERROR] Trakt sync failed: ${errorMsg}`);
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, run.id));
+    await markRunFailed(db, run.id, errorMsg);
     throw err;
   }
 }

@@ -26,20 +26,15 @@ import adminAttending from './routes/admin-attending.js';
 import { LastfmClient } from './services/lastfm/client.js';
 import { syncListening } from './services/lastfm/sync.js';
 import { syncRunning } from './services/strava/sync.js';
-import { syncLetterboxd } from './services/letterboxd/sync.js';
 import { syncCollecting } from './services/discogs/sync.js';
 import { syncTraktCollection } from './services/trakt/sync.js';
 import { syncTraktHistory } from './services/trakt/history-sync.js';
-import { syncReading } from './services/instapaper/sync.js';
 import { syncPlaces } from './services/foursquare/sync.js';
 import { syncCoding } from './services/coding/sync.js';
-import { reconcileReadingDeletions } from './services/instapaper/reconcile-deletions.js';
-import { backfillAttending } from './services/attending/backfill.js';
 import {
   processListeningImages,
   processWatchingImages,
   processCollectingImages,
-  processReadingImages,
   refreshArtistImageFromAppleMusicId,
 } from './services/images/sync-images.js';
 import { enrichBatch, enrichArtistsByName } from './services/itunes/enrich.js';
@@ -339,7 +334,7 @@ export default {
       // has no Plex server, leaving the branch unreachable. Plex syncs on
       // demand via POST /v1/admin/sync/watching?source=plex, which no-ops
       // until PLEX_URL/PLEX_TOKEN are set.
-      case '45 3 * * 0': {
+      case '45 3 * * SUN': {
         const collectingRetry = await shouldRetry(db, 'collecting');
         if (collectingRetry.shouldRetry) {
           console.log(
@@ -364,136 +359,14 @@ export default {
         );
         break;
       }
-      case '0 */6 * * *': {
-        const watchingRetry = await shouldRetry(db, 'watching');
-        if (watchingRetry.shouldRetry && env.LETTERBOXD_USERNAME) {
-          console.log(
-            `[SYNC] Retrying failed watching sync (${watchingRetry.consecutiveFailures} consecutive failures)`
-          );
-        }
-        if (env.LETTERBOXD_USERNAME) {
-          console.log('[SYNC] Letterboxd RSS sync');
-          ctx.waitUntil(
-            (async () => {
-              try {
-                await syncLetterboxd(db, env);
-                // Letterboxd-only movies still need posters. The hourly
-                // Trakt job also processes watching images, but Letterboxd
-                // runs here independently, so process here too (skipping
-                // when the Plex cron ran recently).
-                const skip = await shouldSkipWatchingImages(db);
-                if (skip) {
-                  console.log(
-                    '[SYNC] Skipping watching image processing: Plex cron already ran it recently'
-                  );
-                } else {
-                  await processWatchingImages(db, env);
-                }
-              } catch (error) {
-                console.log(
-                  `[ERROR] Letterboxd sync failed: ${error instanceof Error ? error.message : String(error)}`
-                );
-              }
-            })()
-          );
-        }
-
-        // Reading sync (Instapaper). Skipped when ENABLE_INSTAPAPER === 'false'.
-        if (env.ENABLE_INSTAPAPER === 'false') {
-          console.log(
-            '[SYNC] Instapaper bookmarks disabled (ENABLE_INSTAPAPER=false)'
-          );
-        } else {
-          const readingRetry = await shouldRetry(db, 'reading');
-          if (readingRetry.shouldRetry) {
-            console.log(
-              `[SYNC] Retrying failed reading sync (${readingRetry.consecutiveFailures} consecutive failures)`
-            );
-          }
-          console.log('[SYNC] Instapaper bookmarks');
-          ctx.waitUntil(
-            (async () => {
-              try {
-                await syncReading(db, env);
-                await processReadingImages(db, env);
-              } catch (error) {
-                console.log(
-                  `[ERROR] Instapaper sync failed: ${error instanceof Error ? error.message : String(error)}`
-                );
-              }
-            })()
-          );
-        }
-        break;
-      }
-      case '0 4 * * *': {
-        const attendingRetry = await shouldRetry(db, 'attending');
-        if (attendingRetry.shouldRetry) {
-          console.log(
-            `[SYNC] Retrying failed attending sync (${attendingRetry.consecutiveFailures} consecutive failures)`
-          );
-        }
-        console.log(
-          '[SYNC] Attending refresh (calendar + gmail) + MLB box-score enrichment'
-        );
-        // Chain MLB box-score enrichment after the calendar/gmail backfill
-        // so newly-discovered games get attendance / weather / duration /
-        // linescore populated within 24h. enrichAttendedBoxScores is
-        // idempotent (skipEnriched: true) so already-enriched games are
-        // no-ops; the admin route remains available for one-shot
-        // backfills if you need to force an earlier refresh.
-        ctx.waitUntil(
-          backfillAttending(db, env, {
-            source: 'all',
-            mode: 'incremental',
-          })
-            .then(async () => {
-              const { enrichAttendedBoxScores } =
-                await import('./services/attending/enrich-boxscore.js');
-              const result = await enrichAttendedBoxScores(db, {
-                skipEnriched: true,
-                limit: 100,
-              });
-              console.log(
-                `[SYNC] Attending box-score enrichment: scanned=${result.scanned}, enriched=${result.enriched}, failures=${result.failures.length}`
-              );
-            })
-            .catch((err) =>
-              console.log(
-                `[ERROR] Attending sync/enrich failed: ${err instanceof Error ? err.message : String(err)}`
-              )
-            )
-        );
-        break;
-      }
-      case '0 5 * * SUN': {
-        // Weekly Sunday 5:00 AM: full Instapaper deletion reconciliation.
-        // The 6-hour bookmarks sync only sees deletions in the 500-newest
-        // window per folder; this pass enumerates every folder fully so
-        // older deletions get caught.
-        if (env.ENABLE_INSTAPAPER === 'false') {
-          console.log(
-            '[SYNC] Instapaper deletion reconciliation disabled (ENABLE_INSTAPAPER=false)'
-          );
-          break;
-        }
-        console.log('[SYNC] Instapaper deletion reconciliation');
-        ctx.waitUntil(
-          (async () => {
-            try {
-              const result = await reconcileReadingDeletions(db, env);
-              console.log(
-                `[SYNC] Reconcile: scanned=${result.foldersScanned} folders, api=${result.apiCalls} calls, known=${result.knownInDb} items, candidates=${result.candidates}, deleted=${result.deleted} items + ${result.imagesDeleted} images, took=${result.tookMs}ms${result.abortedReason ? ` ABORTED: ${result.abortedReason}` : ''}`
-              );
-            } catch (error) {
-              console.log(
-                `[ERROR] Reconcile reading deletions failed: ${error instanceof Error ? error.message : String(error)}`
-              );
-            }
-          })()
-        );
-        break;
-      }
+      // Triggers for Letterboxd/Instapaper ('0 */6 * * *'), attending
+      // ('0 4 * * *'), and the Instapaper deletion reconciliation
+      // ('0 5 * * SUN') came out of wrangler.toml on 2026-07-26 -- see the
+      // note there for why none of them could do work on this instance.
+      // Their handler blocks are removed too: an unreachable `case` is not
+      // free, it is what let a genuinely-broken trigger hide among
+      // intentionally-dead ones (issue #18). src/__tests__/cron-wiring.test.ts
+      // now fails if the two sides drift again.
       default:
         console.log(`[SYNC] Unknown cron: ${event.cron}`);
     }

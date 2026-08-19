@@ -12,6 +12,7 @@ import { TmdbClient, resolveTmdbId } from '../watching/tmdb.js';
 import { upsertMovieFromPlex } from './webhook.js';
 import { afterSync } from '../../lib/after-sync.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 interface PlexLibrarySection {
   key: string;
@@ -580,14 +581,7 @@ export async function syncWatching(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMessage,
-      })
-      .where(eq(syncRuns.id, syncRun.id));
+    await markRunFailed(db, syncRun.id, errorMessage);
 
     console.log(`[ERROR] Plex library sync failed: ${errorMessage}`);
     throw error;

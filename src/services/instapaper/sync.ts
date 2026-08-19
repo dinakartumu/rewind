@@ -22,6 +22,7 @@ import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import { htmlToText } from '../../lib/html-to-text.js';
 import { BROWSER_HEADERS_NAVIGATE } from '../../lib/browser-headers.js';
 import { fetchOgFallback } from '../../lib/og-fallback.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 interface SyncResult {
   itemsSynced: number;
@@ -66,14 +67,7 @@ async function failSyncRun(
   runId: number,
   error: string
 ): Promise<void> {
-  await db
-    .update(syncRuns)
-    .set({
-      status: 'failed',
-      completedAt: new Date().toISOString(),
-      error,
-    })
-    .where(eq(syncRuns.id, runId));
+  await markRunFailed(db, runId, error);
 }
 
 // ─── OG metadata extraction ─────────────────────────────────────────

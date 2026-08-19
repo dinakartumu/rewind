@@ -16,6 +16,7 @@ import { afterSync } from '../../lib/after-sync.js';
 import { chunkForSelectIn } from '../../lib/d1-chunk.js';
 import type { FeedItem, SearchItem } from '../../lib/after-sync.js';
 import type { Env } from '../../types/env.js';
+import { markRunFailed } from '../../lib/sync-run.js';
 
 // The per-page inArray dedup binds PAGE_LIMIT parameters plus the user_id
 // param in one select, and remote D1 caps queries at 100 bound parameters —
@@ -538,42 +539,6 @@ export async function applyMovieRatings(
 
   console.log(`[SYNC] Applied ${applied} Trakt movie ratings`);
   return applied;
-}
-
-/**
- * Mark a sync run failed, never throwing.
- *
- * This is a D1 write inside a failure path, which means whatever killed the
- * sync — an exhausted subrequest budget, a D1 outage — is likely to take
- * this write down too. Letting that secondary error escape swapped the real
- * cause for a misleading one and left the row stuck at 'running', so a dead
- * cron reported as healthy-in-progress. Log and move on instead; a run left
- * at 'running' past a Worker's lifetime is reported as stale by
- * `GET /v1/health/sync`.
- */
-export async function markRunFailed(
-  db: Database,
-  runId: number,
-  errorMsg: string
-): Promise<void> {
-  try {
-    await db
-      .update(syncRuns)
-      .set({
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: errorMsg,
-      })
-      .where(eq(syncRuns.id, runId));
-  } catch (bookkeepingError) {
-    const message =
-      bookkeepingError instanceof Error
-        ? bookkeepingError.message
-        : String(bookkeepingError);
-    console.log(
-      `[ERROR] Could not mark sync run ${runId} failed: ${message} (original error: ${errorMsg})`
-    );
-  }
 }
 
 /**
