@@ -7,6 +7,13 @@ on:
     branches: [main]
     paths:
       - 'mcp-server/**'
+      # publish-docs also pushes openapi.json to the docs repo, so a spec
+      # change has to wake this workflow. Without it the published spec only
+      # refreshed when an unrelated mcp-server change happened to land, which
+      # is the silent staleness the job exists to prevent. The snapshot is the
+      # right trigger rather than the sources that generate it: CI already
+      # fails if it drifts from src/lib/openapi.ts.
+      - 'openapi.snapshot.json'
   pull_request:
     branches: [main]
     paths:
@@ -128,13 +135,21 @@ jobs:
           cp openapi.snapshot.json "${RUNNER_TEMP}/rewind-docs/openapi.json"
 
           cd "${RUNNER_TEMP}/rewind-docs"
-          if git diff --quiet; then
+
+          # Stage first, then test the INDEX. `git diff` on the worktree does
+          # not see untracked files, so a brand-new reference page — what a
+          # new tool domain produces — read as "nothing changed" and was
+          # never published. Diffing the index also scopes the test to
+          # exactly what is about to be committed.
+          git add -A reference/mcp-tools openapi.json
+          if git diff --cached --quiet; then
             echo "Docs artifacts already up to date; nothing to publish."
             exit 0
           fi
+          git -c core.pager=cat diff --cached --stat
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A reference/mcp-tools openapi.json
           git commit \
             -m "docs: regenerate MCP tool reference and API spec" \
             -m "Generated from rewind@${GITHUB_SHA}."
