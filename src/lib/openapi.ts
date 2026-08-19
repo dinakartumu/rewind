@@ -36,10 +36,14 @@ export const openAPIConfig = {
 
 All endpoints require a Bearer token. There are two key types:
 
-- **Read keys** (\`rw_live_...\`) — access all GET endpoints
-- **Admin keys** (\`rw_admin_...\`) — access all endpoints including sync triggers and data management
+- **Read keys** — access all GET endpoints
+- **Admin keys** — access all endpoints including sync triggers and data management
 
-Pass your key in the Authorization header: \`Authorization: Bearer rw_live_...\`
+A key is \`rw_\` followed by 64 hex characters. Scope is recorded server-side, not
+encoded in the key, so the two types look identical; keep track of which is which
+when you mint them.
+
+Pass your key in the Authorization header: \`Authorization: Bearer rw_...\`
 
 ## Pagination
 
@@ -61,11 +65,11 @@ The activity feed uses cursor-based pagination instead.
 curl https://api.rewind.rest/v1/health
 
 # Fetch recent scrobbles (requires read key)
-curl -H "Authorization: Bearer rw_live_..." \\
+curl -H "Authorization: Bearer rw_..." \\
   https://api.rewind.rest/v1/listening/recent
 
 # Fetch running stats
-curl -H "Authorization: Bearer rw_live_..." \\
+curl -H "Authorization: Bearer rw_..." \\
   https://api.rewind.rest/v1/running/stats
 \`\`\`
 
@@ -164,6 +168,6 @@ export const securitySchemes = {
     type: 'http' as const,
     scheme: 'bearer',
     description:
-      'API key. Read keys (rw_live_...) access GET endpoints. Admin keys (rw_admin_...) access all endpoints.',
+      'API key, formatted as rw_ followed by 64 hex characters. Read keys access GET endpoints. Admin keys access all endpoints. Scope is recorded server-side, not encoded in the key.',
   },
 };

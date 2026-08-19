@@ -1,7 +1,0 @@
-/*
- * Round content/hero images (e.g. the introduction hero). Scoped to /images/
- * so the navbar logo (served from /logo/) is untouched.
- */
-img[src*='/images/'] {
-  border-radius: 1rem;
-}

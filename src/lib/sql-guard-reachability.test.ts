@@ -42,6 +42,15 @@ describe('table reachability', () => {
       `SELECT * FROM movies m, ${t} x`,
       `SELECT * FROM movies AS m, ${t} AS x`,
       `SELECT * FROM movies, watch_history, ${t}`,
+      // Derived tables. Walking the comma list means stepping over a paren
+      // group to find the next item, and stepping over it must not mean
+      // leaving its contents unread.
+      `SELECT * FROM (SELECT * FROM ${t}) x`,
+      `SELECT * FROM movies, (SELECT * FROM ${t}) x`,
+      `SELECT * FROM movies JOIN (SELECT * FROM ${t}) x ON 1=1`,
+      `SELECT * FROM (SELECT * FROM (SELECT * FROM ${t}) y) x`,
+      `SELECT * FROM movies WHERE id IN (SELECT rowid FROM ${t})`,
+      `WITH c AS (SELECT * FROM ${t}) SELECT * FROM c`,
     ];
 
     const reachable = realTables

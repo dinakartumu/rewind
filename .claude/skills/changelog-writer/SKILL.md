@@ -1,12 +1,12 @@
 ---
 name: changelog-writer
-description: This skill should be used when the user asks to "add a changelog entry", "write changelog", "audit changelog", "review changelog", "check changelog entries", or is editing docs-mintlify/changelog.mdx. Enforces a consistent, reader-facing voice and cuts implementation trivia.
+description: This skill should be used when the user asks to "add a changelog entry", "write changelog", "audit changelog", "review changelog", "check changelog entries", or is editing changelog/index.mdx in the rewind-docs repo. Enforces a consistent, reader-facing voice and cuts implementation trivia.
 argument-hint: 'write | audit | entry for {feature}'
 ---
 
 # Changelog Writer
 
-Writes and audits entries in `docs-mintlify/changelog.mdx`. Enforces a reader-facing voice modeled on Stripe, Linear, Resend, and Mintlify: short, benefit-led, concrete, no vanity.
+Writes and audits entries in `changelog/index.mdx` in the [rewind-docs](https://github.com/dinakartumu/rewind-docs) repo. Enforces a reader-facing voice modeled on Stripe, Linear, Resend, and Mintlify: short, benefit-led, concrete, no vanity.
 
 ## When to use
 
@@ -111,7 +111,7 @@ Two shapes. Pick one.
 
 ## Audit procedure
 
-When asked to audit, run this checklist on every `<Update>` block in `docs-mintlify/changelog.mdx`:
+When asked to audit, run this checklist on every `<Update>` block in `changelog/index.mdx` in the [rewind-docs](https://github.com/dinakartumu/rewind-docs) repo:
 
 1. **Length.** Longer than ~8 bullets or ~2 paragraphs? Candidate for trimming or splitting.
 2. **Preamble.** Any "rolls up", "combines", "this release" framing? Cut.
@@ -177,8 +177,8 @@ Reading domain.
 4. Draft the heading using domain:feature if the change is scoped, else a noun phrase.
 5. Write each bullet / paragraph against the rules.
 6. Run the audit checklist on the draft before inserting.
-7. Insert at the **top** of `docs-mintlify/changelog.mdx` (entries are reverse chronological, right under the frontmatter and title).
+7. Insert at the **top** of `changelog/index.mdx` in the [rewind-docs](https://github.com/dinakartumu/rewind-docs) repo (entries are reverse chronological, right under the frontmatter and title).
 
 ## Scope
 
-This skill operates only on `docs-mintlify/changelog.mdx`. Release-please-generated `CHANGELOG.md` files are out of scope — they serve a different audience (developer release log), are derived from conventional commits, and shouldn't be hand-edited.
+This skill operates only on `changelog/index.mdx` in the [rewind-docs](https://github.com/dinakartumu/rewind-docs) repo. Release-please-generated `CHANGELOG.md` files are out of scope — they serve a different audience (developer release log), are derived from conventional commits, and shouldn't be hand-edited.

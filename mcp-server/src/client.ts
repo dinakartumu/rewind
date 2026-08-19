@@ -162,7 +162,7 @@ export function createClientFromEnv(): RewindClient {
   if (!apiKey) {
     throw new Error(
       'REWIND_API_KEY environment variable is required. ' +
-        'Set it to your Rewind API key (rw_live_... or rw_admin_...).'
+        'Set it to your Rewind API key (rw_...). A read key is enough.'
     );
   }
 
