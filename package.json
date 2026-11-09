@@ -37,9 +37,6 @@
     "www:dev": "cd docs-site && npx astro dev",
     "www:build": "cd docs-site && npx astro build",
     "www:deploy": "cd docs-site && npx astro build && npx wrangler pages deploy dist --project-name rewind-www --commit-dirty=true",
-    "docs:dev": "cd docs-mintlify && mint dev",
-    "docs:validate": "cd docs-mintlify && mint validate",
-    "docs:links": "cd docs-mintlify && mint broken-links",
     "docs:gen-mcp": "tsx scripts/gen-mcp-reference.ts",
     "prepare": "husky"
   },
@@ -92,6 +89,7 @@
     "knip": "^5.86.0",
     "lint-staged": "^16.3.3",
     "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
     "vitest": "~3.2.0",

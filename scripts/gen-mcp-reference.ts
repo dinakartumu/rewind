@@ -1,12 +1,16 @@
 /**
- * Generate the per-domain MCP tool reference pages for the Mintlify docs.
+ * Generate the per-domain MCP tool reference pages for the docs site.
  *
  * Source of truth: mcp-server/mcp-manifest.snapshot.json (the drift-checked
  * manifest of every registered tool with its description + JSON-Schema input).
  * Tool -> domain grouping is derived by scanning which mcp-server/src/tools/*.ts
  * (or server.ts) file registers each tool, so it cannot drift from the code.
  *
- * Output: docs-mintlify/reference/mcp-tools/{index,<domain>}.mdx
+ * The docs live in their own repo (dinakartumu/rewind-docs, served by
+ * Pageloop), so this writes outside the monorepo. Point it at a checkout
+ * with REWIND_DOCS_DIR; it defaults to a ../rewind-docs sibling.
+ *
+ * Output: $REWIND_DOCS_DIR/reference/mcp-tools/{index,<domain>}.mdx
  *
  * Usage:
  *   npx tsx scripts/gen-mcp-reference.ts          # write the pages
@@ -22,15 +26,19 @@ import {
   readdirSync,
   mkdirSync,
   unlinkSync,
+  existsSync,
 } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = join(ROOT, 'mcp-server', 'mcp-manifest.snapshot.json');
 const TOOLS_DIR = join(ROOT, 'mcp-server', 'src', 'tools');
 const SERVER_TS = join(ROOT, 'mcp-server', 'src', 'server.ts');
-const OUT_DIR = join(ROOT, 'docs-mintlify', 'reference', 'mcp-tools');
+const DOCS_DIR = resolve(
+  process.env.REWIND_DOCS_DIR ?? join(ROOT, '..', 'rewind-docs')
+);
+const OUT_DIR = join(DOCS_DIR, 'reference', 'mcp-tools');
 
 interface JsonSchema {
   type?: string;
@@ -263,6 +271,17 @@ function generate(): Record<string, string> {
 
 function main(): void {
   const check = process.argv.includes('--check');
+  // Without this the script would happily mkdir -p a stray tree next to the
+  // monorepo and report success while writing nowhere useful.
+  if (!existsSync(join(DOCS_DIR, 'docs.json'))) {
+    console.error(
+      `[gen-mcp-reference] No docs checkout at ${DOCS_DIR} (expected docs.json).`
+    );
+    console.error(
+      'Clone https://github.com/dinakartumu/rewind-docs and set REWIND_DOCS_DIR to it.'
+    );
+    process.exit(2);
+  }
   const files = generate();
   mkdirSync(OUT_DIR, { recursive: true });
   let stale = false;

@@ -7,12 +7,17 @@ on:
     branches: [main]
     paths:
       - 'mcp-server/**'
-      - 'docs-mintlify/**'
+      # publish-docs also pushes openapi.json to the docs repo, so a spec
+      # change has to wake this workflow. Without it the published spec only
+      # refreshed when an unrelated mcp-server change happened to land, which
+      # is the silent staleness the job exists to prevent. The snapshot is the
+      # right trigger rather than the sources that generate it: CI already
+      # fails if it drifts from src/lib/openapi.ts.
+      - 'openapi.snapshot.json'
   pull_request:
     branches: [main]
     paths:
       - 'mcp-server/**'
-      - 'docs-mintlify/**'
 
 concurrency:
   group: mcp-server-${{ github.ref }}
@@ -22,6 +27,8 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-latest
+    env:
+      REWIND_DOCS_SSH_KEY: ${{ secrets.REWIND_DOCS_SSH_KEY }}
     defaults:
       run:
         working-directory: mcp-server
@@ -39,7 +46,31 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      # The docs live in a separate private repo served by Pageloop, so the
+      # drift check needs a checkout of it. Access is a read-only deploy key
+      # on rewind-docs. Skipped when the secret is absent (forks), since the
+      # check cannot run without access.
+      - name: Check out docs repo
+        id: docs_checkout
+        if: env.REWIND_DOCS_SSH_KEY != ''
+        working-directory: ${{ github.workspace }}
+        run: |
+          KEY_FILE="$(mktemp)"
+          # Written via printf, not the heredoc-prone echo, so the trailing
+          # newline OpenSSH requires survives.
+          printf '%s\n' "$REWIND_DOCS_SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          GIT_SSH_COMMAND="ssh -i $KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git clone --depth 1 \
+              git@github.com:dinakartumu/rewind-docs.git \
+              "${RUNNER_TEMP}/rewind-docs"
+          echo "dir=${RUNNER_TEMP}/rewind-docs" >> "$GITHUB_OUTPUT"
+
       - name: Verify MDX docs reference every registered tool/prompt/resource
+        if: steps.docs_checkout.outputs.dir != ''
+        env:
+          REWIND_DOCS_DIR: ${{ steps.docs_checkout.outputs.dir }}
         run: node scripts/check-docs.mjs
 
       - name: Verify package contents
@@ -61,6 +92,68 @@ jobs:
             exit 1
           fi
           echo "OK: both files at $PKG_VERSION."
+
+  publish-docs:
+    name: Publish MCP reference to docs
+    needs: build
+    runs-on: ubuntu-latest
+    # Only from the canonical repo on main. Forks have no key, and a branch
+    # build must not rewrite the published reference.
+    if: github.ref == 'refs/heads/main' && github.repository == 'dinakartumu/rewind'
+    env:
+      REWIND_DOCS_PUBLISH_KEY: ${{ secrets.REWIND_DOCS_PUBLISH_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Two generated artifacts belong to the docs repo but are produced
+      # here: the MCP tool reference (from the manifest) and openapi.json
+      # (which drives the site's API Reference). Both are pushed rather
+      # than hand-maintained, since a hand-copied spec silently goes stale.
+      # Needs a write-capable deploy key; the drift check's key is
+      # read-only on purpose.
+      - name: Regenerate and push the docs artifacts
+        if: env.REWIND_DOCS_PUBLISH_KEY != ''
+        run: |
+          KEY_FILE="$(mktemp)"
+          printf '%s\n' "$REWIND_DOCS_PUBLISH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          export GIT_SSH_COMMAND="ssh -i $KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+          git clone --depth 1 \
+            git@github.com:dinakartumu/rewind-docs.git \
+            "${RUNNER_TEMP}/rewind-docs"
+
+          REWIND_DOCS_DIR="${RUNNER_TEMP}/rewind-docs" npm run docs:gen-mcp
+          cp openapi.snapshot.json "${RUNNER_TEMP}/rewind-docs/openapi.json"
+
+          cd "${RUNNER_TEMP}/rewind-docs"
+
+          # Stage first, then test the INDEX. `git diff` on the worktree does
+          # not see untracked files, so a brand-new reference page — what a
+          # new tool domain produces — read as "nothing changed" and was
+          # never published. Diffing the index also scopes the test to
+          # exactly what is about to be committed.
+          git add -A reference/mcp-tools openapi.json
+          if git diff --cached --quiet; then
+            echo "Docs artifacts already up to date; nothing to publish."
+            exit 0
+          fi
+          git -c core.pager=cat diff --cached --stat
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit \
+            -m "docs: regenerate MCP tool reference and API spec" \
+            -m "Generated from rewind@${GITHUB_SHA}."
+          git push
 
   publish-npm:
     name: Publish to npm

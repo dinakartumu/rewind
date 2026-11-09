@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
  * MDX cross-check: fails CI if any registered MCP tool, prompt, resource
- * URI, or resource template URI template is missing from the Mintlify
+ * URI, or resource template URI template is missing from the published
  * docs. Companion to the manifest-snapshot vitest — snapshot catches
  * shape changes in PR review; this script guarantees the MDX is kept in
  * sync.
+ *
+ * The docs live in their own repo (dinakartumu/rewind-docs, served by
+ * Pageloop). Point this at a checkout with REWIND_DOCS_DIR; it defaults
+ * to a ../rewind-docs sibling of the monorepo.
  *
  * Run: npm run check:docs
  *
@@ -17,7 +21,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
@@ -27,7 +31,9 @@ const { RewindClient } = await import('../dist/client.js');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
-const DOCS_DIR = join(REPO_ROOT, 'docs-mintlify');
+const DOCS_DIR = resolve(
+  process.env.REWIND_DOCS_DIR ?? join(REPO_ROOT, '..', 'rewind-docs')
+);
 
 // Intentionally-internal identifiers we do not document publicly.
 // Add with a justification; drop when a tool goes public.
@@ -70,7 +76,7 @@ const MDX_FILES = [
   'domains/reading.mdx',
   'domains/attending.mdx',
   'domains/images.mdx',
-  'changelog.mdx',
+  'changelog/index.mdx',
 ];
 
 async function buildClient() {
@@ -88,6 +94,18 @@ async function buildClient() {
 }
 
 function loadMdxCorpus() {
+  // A missing checkout would otherwise surface as "every identifier is
+  // undocumented", which sends you hunting through the docs instead of
+  // cloning them.
+  if (!existsSync(join(DOCS_DIR, 'docs.json'))) {
+    console.error(
+      `[check-docs] ERROR: no docs checkout at ${DOCS_DIR} (expected docs.json).`
+    );
+    console.error(
+      '[check-docs] Clone https://github.com/dinakartumu/rewind-docs and set REWIND_DOCS_DIR to it.'
+    );
+    process.exit(2);
+  }
   const parts = [];
   for (const file of MDX_FILES) {
     const path = join(DOCS_DIR, file);
@@ -179,7 +197,7 @@ async function main() {
   }
   console.error('');
   console.error(
-    'Either add the identifier to the appropriate table in docs-mintlify/,'
+    'Either add the identifier to the appropriate table in the rewind-docs repo,'
   );
   console.error(
     'or add it to UNDOCUMENTED_ALLOWLIST in scripts/check-docs.mjs with a justification.'

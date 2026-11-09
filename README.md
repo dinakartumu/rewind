@@ -46,3 +46,16 @@ npm run db:migrate   # Apply migrations locally
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design, sync flow, caching strategy, and image pipeline details.
+
+## Documentation
+
+The published docs at [docs.rewind.rest](https://docs.rewind.rest) are built from a
+separate repo, [dinakartumu/rewind-docs](https://github.com/dinakartumu/rewind-docs).
+Edit them there. `docs/` in this repo holds internal design notes only.
+
+Regenerating the MCP tool reference writes into a checkout of that repo:
+
+```bash
+git clone https://github.com/dinakartumu/rewind-docs ../rewind-docs
+npm run docs:gen-mcp          # or set REWIND_DOCS_DIR to the checkout
+```

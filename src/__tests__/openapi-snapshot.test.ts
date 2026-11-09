@@ -4,23 +4,23 @@ import { setupTestDb } from '../test-helpers.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Two committed snapshots are kept in lockstep:
-//   - openapi.snapshot.json          -- linted by spectral, source of truth
-//   - docs-mintlify/openapi.json     -- consumed by the Mintlify API Reference
-// Both are written when running `npm run spec:update` and both are checked
-// in CI; if a route or schema changes and only one is updated, this test
-// fails. Run `npm run spec:update` to refresh.
+// openapi.snapshot.json is the committed spec: linted by spectral, written
+// by `npm run spec:update`, and checked in CI, so a route or schema change
+// that skips the update fails here.
+//
+// The docs site consumes its own copy of this spec. That copy lives in the
+// rewind-docs repo and is synced by the publish-docs CI job, not written
+// from here.
 describe('OpenAPI spec snapshot', () => {
   beforeAll(async () => {
     await setupTestDb();
   });
 
-  it('matches committed snapshots (root + Mintlify docs)', async () => {
+  it('matches the committed snapshot', async () => {
     const res = await SELF.fetch('http://localhost/v1/openapi.json');
     const spec = (await res.json()) as any;
     const json = JSON.stringify(spec, null, 2) + '\n';
 
     await expect(json).toMatchFileSnapshot('../../openapi.snapshot.json');
-    await expect(json).toMatchFileSnapshot('../../docs-mintlify/openapi.json');
   });
 });

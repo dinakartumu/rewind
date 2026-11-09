@@ -60,8 +60,10 @@ jobs:
         run: npm test
 
   docs:
-    name: Docs Links
+    name: Docs
     runs-on: ubuntu-latest
+    env:
+      REWIND_DOCS_SSH_KEY: ${{ secrets.REWIND_DOCS_SSH_KEY }}
     steps:
       - uses: actions/checkout@v6
 
@@ -69,12 +71,29 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Check MCP tool reference is up to date
-        run: npx tsx scripts/gen-mcp-reference.ts --check
+      # The generated reference lives in the rewind-docs repo, so the
+      # staleness check needs a checkout of it. Skipped when the secret is
+      # absent (forks), since the check cannot run without access. Link
+      # checking now belongs to that repo's own build.
+      - name: Check out docs repo
+        id: docs_checkout
+        if: env.REWIND_DOCS_SSH_KEY != ''
+        run: |
+          KEY_FILE="$(mktemp)"
+          printf '%s\n' "$REWIND_DOCS_SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          GIT_SSH_COMMAND="ssh -i $KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git clone --depth 1 \
+              git@github.com:dinakartumu/rewind-docs.git \
+              "${RUNNER_TEMP}/rewind-docs"
+          echo "dir=${RUNNER_TEMP}/rewind-docs" >> "$GITHUB_OUTPUT"
 
-      - name: Check broken links
-        run: npx mint@latest broken-links
-        working-directory: docs-mintlify
+      - name: Check MCP tool reference is up to date
+        if: steps.docs_checkout.outputs.dir != ''
+        env:
+          REWIND_DOCS_DIR: ${{ steps.docs_checkout.outputs.dir }}
+        run: npx tsx scripts/gen-mcp-reference.ts --check
 
   build:
     name: Build
