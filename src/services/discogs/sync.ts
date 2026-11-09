@@ -590,12 +590,36 @@ async function updateSyncRun(
 }
 
 /**
+ * True when this instance has a Discogs account to sync. Wrangler leaves unset
+ * secrets undefined at runtime whatever the Env type claims, so both vars are
+ * checked for presence rather than trusted from the type.
+ */
+export function isDiscogsConfigured(env: {
+  DISCOGS_PERSONAL_TOKEN?: string;
+  DISCOGS_USERNAME?: string;
+}): boolean {
+  return Boolean(env.DISCOGS_PERSONAL_TOKEN && env.DISCOGS_USERNAME);
+}
+
+/**
  * Full Discogs sync: collection + wantlist + stats + cross-reference.
+ *
+ * Discogs is optional: an instance without a Discogs account never sets
+ * DISCOGS_PERSONAL_TOKEN/DISCOGS_USERNAME. Skip before recording a sync run so
+ * an unconfigured integration leaves no failure trail, the same posture as
+ * syncWatching for Plex. The Sunday cron still runs the Trakt collection half.
  */
 export async function syncCollecting(
   env: Env,
   userId: number = 1
 ): Promise<void> {
+  if (!isDiscogsConfigured(env)) {
+    console.log(
+      '[SYNC] Discogs not configured (DISCOGS_PERSONAL_TOKEN/DISCOGS_USERNAME unset), skipping collection sync'
+    );
+    return;
+  }
+
   const db = createDb(env.DB);
   const client = new DiscogsClient(
     env.DISCOGS_PERSONAL_TOKEN,
